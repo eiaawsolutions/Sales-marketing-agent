@@ -1,0 +1,88 @@
+import { Router } from 'express';
+import { leadsService } from '../services/leads.js';
+import { runAgent } from '../services/ai-agent.js';
+
+const router = Router();
+
+router.get('/', (req, res) => {
+  const userId = req.user.role === 'superadmin' ? null : req.user.id;
+  res.json(leadsService.getAll(userId, req.query));
+});
+
+router.get('/stats', (req, res) => {
+  const userId = req.user.role === 'superadmin' ? null : req.user.id;
+  res.json(leadsService.getStats(userId));
+});
+
+router.get('/:id', (req, res) => {
+  const userId = req.user.role === 'superadmin' ? null : req.user.id;
+  const lead = leadsService.getById(userId, req.params.id);
+  if (!lead) return res.status(404).json({ error: 'Lead not found' });
+  res.json(lead);
+});
+
+router.post('/', (req, res) => {
+  try {
+    const lead = leadsService.create(req.user.id, req.body);
+    res.status(201).json(lead);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.put('/:id', (req, res) => {
+  const userId = req.user.role === 'superadmin' ? null : req.user.id;
+  const lead = leadsService.update(userId, req.params.id, req.body);
+  if (!lead) return res.status(404).json({ error: 'Lead not found' });
+  res.json(lead);
+});
+
+router.delete('/:id', (req, res) => {
+  const userId = req.user.role === 'superadmin' ? null : req.user.id;
+  leadsService.delete(userId, req.params.id);
+  res.json({ success: true });
+});
+
+router.get('/:id/activities', (req, res) => {
+  const userId = req.user.role === 'superadmin' ? null : req.user.id;
+  res.json(leadsService.getActivities(userId, req.params.id));
+});
+
+router.post('/:id/activities', (req, res) => {
+  const activity = leadsService.addActivity(req.user.id, req.params.id, req.body);
+  res.status(201).json(activity);
+});
+
+router.post('/:id/score', async (req, res) => {
+  try {
+    const result = await runAgent(req.user.id, 'score_lead', { leadId: parseInt(req.params.id), campaignId: null });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/qualify', async (req, res) => {
+  try {
+    const result = await runAgent(req.user.id, 'qualify_lead', {
+      leadId: parseInt(req.params.id), additionalInfo: req.body.additionalInfo,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/outreach', async (req, res) => {
+  try {
+    const result = await runAgent(req.user.id, 'craft_outreach', {
+      leadId: parseInt(req.params.id), context: req.body.context,
+      valueProposition: req.body.valueProposition,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;

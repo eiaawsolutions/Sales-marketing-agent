@@ -1,0 +1,2755 @@
+// ========== Auth State ==========
+let authToken = sessionStorage.getItem('auth_token') || null;
+let currentUser = null;
+
+// ========== API Helper ==========
+async function apiRequest(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+  const r = await fetch(`/api${url}`, { ...options, headers });
+  if (r.status === 401) {
+    authToken = null; currentUser = null;
+    sessionStorage.removeItem('auth_token');
+    render();
+    throw new Error('Session expired. Please log in again.');
+  }
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  if (!r.ok) throw new Error(`Request failed (${r.status})`);
+  return data;
+}
+
+const api = {
+  async get(url, headers = {}) { return apiRequest(url, { headers }); },
+  async post(url, body, headers = {}) { return apiRequest(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }); },
+  async put(url, body, headers = {}) { return apiRequest(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }); },
+  async del(url, headers = {}) { return apiRequest(url, { method: 'DELETE', headers }); },
+};
+
+// ========== State ==========
+let currentPage = 'dashboard';
+let modal = null;
+
+// ========== Router ==========
+function navigate(page) {
+  currentPage = page;
+  render();
+}
+
+// ========== Login ==========
+function renderLoginPage() {
+  return `
+    <div style="max-width:400px;margin:100px auto;text-align:center">
+      <h1 style="background:linear-gradient(135deg,var(--primary),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;font-size:28px">SalesAgent AI</h1>
+      <p class="text-muted mb-4">Sign in to your account</p>
+      <div class="card">
+        <div class="form-group"><label>Username</label><input id="login-user" placeholder="Username" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()"></div>
+        <div class="form-group"><label>Password</label><input id="login-pass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div id="login-error" style="color:var(--danger);font-size:13px;margin-bottom:12px;display:none"></div>
+        <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Sign In</button>
+      </div>
+    </div>
+  `;
+}
+
+async function doLogin() {
+  const username = document.getElementById('login-user')?.value;
+  const password = document.getElementById('login-pass')?.value;
+  const errEl = document.getElementById('login-error');
+  try {
+    const result = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    }).then(r => r.json());
+    if (result.error) throw new Error(result.error);
+
+    authToken = result.token;
+    currentUser = result.user;
+    sessionStorage.setItem('auth_token', authToken);
+    navigate('dashboard');
+  } catch (e) {
+    if (errEl) { errEl.style.display = 'block'; errEl.textContent = e.message; }
+  }
+}
+
+function doLogout() {
+  api.post('/auth/logout').catch(() => {});
+  authToken = null; currentUser = null;
+  sessionStorage.removeItem('auth_token');
+  render();
+}
+
+// ========== Render Engine ==========
+function render() {
+  const app = document.getElementById('app');
+  if (!authToken || !currentUser) {
+    app.innerHTML = renderLoginPage();
+    setTimeout(() => document.getElementById('login-user')?.focus(), 100);
+    return;
+  }
+  app.innerHTML = `
+    ${renderSidebar()}
+    <div class="main">${renderPage()}</div>
+    ${modal ? renderModal() : ''}
+  `;
+  afterRender();
+}
+
+function renderSidebar() {
+  const isSuperadmin = currentUser?.role === 'superadmin';
+  const items = [
+    { id: 'dashboard', icon: '&#9632;', label: 'Dashboard' },
+    { id: 'leads', icon: '&#9679;', label: 'Leads' },
+    { id: 'pipeline', icon: '&#9654;', label: 'Pipeline' },
+    { id: 'campaigns', icon: '&#9993;', label: 'Campaigns' },
+    { id: 'content', icon: '&#9998;', label: 'AI Content' },
+    { id: 'chat', icon: '&#10070;', label: 'AI Assistant' },
+  ];
+
+  if (isSuperadmin) {
+    items.push({ id: 'settings', icon: '&#9881;', label: 'Settings' });
+    items.push({ id: 'accounts', icon: '&#9775;', label: 'Accounts' });
+    items.push({ id: 'system-logic', icon: '&#9883;', label: 'System Logic' });
+  }
+
+  return `
+    <div class="sidebar">
+      <div class="sidebar-logo">
+        <h1>SalesAgent AI</h1>
+        <small>Marketing & Sales Automation</small>
+      </div>
+      ${items.map(i => `
+        <div class="nav-item ${currentPage === i.id ? 'active' : ''}" onclick="navigate('${i.id}')">
+          <span>${i.icon}</span> ${i.label}
+        </div>
+      `).join('')}
+      <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface)">
+        <div class="text-sm" style="font-weight:600">${currentUser?.displayName || currentUser?.username || ''}</div>
+        <div class="text-muted text-sm">${currentUser?.role === 'superadmin' ? 'Super Admin' : 'User'}</div>
+        <button class="btn btn-sm btn-outline" style="margin-top:8px;width:100%" onclick="doLogout()">Sign Out</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderPage() {
+  switch (currentPage) {
+    case 'dashboard': return '<div id="page" class="loading">Loading dashboard...</div>';
+    case 'leads': return '<div id="page" class="loading">Loading leads...</div>';
+    case 'pipeline': return '<div id="page" class="loading">Loading pipeline...</div>';
+    case 'campaigns': return '<div id="page" class="loading">Loading campaigns...</div>';
+    case 'content': return '<div id="page" class="loading">Loading content...</div>';
+    case 'chat': return renderChatPage();
+    case 'settings': return '<div id="page" class="loading">Loading settings...</div>';
+    case 'accounts': return '<div id="page" class="loading">Loading accounts...</div>';
+    case 'system-logic': return '<div id="page" class="loading">Loading...</div>';
+    default: return '<div>Page not found</div>';
+  }
+}
+
+async function afterRender() {
+  switch (currentPage) {
+    case 'dashboard': return loadDashboard();
+    case 'leads': return loadLeads();
+    case 'pipeline': return loadPipeline();
+    case 'campaigns': return loadCampaigns();
+    case 'content': return loadContent();
+    case 'settings': return loadSettings();
+    case 'accounts': return loadAccounts();
+    case 'system-logic': return loadSystemLogic();
+  }
+}
+
+// ========== Dashboard ==========
+async function loadDashboard() {
+  try {
+    const data = await api.get('/dashboard');
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar"><h2>Dashboard</h2></div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value blue">${data.leads.total}</div>
+          <div class="stat-label">Total Leads</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value green">${data.leads.qualified}</div>
+          <div class="stat-label">Qualified Leads</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value yellow">$${(data.deals.openValue || 0).toLocaleString()}</div>
+          <div class="stat-label">Open Pipeline Value</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value purple">${data.campaigns.active}</div>
+          <div class="stat-label">Active Campaigns</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Top Leads by Score</h3>
+          <table>
+            <tr><th>Name</th><th>Company</th><th>Score</th><th>Status</th></tr>
+            ${data.topLeads.map(l => `
+              <tr>
+                <td>${l.name}</td>
+                <td>${l.company || '-'}</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div class="score-bar" style="width:60px"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
+                    ${l.score}
+                  </div>
+                </td>
+                <td><span class="badge badge-${l.status}">${l.status}</span></td>
+              </tr>
+            `).join('') || '<tr><td colspan="4" class="empty">No leads yet</td></tr>'}
+          </table>
+        </div>
+
+        <div class="card">
+          <h3>Recent Activity</h3>
+          ${data.recentActivities.length ? data.recentActivities.map(a => `
+            <div style="padding:8px 0;border-bottom:1px solid rgba(71,85,105,0.3);font-size:13px">
+              <span class="badge badge-${a.type === 'ai_action' ? 'qualified' : 'contacted'}">${a.type}</span>
+              <span style="margin-left:8px">${a.lead_name || ''} — ${a.description.substring(0, 80)}</span>
+              <div class="text-muted text-sm" style="margin-top:2px">${new Date(a.created_at).toLocaleString()}</div>
+            </div>
+          `).join('') : '<div class="empty">No activities yet</div>'}
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Quick Actions</h3>
+        <div class="flex gap-2" style="flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="navigate('leads')">Manage Leads</button>
+          <button class="btn btn-outline" onclick="showGenerateModal('email')">Generate Email</button>
+          <button class="btn btn-outline" onclick="showGenerateModal('social')">Generate Social Post</button>
+          <button class="btn btn-outline" onclick="showGenerateModal('ad')">Generate Ad Copy</button>
+          <button class="btn btn-outline" onclick="requestPipelineAnalysis()">Analyze Pipeline</button>
+          <button class="btn btn-outline" onclick="navigate('chat')">Chat with AI</button>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error loading dashboard: ${e.message}</div>`;
+  }
+}
+
+// ========== Leads ==========
+async function loadLeads() {
+  try {
+    const leads = await api.get('/leads');
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar">
+        <h2>Leads (${leads.length})</h2>
+        <div class="flex gap-2">
+          <button class="btn btn-primary" onclick="showLeadModal()">+ Add Lead</button>
+          <button class="btn btn-outline" onclick="showBulkImportModal()">Import CSV</button>
+        </div>
+      </div>
+      <div class="card">
+        <table>
+          <tr><th>Name</th><th>Email</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Performance</th><th>Actions</th></tr>
+          ${leads.map(l => `
+            <tr>
+              <td><strong>${l.name}</strong></td>
+              <td>${l.email}</td>
+              <td>${l.company || '-'}</td>
+              <td>${l.source}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div class="score-bar" style="width:50px"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
+                  ${l.score}
+                </div>
+              </td>
+              <td><span class="badge badge-${l.status}">${l.status}</span></td>
+              <td>
+                <span style="color:${l.open_count > 0 ? 'var(--success)' : 'var(--text-muted)'}">${l.open_count || 0} open${l.open_count !== 1 ? 's' : ''}</span>,
+                <span style="color:${l.click_count > 0 ? 'var(--primary)' : 'var(--text-muted)'}">${l.click_count || 0} click${l.click_count !== 1 ? 's' : ''}</span>
+              </td>
+              <td>
+                <div class="flex gap-2">
+                  <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id})">AI Score</button>
+                  <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id})">Qualify</button>
+                  <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id})">Outreach</button>
+                  <button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteLead(${l.id})">X</button>
+                </div>
+              </td>
+            </tr>
+          `).join('') || '<tr><td colspan="8" class="empty">No leads yet. Add your first lead!</td></tr>'}
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+async function showLeadModal(id) {
+  let lead = { name: '', email: '', company: '', title: '', phone: '', source: 'manual', notes: '' };
+  if (id) {
+    lead = await api.get(`/leads/${id}`);
+  }
+
+  modal = {
+    title: id ? 'Edit Lead' : 'Add Lead',
+    body: `
+      <div class="form-group"><label>Name *</label><input id="f-name" value="${lead.name}"></div>
+      <div class="form-group"><label>Email *</label><input id="f-email" type="email" value="${lead.email}"></div>
+      <div class="grid-2">
+        <div class="form-group"><label>Company</label><input id="f-company" value="${lead.company || ''}"></div>
+        <div class="form-group"><label>Title</label><input id="f-title" value="${lead.title || ''}"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>Phone</label><input id="f-phone" value="${lead.phone || ''}"></div>
+        <div class="form-group"><label>Source</label>
+          <select id="f-source">
+            ${['manual','website','linkedin','referral','ad','event','cold_outreach'].map(s => `<option value="${s}" ${lead.source === s ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="f-notes">${lead.notes || ''}</textarea></div>
+    `,
+    onSave: async () => {
+      const data = {
+        name: document.getElementById('f-name').value,
+        email: document.getElementById('f-email').value,
+        company: document.getElementById('f-company').value,
+        title: document.getElementById('f-title').value,
+        phone: document.getElementById('f-phone').value,
+        source: document.getElementById('f-source').value,
+        notes: document.getElementById('f-notes').value,
+      };
+      if (id) await api.put(`/leads/${id}`, data);
+      else await api.post('/leads', data);
+      modal = null;
+      navigate('leads');
+    },
+  };
+  render();
+}
+
+async function deleteLead(id) {
+  if (!confirm('Delete this lead?')) return;
+  await api.del(`/leads/${id}`);
+  loadLeads();
+}
+
+async function aiScoreLead(id) {
+  showNotification('Scoring lead with AI...');
+  try {
+    const result = await api.post(`/leads/${id}/score`);
+    showResultModal('AI Lead Score', `
+      <div class="stat-card mb-4">
+        <div class="stat-value ${result.score > 70 ? 'green' : result.score > 40 ? 'yellow' : ''}">${result.score}/100</div>
+        <div class="stat-label">Lead Score</div>
+      </div>
+      <p><strong>Reasoning:</strong> ${result.reasoning}</p>
+      <p style="margin-top:8px"><strong>Recommended Action:</strong> ${result.recommended_action}</p>
+    `);
+    loadLeads();
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+async function aiQualifyLead(id) {
+  showNotification('Qualifying lead with AI...');
+  try {
+    const result = await api.post(`/leads/${id}/qualify`);
+    showResultModal('AI Lead Qualification', `
+      <div class="stat-card mb-4">
+        <div class="stat-value ${result.qualified ? 'green' : 'yellow'}">${result.qualified ? 'QUALIFIED' : 'NOT YET QUALIFIED'}</div>
+        <div class="stat-label">BANT Score: ${result.total_score}/100</div>
+      </div>
+      <div class="grid-2 mb-4">
+        <div>Budget: ${result.bant_score?.budget || 0}/25</div>
+        <div>Authority: ${result.bant_score?.authority || 0}/25</div>
+        <div>Need: ${result.bant_score?.need || 0}/25</div>
+        <div>Timeline: ${result.bant_score?.timeline || 0}/25</div>
+      </div>
+      <p><strong>Notes:</strong> ${result.qualification_notes}</p>
+      <p style="margin-top:8px"><strong>Next Steps:</strong></p>
+      <ul>${(result.next_steps || []).map(s => `<li>${s}</li>`).join('')}</ul>
+    `);
+    loadLeads();
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+async function aiOutreach(id) {
+  showNotification('Generating outreach sequence...');
+  try {
+    const result = await api.post(`/leads/${id}/outreach`, {
+      valueProposition: 'We help businesses automate their sales and marketing with AI.',
+    });
+    showResultModal('AI Outreach Sequence', `
+      ${(result.sequence || []).map(s => `
+        <div class="content-card">
+          <div class="type">Step ${s.step} — ${s.channel} (Day ${s.delay_days})</div>
+          ${s.subject ? `<div><strong>Subject:</strong> ${s.subject}</div>` : ''}
+          <pre>${s.message}</pre>
+          <div class="text-muted text-sm">Goal: ${s.goal}</div>
+        </div>
+      `).join('')}
+    `);
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+// ========== Pipeline ==========
+async function loadPipeline() {
+  try {
+    const [deals, stats] = await Promise.all([api.get('/pipeline'), api.get('/pipeline/stats')]);
+    const stages = ['prospecting', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost'];
+
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar">
+        <h2>Sales Pipeline</h2>
+        <div class="flex gap-2">
+          <button class="btn btn-primary" onclick="showDealModal()">+ Add Deal</button>
+          <button class="btn btn-outline" onclick="requestPipelineAnalysis()">AI Analysis</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value blue">${stats.open?.count || 0}</div>
+          <div class="stat-label">Open Deals</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value yellow">$${(stats.open?.total_value || 0).toLocaleString()}</div>
+          <div class="stat-label">Open Value</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value green">$${(stats.weightedPipelineValue || 0).toLocaleString()}</div>
+          <div class="stat-label">Weighted Pipeline</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value purple">${stats.winRate || 0}%</div>
+          <div class="stat-label">Win Rate</div>
+        </div>
+      </div>
+
+      <div class="pipeline-board">
+        ${stages.map(stage => {
+          const stageDeals = deals.filter(d => d.stage === stage);
+          const total = stageDeals.reduce((s, d) => s + d.deal_value, 0);
+          return `
+            <div class="pipeline-column">
+              <h4>
+                <span>${stage.replace(/_/g, ' ')}</span>
+                <span>$${total.toLocaleString()}</span>
+              </h4>
+              ${stageDeals.map(d => `
+                <div class="pipeline-card" onclick="showDealModal(${d.id})">
+                  <div class="name">${d.name}</div>
+                  <div class="company">${d.company || ''}</div>
+                  <div class="value">$${d.deal_value.toLocaleString()}</div>
+                  <div class="text-muted text-sm">${d.probability}% probability</div>
+                </div>
+              `).join('') || '<div class="text-muted text-sm" style="text-align:center">No deals</div>'}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+async function showDealModal(id) {
+  let deal = { lead_id: '', stage: 'prospecting', deal_value: 0, probability: 10, expected_close_date: '', notes: '' };
+  if (id) deal = await api.get(`/pipeline/${id}`);
+
+  const leads = await api.get('/leads');
+
+  modal = {
+    title: id ? 'Edit Deal' : 'New Deal',
+    body: `
+      <div class="form-group"><label>Lead</label>
+        <select id="f-lead">${leads.map(l => `<option value="${l.id}" ${deal.lead_id == l.id ? 'selected' : ''}>${l.name} (${l.company || l.email})</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label>Stage</label>
+        <select id="f-stage">${['prospecting','qualification','proposal','negotiation','closed_won','closed_lost'].map(s => `<option value="${s}" ${deal.stage === s ? 'selected' : ''}>${s.replace('_',' ')}</option>`).join('')}</select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>Deal Value ($)</label><input id="f-value" type="number" value="${deal.deal_value}"></div>
+        <div class="form-group"><label>Probability (%)</label><input id="f-prob" type="number" min="0" max="100" value="${deal.probability}"></div>
+      </div>
+      <div class="form-group"><label>Expected Close Date</label><input id="f-close" type="date" value="${deal.expected_close_date || ''}"></div>
+      <div class="form-group"><label>Notes</label><textarea id="f-notes">${deal.notes || ''}</textarea></div>
+    `,
+    onSave: async () => {
+      const data = {
+        lead_id: parseInt(document.getElementById('f-lead').value),
+        stage: document.getElementById('f-stage').value,
+        deal_value: parseFloat(document.getElementById('f-value').value),
+        probability: parseInt(document.getElementById('f-prob').value),
+        expected_close_date: document.getElementById('f-close').value,
+        notes: document.getElementById('f-notes').value,
+      };
+      if (id) await api.put(`/pipeline/${id}`, data);
+      else await api.post('/pipeline', data);
+      modal = null;
+      navigate('pipeline');
+    },
+  };
+  render();
+}
+
+async function requestPipelineAnalysis() {
+  showNotification('Running AI pipeline analysis...');
+  try {
+    const result = await api.post('/pipeline/analyze');
+    const a = result.analysis;
+    showResultModal('AI Pipeline Analysis', `
+      <div class="stat-card mb-4">
+        <div class="stat-value ${a.health_score > 70 ? 'green' : a.health_score > 40 ? 'yellow' : ''}">${a.health_score}/100</div>
+        <div class="stat-label">Pipeline Health Score</div>
+      </div>
+      <h4>Revenue Forecast</h4>
+      <div class="grid-2 mb-4" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="stat-card"><div class="stat-value green text-sm">$${(a.forecast?.optimistic || 0).toLocaleString()}</div><div class="stat-label">Optimistic</div></div>
+        <div class="stat-card"><div class="stat-value blue text-sm">$${(a.forecast?.realistic || 0).toLocaleString()}</div><div class="stat-label">Realistic</div></div>
+        <div class="stat-card"><div class="stat-value yellow text-sm">$${(a.forecast?.pessimistic || 0).toLocaleString()}</div><div class="stat-label">Pessimistic</div></div>
+      </div>
+      <h4>Bottlenecks</h4>
+      <ul>${(a.bottlenecks || []).map(b => `<li>${b}</li>`).join('')}</ul>
+      <h4 style="margin-top:12px">Recommendations</h4>
+      <ul>${(a.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
+    `);
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+// ========== Campaigns ==========
+let wizardState = null; // holds wizard data when active
+
+async function loadCampaigns() {
+  // If wizard is active, render the wizard instead
+  if (wizardState) { renderCampaignWizard(); return; }
+
+  try {
+    const [campaigns, costData] = await Promise.all([
+      api.get('/campaigns'),
+      api.get('/campaigns/ai-costs').catch(() => ({ overall: { total_cost: 0, total_tokens: 0, call_count: 0 }, byCampaign: [] })),
+    ]);
+
+    // Map cost data by campaign id
+    const costMap = {};
+    (costData.byCampaign || []).forEach(c => { costMap[c.id] = c; });
+
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar">
+        <h2>Campaigns (${campaigns.length})</h2>
+        <button class="btn btn-primary" onclick="startCampaignWizard()">+ New Campaign</button>
+      </div>
+
+      ${campaigns.length > 0 ? `
+        <!-- AI Cost Overview -->
+        <div class="stats-grid" style="margin-bottom:16px">
+          <div class="stat-card">
+            <div class="stat-value blue">${costData.overall.call_count}</div>
+            <div class="stat-label">Total AI Calls</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value yellow">$${costData.overall.total_cost.toFixed(4)}</div>
+            <div class="stat-label">Total AI Cost</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value purple">${(costData.overall.total_tokens / 1000).toFixed(1)}k</div>
+            <div class="stat-label">Total Tokens Used</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value green">${campaigns.length}</div>
+            <div class="stat-label">Active Campaigns</div>
+          </div>
+        </div>
+      ` : ''}
+
+      ${campaigns.length === 0 ? `
+        <div class="card" style="text-align:center;padding:60px 20px">
+          <div style="font-size:48px;margin-bottom:16px">&#9993;</div>
+          <h3 style="color:var(--text);font-size:18px;margin-bottom:8px;text-transform:none;letter-spacing:0">Create Your First Campaign</h3>
+          <p class="text-muted mb-4">We'll guide you through it step by step — it only takes a minute.</p>
+          <button class="btn btn-primary" onclick="startCampaignWizard()" style="font-size:15px;padding:12px 24px">Get Started</button>
+        </div>
+      ` : campaigns.map(c => {
+        const cost = costMap[c.id] || { total_cost: 0, total_tokens: 0, call_count: 0, budget_limit: 0 };
+        const budgetPct = cost.budget_limit > 0 ? Math.min((cost.total_cost / cost.budget_limit) * 100, 100) : 0;
+        const overBudget = cost.budget_limit > 0 && cost.total_cost >= cost.budget_limit;
+        return `
+        <div class="camp-card" id="camp-${c.id}">
+          <div class="camp-header" onclick="toggleCampaignLeads(${c.id})">
+            <div class="camp-info">
+              <div class="camp-title">
+                <strong>${c.name}</strong>
+                <span class="badge badge-${c.status}">${c.status}</span>
+                <span class="badge badge-new">${c.type}</span>
+              </div>
+              <div class="camp-meta text-muted text-sm">
+                ${c.target_audience ? `Target: ${c.target_audience}` : 'No target audience set'}
+                &nbsp;&middot;&nbsp; Sent: ${c.sent_count} &nbsp;&middot;&nbsp; Opens: ${c.open_count} &nbsp;&middot;&nbsp; Clicks: ${c.click_count}
+              </div>
+              <!-- Cost bar -->
+              <div class="camp-cost-row">
+                <span class="text-sm">AI Cost: <strong${overBudget ? ' style="color:var(--danger)"' : ''}>$${cost.total_cost.toFixed(4)}</strong>${cost.budget_limit > 0 ? ` / $${cost.budget_limit.toFixed(2)}` : ''}</span>
+                <span class="text-sm text-muted">${cost.call_count} calls &middot; ${(cost.total_tokens / 1000).toFixed(1)}k tokens</span>
+                <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); showBudgetModal(${c.id}, ${cost.budget_limit || 0})" style="padding:2px 8px;font-size:11px">
+                  ${cost.budget_limit > 0 ? 'Edit Budget' : 'Set Budget'}
+                </button>
+              </div>
+              ${cost.budget_limit > 0 ? `
+                <div class="camp-budget-bar">
+                  <div class="camp-budget-fill ${overBudget ? 'over' : ''}" style="width:${budgetPct}%"></div>
+                </div>
+              ` : ''}
+            </div>
+            <div class="camp-actions flex gap-2" onclick="event.stopPropagation()">
+              <button class="btn btn-sm btn-primary" onclick="aiGenerateLeads(${c.id})" title="AI finds leads matching your target audience">
+                Auto-Find Leads
+              </button>
+              <button class="btn btn-sm btn-success" onclick="aiAutoOutreach(${c.id})" title="AI creates personalized outreach for every lead and sends Step 1">
+                Auto-Outreach
+              </button>
+              <button class="btn btn-sm btn-outline" onclick="startCampaignWizard(${c.id})">Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteCampaign(${c.id})">X</button>
+              <span class="camp-toggle" id="camp-toggle-${c.id}">&#9660;</span>
+            </div>
+          </div>
+          <div class="camp-leads" id="camp-leads-${c.id}" style="display:none">
+            <div class="loading text-sm">Click to load leads...</div>
+          </div>
+        </div>
+      `; }).join('')}
+    `;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+// Budget modal
+function showBudgetModal(campaignId, currentBudget) {
+  modal = {
+    title: 'Set AI Budget Limit',
+    body: `
+      <p class="text-muted text-sm mb-4">Set a maximum AI spending limit for this campaign. When the limit is reached, AI features will be paused for this campaign.</p>
+      <div class="form-group">
+        <label>Budget Limit (USD)</label>
+        <input id="f-budget" type="number" step="0.01" min="0" value="${currentBudget || ''}" placeholder="e.g. 1.00 — leave empty or 0 for unlimited">
+        <small class="text-muted">$0.003–0.01 per typical AI call (scoring, content generation, etc.)</small>
+      </div>
+    `,
+    onSave: async () => {
+      const budget = parseFloat(document.getElementById('f-budget').value) || 0;
+      await api.put(`/campaigns/${campaignId}/budget`, { budget_limit: budget });
+      modal = null;
+      showNotification(budget > 0 ? `Budget set to $${budget.toFixed(2)}` : 'Budget limit removed', 'success');
+      navigate('campaigns');
+    },
+  };
+  render();
+}
+
+// Toggle campaign leads panel
+async function toggleCampaignLeads(id) {
+  const panel = document.getElementById(`camp-leads-${id}`);
+  const toggle = document.getElementById(`camp-toggle-${id}`);
+  if (!panel) return;
+
+  const isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? 'block' : 'none';
+  if (toggle) toggle.innerHTML = isHidden ? '&#9650;' : '&#9660;';
+
+  if (isHidden) {
+    panel.innerHTML = '<div class="loading text-sm" style="padding:16px">Loading...</div>';
+    try {
+      const [campaign, outreachQueue] = await Promise.all([
+        api.get(`/campaigns/${id}`),
+        api.get(`/campaigns/${id}/outreach-queue`).catch(() => []),
+      ]);
+      const leads = campaign.leads || [];
+
+      // Count outreach stats
+      const outreachSent = outreachQueue.filter(q => q.status === 'sent').length;
+      const outreachPending = outreachQueue.filter(q => q.status === 'pending').length;
+      const leadsWithOutreach = new Set(outreachQueue.map(q => q.lead_id)).size;
+
+      panel.innerHTML = `
+        <div style="padding:12px 16px;border-top:1px solid var(--border)">
+          <!-- Leads Section -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span class="text-sm"><strong>${leads.length}</strong> leads assigned</span>
+            <div class="flex gap-2">
+              <button class="btn btn-sm btn-primary" onclick="aiGenerateLeads(${id})">+ Find More Leads</button>
+              ${leads.length > 0 ? `<button class="btn btn-sm btn-success" onclick="aiAutoOutreach(${id})">Auto-Outreach All</button>` : ''}
+            </div>
+          </div>
+          ${leads.length > 0 ? `
+            <table style="font-size:13px">
+              <tr><th>Name</th><th>Email</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Performance</th></tr>
+              ${leads.map(l => {
+                const cs = l.campaign_status || 'pending';
+                const opened = ['opened','clicked','replied'].includes(cs) ? 1 : 0;
+                const clicked = ['clicked','replied'].includes(cs) ? 1 : 0;
+                return `
+                <tr>
+                  <td><strong>${l.name}</strong></td>
+                  <td>${l.email}</td>
+                  <td>${l.company || '-'}</td>
+                  <td>${l.source === 'ai_generated' ? '<span class="badge badge-new">AI Found</span>' : l.source}</td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div class="score-bar" style="width:40px"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
+                      ${l.score}
+                    </div>
+                  </td>
+                  <td><span class="badge badge-${cs}">${cs}</span></td>
+                  <td>
+                    <span style="color:${opened ? 'var(--success)' : 'var(--text-muted)'}">${opened} open${opened !== 1 ? 's' : ''}</span>,
+                    <span style="color:${clicked ? 'var(--primary)' : 'var(--text-muted)'}">${clicked} click${clicked !== 1 ? 's' : ''}</span>
+                  </td>
+                </tr>
+              `; }).join('')}
+            </table>
+          ` : `
+            <div class="empty text-sm" style="padding:20px">
+              No leads yet. Click <strong>Find More Leads</strong> to let AI find matching leads.
+            </div>
+          `}
+
+          ${outreachQueue.length > 0 ? `
+            <!-- Outreach Section -->
+            <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span class="text-sm">
+                  <strong>Outreach:</strong>
+                  <span class="badge badge-active">${outreachSent} sent</span>
+                  <span class="badge badge-draft">${outreachPending} pending</span>
+                  &nbsp;for ${leadsWithOutreach} leads
+                </span>
+                <button class="btn btn-sm btn-outline" onclick="showOutreachQueue(${id})">View Full Queue</button>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    } catch (e) {
+      panel.innerHTML = `<div class="empty text-sm" style="padding:16px">Error: ${e.message}</div>`;
+    }
+  }
+}
+
+// AI auto-generate leads for a campaign
+async function aiGenerateLeads(campaignId) {
+  const countStr = prompt('How many leads should AI find? (1-15)', '5');
+  if (!countStr) return;
+  const count = Math.min(Math.max(parseInt(countStr) || 5, 1), 15);
+
+  showNotification(`AI is finding ${count} leads for your campaign...`);
+
+  try {
+    const result = await api.post(`/campaigns/${campaignId}/generate-leads`, { count });
+    showNotification(`Found ${result.generated} new leads!`, 'success');
+
+    // Refresh the leads panel if open
+    const panel = document.getElementById(`camp-leads-${campaignId}`);
+    if (panel && panel.style.display !== 'none') {
+      toggleCampaignLeads(campaignId); // close
+      toggleCampaignLeads(campaignId); // reopen to refresh
+    }
+
+    // Also refresh leads page if visible
+    if (currentPage === 'leads') loadLeads();
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+  }
+}
+
+// AI Auto-Outreach
+async function aiAutoOutreach(campaignId) {
+  if (!confirm('AI will generate a personalized outreach sequence for every lead in this campaign and send Step 1 immediately.\n\nContinue?')) return;
+
+  showNotification('AI is generating outreach sequences for all leads...');
+
+  try {
+    const result = await api.post(`/campaigns/${campaignId}/auto-outreach`);
+    showNotification(
+      `Outreach started! ${result.leadsProcessed} leads, ${result.totalSteps} steps queued, ${result.immediatelySent} Step 1 messages sent.`,
+      'success'
+    );
+
+    // Refresh panel if open
+    const panel = document.getElementById(`camp-leads-${campaignId}`);
+    if (panel && panel.style.display !== 'none') {
+      toggleCampaignLeads(campaignId);
+      toggleCampaignLeads(campaignId);
+    }
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+  }
+}
+
+// View outreach queue for a campaign
+async function showOutreachQueue(campaignId) {
+  showNotification('Loading outreach queue...');
+  try {
+    const queue = await api.get(`/campaigns/${campaignId}/outreach-queue`);
+
+    if (!queue.length) {
+      showNotification('No outreach queued yet. Click Auto-Outreach first.', 'error');
+      return;
+    }
+
+    // Group by lead
+    const byLead = {};
+    for (const item of queue) {
+      if (!byLead[item.lead_id]) byLead[item.lead_id] = { name: item.lead_name, email: item.lead_email, company: item.lead_company, steps: [] };
+      byLead[item.lead_id].steps.push(item);
+    }
+
+    const body = Object.values(byLead).map(lead => `
+      <div class="content-card" style="margin-bottom:12px">
+        <div class="type" style="margin-bottom:8px">${lead.name} — ${lead.company || lead.email}</div>
+        ${lead.steps.map(s => `
+          <div class="outreach-step ${s.status}">
+            <div class="outreach-step-header">
+              <span class="outreach-step-num">${s.step}</span>
+              <span class="badge badge-${s.status === 'sent' ? 'active' : s.status === 'pending' ? 'draft' : 'paused'}">${s.status}</span>
+              <span class="text-sm">${s.channel}</span>
+              <span class="text-muted text-sm">${s.delay_days === 0 ? 'Immediate' : `Day ${s.delay_days}`}</span>
+            </div>
+            ${s.subject ? `<div class="text-sm" style="margin:4px 0"><strong>Subject:</strong> ${s.subject}</div>` : ''}
+            <div class="text-sm" style="color:var(--text-muted);line-height:1.5">${s.message.substring(0, 200)}${s.message.length > 200 ? '...' : ''}</div>
+            ${s.goal ? `<div class="text-sm" style="margin-top:4px;color:var(--primary)">Goal: ${s.goal}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+
+    modal = {
+      title: `Outreach Queue (${queue.length} steps for ${Object.keys(byLead).length} leads)`,
+      body: `<div style="max-height:60vh;overflow-y:auto">${body}</div>`,
+    };
+    render();
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+  }
+}
+
+// ===== Campaign Wizard =====
+const WIZARD_STEPS = [
+  { id: 'basics', label: 'Basic Info', icon: '&#9998;' },
+  { id: 'content', label: 'Content', icon: '&#9993;' },
+  { id: 'leads', label: 'Assign Leads', icon: '&#9679;' },
+  { id: 'review', label: 'Review & Launch', icon: '&#9654;' },
+];
+
+async function startCampaignWizard(editId) {
+  let campaign = { name: '', type: 'email', subject: '', body: '', target_audience: '' };
+  let assignedLeadIds = [];
+
+  if (editId) {
+    campaign = await api.get(`/campaigns/${editId}`);
+    assignedLeadIds = (campaign.leads || []).map(l => l.id);
+  }
+
+  wizardState = {
+    editId: editId || null,
+    step: 0,
+    data: {
+      name: campaign.name,
+      type: campaign.type,
+      subject: campaign.subject || '',
+      body: campaign.body || '',
+      target_audience: campaign.target_audience || '',
+      budget_limit: campaign.budget_limit || 0,
+    },
+    selectedLeads: assignedLeadIds,
+    allLeads: [],
+  };
+
+  renderCampaignWizard();
+}
+
+function renderCampaignWizard() {
+  const page = document.getElementById('page');
+  if (!page) return;
+
+  const s = wizardState;
+  const step = WIZARD_STEPS[s.step];
+
+  page.innerHTML = `
+    <div class="toolbar">
+      <h2>${s.editId ? 'Edit Campaign' : 'New Campaign'}</h2>
+      <button class="btn btn-outline" onclick="exitCampaignWizard()">Cancel</button>
+    </div>
+
+    <!-- Progress Steps -->
+    <div class="wizard-progress">
+      ${WIZARD_STEPS.map((ws, i) => `
+        <div class="wizard-step ${i < s.step ? 'completed' : ''} ${i === s.step ? 'active' : ''}" onclick="${i < s.step ? `wizardGoTo(${i})` : ''}">
+          <div class="wizard-step-circle">${i < s.step ? '&#10003;' : i + 1}</div>
+          <div class="wizard-step-label">${ws.label}</div>
+        </div>
+        ${i < WIZARD_STEPS.length - 1 ? '<div class="wizard-step-line ' + (i < s.step ? 'completed' : '') + '"></div>' : ''}
+      `).join('')}
+    </div>
+
+    <!-- Step Content -->
+    <div class="card wizard-card">
+      <div class="wizard-step-header">
+        <span class="wizard-step-icon">${step.icon}</span>
+        <div>
+          <h3 style="color:var(--text);text-transform:none;letter-spacing:0;font-size:16px;margin-bottom:2px">Step ${s.step + 1}: ${step.label}</h3>
+          <p class="text-muted text-sm">${getStepDescription(s.step)}</p>
+        </div>
+      </div>
+      <div class="wizard-step-body" id="wizard-body">
+        ${renderWizardStepContent(s.step)}
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="wizard-nav">
+      <div>
+        ${s.step > 0 ? `<button class="btn btn-outline" onclick="wizardBack()">Back</button>` : ''}
+      </div>
+      <div class="flex gap-2">
+        ${s.step === 2 ? `<button class="btn btn-outline" onclick="wizardNext()">Skip — I'll add leads later</button>` : ''}
+        ${s.step < WIZARD_STEPS.length - 1 ? `
+          <button class="btn btn-primary" onclick="wizardNext()" id="wizard-next-btn">
+            Next: ${WIZARD_STEPS[s.step + 1].label} &#8594;
+          </button>
+        ` : ''}
+        ${s.step === WIZARD_STEPS.length - 1 ? `
+          <button class="btn btn-outline" onclick="wizardSave('draft')">Save as Draft</button>
+          ${wizardState.data.type === 'email' && wizardState.selectedLeads.length > 0 ? `
+            <button class="btn btn-success" onclick="wizardSave('send')">Save & Send Now</button>
+          ` : `
+            <button class="btn btn-primary" onclick="wizardSave('draft')">Save Campaign</button>
+          `}
+        ` : ''}
+      </div>
+    </div>
+  `;
+
+  // Load leads data if on step 2
+  if (s.step === 2 && s.allLeads.length === 0) {
+    loadWizardLeads();
+  }
+}
+
+function getStepDescription(step) {
+  switch (step) {
+    case 0: return 'Give your campaign a name and choose what type it is.';
+    case 1: return 'Write your message or let AI generate it for you.';
+    case 2: return 'Choose which leads will receive this campaign.';
+    case 3: return 'Review everything and launch when ready.';
+  }
+}
+
+function renderWizardStepContent(step) {
+  const d = wizardState.data;
+
+  switch (step) {
+    case 0: return `
+      <div class="form-group">
+        <label>Campaign Name *</label>
+        <input id="wz-name" value="${d.name}" placeholder="e.g. Q2 Product Launch, Welcome Series..."
+          oninput="wizardState.data.name=this.value">
+        <small class="text-muted">Pick a name that helps you remember what this campaign is about.</small>
+      </div>
+      <div class="form-group">
+        <label>Campaign Type *</label>
+        <div class="wizard-type-grid">
+          ${[
+            { val: 'email', icon: '&#9993;', title: 'Email', desc: 'Send emails to your leads' },
+            { val: 'social', icon: '&#128172;', title: 'Social Media', desc: 'Create social media posts' },
+            { val: 'content', icon: '&#9998;', title: 'Content', desc: 'Blog posts, articles, etc.' },
+            { val: 'ad', icon: '&#128226;', title: 'Advertisement', desc: 'Paid ads on platforms' },
+          ].map(t => `
+            <div class="wizard-type-card ${d.type === t.val ? 'selected' : ''}"
+              onclick="wizardState.data.type='${t.val}'; renderCampaignWizard();">
+              <div class="wizard-type-icon">${t.icon}</div>
+              <div class="wizard-type-title">${t.title}</div>
+              <div class="wizard-type-desc">${t.desc}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Target Audience</label>
+        <input id="wz-audience" value="${d.target_audience}" placeholder="e.g. SaaS founders, enterprise CTOs, new signups..."
+          oninput="wizardState.data.target_audience=this.value">
+        <small class="text-muted">Describe who this campaign is for. This helps AI generate better content.</small>
+      </div>
+      <div class="form-group">
+        <label>AI Budget Limit (USD) — optional</label>
+        <input id="wz-budget" type="number" step="0.01" min="0" value="${d.budget_limit || ''}" placeholder="e.g. 1.00 — leave empty for no limit"
+          oninput="wizardState.data.budget_limit=parseFloat(this.value)||0">
+        <small class="text-muted">Set a spending cap for AI features on this campaign. AI calls cost ~$0.003–0.01 each.</small>
+      </div>
+    `;
+
+    case 1:
+      const isEmail = d.type === 'email';
+      return `
+        ${isEmail ? `
+          <div class="form-group">
+            <label>Email Subject Line</label>
+            <input id="wz-subject" value="${d.subject}" placeholder="e.g. Introducing our new AI-powered features..."
+              oninput="wizardState.data.subject=this.value">
+            <small class="text-muted">A compelling subject line increases your open rate.</small>
+          </div>
+        ` : ''}
+        <div class="form-group">
+          <label>${isEmail ? 'Email Body' : d.type === 'social' ? 'Post Content' : d.type === 'ad' ? 'Ad Copy' : 'Content'}</label>
+          <textarea id="wz-body" style="min-height:180px" placeholder="${getContentPlaceholder(d.type)}"
+            oninput="wizardState.data.body=this.value">${d.body}</textarea>
+        </div>
+        <div class="wizard-ai-box">
+          <div style="flex:1">
+            <strong>Need help writing?</strong>
+            <p class="text-muted text-sm">Let AI generate ${isEmail ? 'an email' : 'content'} based on your campaign details.</p>
+          </div>
+          <button class="btn btn-primary" onclick="wizardAiGenerate()" id="wz-ai-btn">Generate with AI</button>
+        </div>
+      `;
+
+    case 2: return `
+      <div id="wz-leads-container">
+        <div class="loading">Loading leads...</div>
+      </div>
+    `;
+
+    case 3: return renderWizardReview();
+  }
+}
+
+function getContentPlaceholder(type) {
+  switch (type) {
+    case 'email': return 'Write your email content here... or use AI to generate it.';
+    case 'social': return 'Write your social media post here...';
+    case 'ad': return 'Write your ad copy here...';
+    case 'content': return 'Write your content here...';
+  }
+}
+
+async function loadWizardLeads() {
+  try {
+    const leads = await api.get('/leads');
+    wizardState.allLeads = leads;
+    const container = document.getElementById('wz-leads-container');
+    if (!container) return;
+
+    if (leads.length === 0) {
+      container.innerHTML = `
+        <div class="empty" style="padding:30px">
+          <p>No leads found. You can add leads from the Leads page.</p>
+          <button class="btn btn-outline" onclick="exitCampaignWizard(); navigate('leads')" style="margin-top:12px">Go to Leads</button>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <strong id="wz-lead-count">${wizardState.selectedLeads.length}</strong> of ${leads.length} leads selected
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-sm btn-outline" onclick="wizardSelectAllLeads()">Select All</button>
+          <button class="btn btn-sm btn-outline" onclick="wizardDeselectAllLeads()">Deselect All</button>
+        </div>
+      </div>
+      <div class="wizard-leads-list">
+        ${leads.map(l => `
+          <label class="wizard-lead-item ${wizardState.selectedLeads.includes(l.id) ? 'selected' : ''}" id="wz-lead-${l.id}">
+            <input type="checkbox" ${wizardState.selectedLeads.includes(l.id) ? 'checked' : ''}
+              onchange="wizardToggleLead(${l.id}, this.checked)">
+            <div class="wizard-lead-info">
+              <strong>${l.name}</strong>
+              <span class="text-muted">${l.email}</span>
+            </div>
+            <div class="text-sm text-muted">${l.company || ''}</div>
+            <div>
+              <span class="badge badge-${l.status}">${l.status}</span>
+            </div>
+            <div class="text-sm">
+              <div class="score-bar" style="width:40px;display:inline-block;vertical-align:middle"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
+              ${l.score}
+            </div>
+          </label>
+        `).join('')}
+      </div>
+    `;
+  } catch (e) {
+    const container = document.getElementById('wz-leads-container');
+    if (container) container.innerHTML = `<div class="empty">Error loading leads: ${e.message}</div>`;
+  }
+}
+
+function wizardToggleLead(id, checked) {
+  if (checked && !wizardState.selectedLeads.includes(id)) {
+    wizardState.selectedLeads.push(id);
+  } else if (!checked) {
+    wizardState.selectedLeads = wizardState.selectedLeads.filter(x => x !== id);
+  }
+  // Update visual
+  const item = document.getElementById(`wz-lead-${id}`);
+  if (item) item.classList.toggle('selected', checked);
+  const countEl = document.getElementById('wz-lead-count');
+  if (countEl) countEl.textContent = wizardState.selectedLeads.length;
+}
+
+function wizardSelectAllLeads() {
+  wizardState.selectedLeads = wizardState.allLeads.map(l => l.id);
+  loadWizardLeads();
+}
+
+function wizardDeselectAllLeads() {
+  wizardState.selectedLeads = [];
+  loadWizardLeads();
+}
+
+function renderWizardReview() {
+  const d = wizardState.data;
+  const leadCount = wizardState.selectedLeads.length;
+  const selectedLeadNames = wizardState.allLeads
+    .filter(l => wizardState.selectedLeads.includes(l.id))
+    .map(l => l.name);
+
+  return `
+    <div class="wizard-review">
+      <div class="wizard-review-section">
+        <div class="wizard-review-label">Campaign Name</div>
+        <div class="wizard-review-value">${d.name || '<span class="text-muted">Not set</span>'}</div>
+      </div>
+      <div class="wizard-review-section">
+        <div class="wizard-review-label">Type</div>
+        <div class="wizard-review-value"><span class="badge badge-active">${d.type}</span></div>
+      </div>
+      <div class="wizard-review-section">
+        <div class="wizard-review-label">Target Audience</div>
+        <div class="wizard-review-value">${d.target_audience || '<span class="text-muted">Not specified</span>'}</div>
+      </div>
+      ${d.type === 'email' ? `
+        <div class="wizard-review-section">
+          <div class="wizard-review-label">Subject</div>
+          <div class="wizard-review-value">${d.subject || '<span class="text-muted">No subject</span>'}</div>
+        </div>
+      ` : ''}
+      <div class="wizard-review-section">
+        <div class="wizard-review-label">Content Preview</div>
+        <div class="wizard-review-value">
+          ${d.body ? `<div class="wizard-review-content">${d.body.substring(0, 300)}${d.body.length > 300 ? '...' : ''}</div>` : '<span class="text-muted">No content</span>'}
+        </div>
+      </div>
+      <div class="wizard-review-section">
+        <div class="wizard-review-label">Assigned Leads</div>
+        <div class="wizard-review-value">
+          ${leadCount > 0
+            ? `<strong>${leadCount} lead${leadCount > 1 ? 's' : ''}</strong> — ${selectedLeadNames.slice(0, 5).join(', ')}${selectedLeadNames.length > 5 ? ` and ${selectedLeadNames.length - 5} more` : ''}`
+            : '<span class="text-muted">No leads assigned — you can add them later</span>'}
+        </div>
+      </div>
+      <div class="wizard-review-section">
+        <div class="wizard-review-label">AI Budget Limit</div>
+        <div class="wizard-review-value">
+          ${d.budget_limit > 0 ? `<strong>$${d.budget_limit.toFixed(2)}</strong> — AI features will pause when this limit is reached` : '<span class="text-muted">No limit set — unlimited AI usage</span>'}
+        </div>
+      </div>
+    </div>
+
+    ${!d.name ? `
+      <div class="wizard-warning">
+        Please go back and enter a campaign name before saving.
+      </div>
+    ` : ''}
+  `;
+}
+
+// Wizard Navigation
+function wizardSaveCurrentStepData() {
+  // Save form field values to state (for fields that use oninput, they're already saved)
+  const nameEl = document.getElementById('wz-name');
+  const audienceEl = document.getElementById('wz-audience');
+  const subjectEl = document.getElementById('wz-subject');
+  const bodyEl = document.getElementById('wz-body');
+
+  const budgetEl = document.getElementById('wz-budget');
+
+  if (nameEl) wizardState.data.name = nameEl.value;
+  if (audienceEl) wizardState.data.target_audience = audienceEl.value;
+  if (subjectEl) wizardState.data.subject = subjectEl.value;
+  if (bodyEl) wizardState.data.body = bodyEl.value;
+  if (budgetEl) wizardState.data.budget_limit = parseFloat(budgetEl.value) || 0;
+}
+
+function wizardNext() {
+  wizardSaveCurrentStepData();
+
+  // Validate current step
+  if (wizardState.step === 0 && !wizardState.data.name.trim()) {
+    showNotification('Please enter a campaign name to continue.', 'error');
+    document.getElementById('wz-name')?.focus();
+    return;
+  }
+
+  if (wizardState.step < WIZARD_STEPS.length - 1) {
+    wizardState.step++;
+    renderCampaignWizard();
+  }
+}
+
+function wizardBack() {
+  wizardSaveCurrentStepData();
+  if (wizardState.step > 0) {
+    wizardState.step--;
+    renderCampaignWizard();
+  }
+}
+
+function wizardGoTo(step) {
+  wizardSaveCurrentStepData();
+  wizardState.step = step;
+  renderCampaignWizard();
+}
+
+function exitCampaignWizard() {
+  if (wizardState && (wizardState.data.name || wizardState.data.body)) {
+    if (!confirm('Are you sure? Your campaign progress will be lost.')) return;
+  }
+  wizardState = null;
+  loadCampaigns();
+}
+
+async function wizardAiGenerate() {
+  const btn = document.getElementById('wz-ai-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+  showNotification('AI is generating content...');
+
+  try {
+    const d = wizardState.data;
+    let result;
+    if (d.type === 'email') {
+      result = await api.post('/agent/generate/email', {
+        audience: d.target_audience, subject: d.subject, purpose: 'marketing', tone: 'professional'
+      });
+      wizardState.data.subject = result.subject || d.subject;
+      wizardState.data.body = result.body_html || result.body_text || d.body;
+    } else if (d.type === 'social') {
+      result = await api.post('/agent/generate/social', {
+        platform: 'linkedin', topic: d.name, tone: 'professional'
+      });
+      wizardState.data.body = typeof result === 'object' ? (result.post || result.content || JSON.stringify(result, null, 2)) : result;
+    } else if (d.type === 'ad') {
+      result = await api.post('/agent/generate/ad', {
+        platform: 'google', objective: 'conversions', audience: d.target_audience, productInfo: d.name
+      });
+      wizardState.data.body = typeof result === 'object' ? (result.copy || result.headline || JSON.stringify(result, null, 2)) : result;
+    } else {
+      result = await api.post('/agent/generate/email', {
+        audience: d.target_audience, subject: d.name, purpose: 'content marketing', tone: 'professional'
+      });
+      wizardState.data.body = result.body_text || result.body_html || d.body;
+    }
+
+    showNotification('Content generated!', 'success');
+    renderCampaignWizard();
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate with AI'; }
+  }
+}
+
+async function wizardSave(action) {
+  wizardSaveCurrentStepData();
+  const d = wizardState.data;
+
+  if (!d.name.trim()) {
+    showNotification('Please enter a campaign name.', 'error');
+    wizardState.step = 0;
+    renderCampaignWizard();
+    return;
+  }
+
+  showNotification('Saving campaign...');
+
+  try {
+    let campaign;
+    const payload = {
+      name: d.name, type: d.type, subject: d.subject,
+      body: d.body, target_audience: d.target_audience,
+      budget_limit: d.budget_limit || 0,
+    };
+
+    if (wizardState.editId) {
+      campaign = await api.put(`/campaigns/${wizardState.editId}`, payload);
+    } else {
+      campaign = await api.post('/campaigns', payload);
+    }
+
+    // Assign leads if any selected
+    if (wizardState.selectedLeads.length > 0 && campaign.id) {
+      await api.post(`/campaigns/${campaign.id}/leads`, { leadIds: wizardState.selectedLeads });
+    }
+
+    // Send if requested
+    if (action === 'send' && campaign.id && d.type === 'email') {
+      const sendResult = await api.post(`/campaigns/${campaign.id}/send`);
+      showNotification(`Campaign saved & sent to ${sendResult.sent}/${sendResult.total} leads!`, 'success');
+    } else {
+      showNotification('Campaign saved as draft!', 'success');
+    }
+
+    wizardState = null;
+    loadCampaigns();
+  } catch (e) {
+    showNotification('Error saving: ' + e.message, 'error');
+  }
+}
+
+async function sendCampaign(id) {
+  if (!confirm('Send this campaign to all assigned leads?')) return;
+  showNotification('Sending campaign...');
+  try {
+    const result = await api.post(`/campaigns/${id}/send`);
+    showNotification(`Sent to ${result.sent}/${result.total} leads`, 'success');
+    loadCampaigns();
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+async function deleteCampaign(id) {
+  if (!confirm('Delete this campaign?')) return;
+  await api.del(`/campaigns/${id}`);
+  loadCampaigns();
+}
+
+// ========== AI Content ==========
+let contentWizard = null;
+
+async function loadContent() {
+  if (contentWizard) { renderContentWizard(); return; }
+
+  try {
+    const content = await api.get('/agent/content');
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar">
+        <h2>AI Generated Content</h2>
+        <button class="btn btn-primary" onclick="startContentWizard()">+ Create Content</button>
+      </div>
+      ${content.length === 0 ? `
+        <div class="card" style="text-align:center;padding:60px 20px">
+          <div style="font-size:48px;margin-bottom:16px">&#9998;</div>
+          <h3 style="color:var(--text);font-size:18px;margin-bottom:8px;text-transform:none;letter-spacing:0">Create Your First AI Content</h3>
+          <p class="text-muted mb-4">Choose a content type and we'll guide you step by step. AI does the heavy lifting.</p>
+          <button class="btn btn-primary" onclick="startContentWizard()" style="font-size:15px;padding:12px 24px">Get Started</button>
+        </div>
+      ` : content.map(c => {
+        let parsed;
+        try { parsed = JSON.parse(c.content); } catch { parsed = c.content; }
+        return `<div class="content-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div class="type" style="margin-bottom:0">${c.type} — ${new Date(c.created_at).toLocaleString()}</div>
+            <div class="flex gap-2">
+              <button class="btn btn-sm btn-outline" onclick="editContent(${c.id})">Edit</button>
+              <button class="btn btn-sm btn-primary" onclick="regenerateContent(${c.id}, '${c.type}')">Regenerate</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteContent(${c.id})">X</button>
+            </div>
+          </div>
+          ${formatContentDisplay(c.type, parsed)}
+        </div>`;
+      }).join('')}
+    `;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+async function editContent(contentId) {
+  try {
+    const items = await api.get('/agent/content');
+    const item = items.find(c => c.id === contentId);
+    if (!item) { showNotification('Content not found', 'error'); return; }
+
+    let parsed;
+    try { parsed = JSON.parse(item.content); } catch { parsed = item.content; }
+
+    // Build editable fields based on type
+    let fields = '';
+    if (typeof parsed === 'object') {
+      for (const [key, value] of Object.entries(parsed)) {
+        if (Array.isArray(value)) {
+          fields += `<div class="form-group"><label>${key}</label><textarea id="ec-${key}" style="min-height:80px">${value.join('\n')}</textarea><small class="text-muted">One item per line</small></div>`;
+        } else if (typeof value === 'string' && value.length > 100) {
+          fields += `<div class="form-group"><label>${key}</label><textarea id="ec-${key}" style="min-height:120px">${value}</textarea></div>`;
+        } else if (typeof value === 'string') {
+          fields += `<div class="form-group"><label>${key}</label><input id="ec-${key}" value="${value.replace(/"/g, '&quot;')}"></div>`;
+        }
+      }
+    } else {
+      fields = `<div class="form-group"><label>Content</label><textarea id="ec-raw" style="min-height:200px">${parsed}</textarea></div>`;
+    }
+
+    modal = {
+      title: `Edit ${item.type} Content`,
+      body: `<div style="max-height:60vh;overflow-y:auto">${fields}</div>`,
+      onSave: async () => {
+        let updated;
+        if (typeof parsed === 'object') {
+          updated = {};
+          for (const key of Object.keys(parsed)) {
+            const el = document.getElementById(`ec-${key}`);
+            if (!el) { updated[key] = parsed[key]; continue; }
+            if (Array.isArray(parsed[key])) {
+              updated[key] = el.value.split('\n').map(s => s.trim()).filter(Boolean);
+            } else {
+              updated[key] = el.value;
+            }
+          }
+        } else {
+          updated = document.getElementById('ec-raw')?.value || parsed;
+        }
+        await api.put(`/agent/content/${contentId}`, { content: updated });
+        modal = null;
+        showNotification('Content updated!', 'success');
+        loadContent();
+      },
+    };
+    render();
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+  }
+}
+
+async function regenerateContent(contentId, type) {
+  if (!confirm('Regenerate this content with AI? The current content will be replaced.')) return;
+
+  try {
+    const items = await api.get('/agent/content');
+    const item = items.find(c => c.id === contentId);
+    if (!item) { showNotification('Content not found', 'error'); return; }
+
+    let prompt;
+    try { prompt = JSON.parse(item.prompt); } catch { prompt = {}; }
+
+    showNotification('AI is regenerating content...');
+
+    // Map stored type to API type
+    const apiType = type === 'social_post' ? 'social' : type === 'ad_copy' ? 'ad' : type === 'seo_keywords' ? 'seo' : type;
+    const result = await api.post(`/agent/generate/${apiType}`, prompt);
+
+    // Update existing content with new result
+    const { taskId, contentId: newId, _cost, ...newContent } = result;
+    await api.put(`/agent/content/${contentId}`, { content: newContent });
+
+    showNotification('Content regenerated!', 'success');
+    loadContent();
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+  }
+}
+
+async function deleteContent(contentId) {
+  if (!confirm('Delete this content?')) return;
+  try {
+    await api.del(`/agent/content/${contentId}`);
+    showNotification('Content deleted', 'success');
+    loadContent();
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+  }
+}
+
+// Format content nicely based on type instead of raw JSON
+function formatContentDisplay(type, data) {
+  if (typeof data === 'string') return `<div class="cw-rendered">${data}</div>`;
+
+  switch (type) {
+    case 'email': return `
+      <div class="cw-rendered">
+        <div class="cw-field"><span class="cw-label">Subject:</span> ${data.subject || ''}</div>
+        <div class="cw-field"><span class="cw-label">Preview:</span> ${data.preview_text || ''}</div>
+        <div class="cw-divider"></div>
+        <div class="cw-body">${data.body_html || data.body_text || ''}</div>
+      </div>`;
+
+    case 'social_post': return `
+      <div class="cw-rendered">
+        <div class="cw-body" style="font-size:15px;line-height:1.6;white-space:pre-wrap">${data.post_text || ''}</div>
+        ${data.hashtags?.length ? `<div class="cw-tags">${data.hashtags.map(h => `<span class="cw-tag">${h}</span>`).join(' ')}</div>` : ''}
+        ${data.best_time_to_post ? `<div class="cw-field" style="margin-top:12px"><span class="cw-label">Best time to post:</span> ${data.best_time_to_post}</div>` : ''}
+        ${data.engagement_tips?.length ? `
+          <div class="cw-divider"></div>
+          <div class="cw-label" style="margin-bottom:6px">Engagement Tips:</div>
+          <ul class="cw-tips">${data.engagement_tips.map(t => `<li>${t}</li>`).join('')}</ul>
+        ` : ''}
+      </div>`;
+
+    case 'ad_copy': return `
+      <div class="cw-rendered">
+        ${data.headline_options?.length ? `
+          <div class="cw-label" style="margin-bottom:6px">Headlines:</div>
+          <div class="cw-options">${data.headline_options.map((h,i) => `<div class="cw-option"><span class="cw-num">${i+1}</span> ${h}</div>`).join('')}</div>
+        ` : ''}
+        ${data.description_options?.length ? `
+          <div class="cw-label" style="margin-top:12px;margin-bottom:6px">Descriptions:</div>
+          <div class="cw-options">${data.description_options.map((d,i) => `<div class="cw-option"><span class="cw-num">${i+1}</span> ${d}</div>`).join('')}</div>
+        ` : ''}
+        ${data.cta_options?.length ? `
+          <div class="cw-label" style="margin-top:12px;margin-bottom:6px">Call to Action:</div>
+          <div class="cw-tags">${data.cta_options.map(c => `<span class="cw-tag">${c}</span>`).join(' ')}</div>
+        ` : ''}
+        ${data.targeting_suggestions ? `
+          <div class="cw-divider"></div>
+          <div class="cw-field"><span class="cw-label">Targeting:</span> ${data.targeting_suggestions}</div>
+        ` : ''}
+      </div>`;
+
+    case 'seo_keywords': return `
+      <div class="cw-rendered">
+        ${data.primary_keywords?.length ? `
+          <div class="cw-label" style="margin-bottom:6px">Primary Keywords:</div>
+          <div class="cw-tags">${data.primary_keywords.map(k => `<span class="cw-tag">${k}</span>`).join(' ')}</div>
+        ` : ''}
+        ${data.long_tail_keywords?.length ? `
+          <div class="cw-label" style="margin-top:12px;margin-bottom:6px">Long-Tail Keywords:</div>
+          <div class="cw-tags">${data.long_tail_keywords.map(k => `<span class="cw-tag cw-tag-alt">${k}</span>`).join(' ')}</div>
+        ` : ''}
+        ${data.content_ideas?.length ? `
+          <div class="cw-divider"></div>
+          <div class="cw-label" style="margin-bottom:6px">Content Ideas:</div>
+          ${data.content_ideas.map(idea => `
+            <div class="cw-option" style="margin-bottom:6px">
+              <strong>${idea.title || idea}</strong>
+              ${idea.type ? `<span class="badge badge-active" style="margin-left:8px">${idea.type}</span>` : ''}
+              ${idea.target_keyword ? `<div class="text-sm text-muted">Target: ${idea.target_keyword}</div>` : ''}
+            </div>
+          `).join('')}
+        ` : ''}
+        ${data.meta_description ? `
+          <div class="cw-divider"></div>
+          <div class="cw-field"><span class="cw-label">Meta Description:</span> ${data.meta_description}</div>
+        ` : ''}
+        ${data.optimization_tips?.length ? `
+          <div class="cw-divider"></div>
+          <div class="cw-label" style="margin-bottom:6px">Optimization Tips:</div>
+          <ul class="cw-tips">${data.optimization_tips.map(t => `<li>${t}</li>`).join('')}</ul>
+        ` : ''}
+      </div>`;
+
+    default: return `<pre style="white-space:pre-wrap">${JSON.stringify(data, null, 2)}</pre>`;
+  }
+}
+
+// ===== Content Generation Wizard =====
+const CONTENT_WIZARD_STEPS = [
+  { id: 'type', label: 'Content Type', icon: '&#9998;' },
+  { id: 'details', label: 'Details', icon: '&#9881;' },
+  { id: 'generate', label: 'Generate & Review', icon: '&#9733;' },
+  { id: 'share', label: 'Share', icon: '&#9992;' },
+];
+
+const POSTER_STYLES = [
+  { id: 'none', label: 'No Poster', desc: 'Text content only', colors: null },
+  { id: 'bold', label: 'Bold & Modern', desc: 'Dark bg, bright accent', colors: ['#1a1a2e', '#e94560', '#ffffff'] },
+  { id: 'minimal', label: 'Clean Minimal', desc: 'White, light and airy', colors: ['#ffffff', '#2d3436', '#0984e3'] },
+  { id: 'gradient', label: 'Gradient Glow', desc: 'Vibrant gradient', colors: ['#667eea', '#764ba2', '#ffffff'] },
+  { id: 'nature', label: 'Warm & Natural', desc: 'Earthy tones', colors: ['#2d3436', '#e17055', '#ffeaa7'] },
+  { id: 'tech', label: 'Tech & Digital', desc: 'Cyber blue, futuristic', colors: ['#0a0a2a', '#00d2ff', '#ffffff'] },
+];
+
+function startContentWizard(presetType) {
+  contentWizard = {
+    step: presetType ? 1 : 0,
+    type: presetType || null,
+    inputs: {},
+    posterStyle: 'bold',
+    result: null,
+    generating: false,
+  };
+  renderContentWizard();
+}
+
+function renderContentWizard() {
+  const page = document.getElementById('page');
+  if (!page) return;
+
+  const cw = contentWizard;
+  const stepIdx = cw.step;
+  const step = CONTENT_WIZARD_STEPS[stepIdx];
+
+  page.innerHTML = `
+    <div class="toolbar">
+      <h2>Create AI Content</h2>
+      <button class="btn btn-outline" onclick="exitContentWizard()">Cancel</button>
+    </div>
+
+    <!-- Progress -->
+    <div class="wizard-progress">
+      ${CONTENT_WIZARD_STEPS.map((ws, i) => `
+        <div class="wizard-step ${i < stepIdx ? 'completed' : ''} ${i === stepIdx ? 'active' : ''}" onclick="${i < stepIdx ? `contentWizardGoTo(${i})` : ''}">
+          <div class="wizard-step-circle">${i < stepIdx ? '&#10003;' : i + 1}</div>
+          <div class="wizard-step-label">${ws.label}</div>
+        </div>
+        ${i < CONTENT_WIZARD_STEPS.length - 1 ? '<div class="wizard-step-line ' + (i < stepIdx ? 'completed' : '') + '"></div>' : ''}
+      `).join('')}
+    </div>
+
+    <div class="card wizard-card">
+      <div class="wizard-step-header">
+        <span class="wizard-step-icon">${step.icon}</span>
+        <div>
+          <h3 style="color:var(--text);text-transform:none;letter-spacing:0;font-size:16px;margin-bottom:2px">Step ${stepIdx + 1}: ${step.label}</h3>
+          <p class="text-muted text-sm">${getContentStepDesc(stepIdx)}</p>
+        </div>
+      </div>
+      <div class="wizard-step-body">
+        ${renderContentWizardStep(stepIdx)}
+      </div>
+    </div>
+
+    <div class="wizard-nav">
+      <div>
+        ${stepIdx > 0 ? `<button class="btn btn-outline" onclick="contentWizardBack()">Back</button>` : ''}
+      </div>
+      <div class="flex gap-2">
+        ${stepIdx === 0 && cw.type ? `
+          <button class="btn btn-primary" onclick="contentWizardNext()">Next: Details &#8594;</button>
+        ` : ''}
+        ${stepIdx === 1 ? `
+          <button class="btn btn-primary" onclick="contentWizardNext()">Next: Generate &#8594;</button>
+        ` : ''}
+        ${stepIdx === 2 && cw.result ? `
+          <button class="btn btn-outline" onclick="contentWizardGenerate()">Regenerate</button>
+          <button class="btn btn-primary" onclick="contentWizardNext()">Next: Share &#8594;</button>
+        ` : ''}
+        ${stepIdx === 3 ? `
+          <button class="btn btn-primary" onclick="exitContentWizard(); loadContent();">Done</button>
+        ` : ''}
+      </div>
+    </div>
+  `;
+
+  // Auto-generate on step 3 if no result yet
+  if (stepIdx === 2 && !cw.result && !cw.generating) {
+    contentWizardGenerate();
+  }
+}
+
+function getContentStepDesc(step) {
+  switch (step) {
+    case 0: return 'What kind of content do you want to create?';
+    case 1: return 'Tell us about your content so AI can tailor it perfectly.';
+    case 2: return 'AI is creating your content. Review and tweak as needed.';
+    case 3: return 'Share your content directly to social media platforms.';
+  }
+}
+
+function renderContentWizardStep(step) {
+  const cw = contentWizard;
+
+  switch (step) {
+    case 0: return `
+      <div class="wizard-type-grid">
+        ${[
+          { val: 'email', icon: '&#9993;', title: 'Marketing Email', desc: 'Promotional emails, newsletters, follow-ups' },
+          { val: 'social', icon: '&#128172;', title: 'Social Media Post', desc: 'LinkedIn, Twitter, Instagram, Facebook' },
+          { val: 'ad', icon: '&#128226;', title: 'Ad Copy', desc: 'Google Ads, Facebook Ads, LinkedIn Ads' },
+          { val: 'seo', icon: '&#128269;', title: 'SEO Strategy', desc: 'Keywords, content ideas, meta descriptions' },
+        ].map(t => `
+          <div class="wizard-type-card ${cw.type === t.val ? 'selected' : ''}"
+            onclick="contentWizard.type='${t.val}'; contentWizard.inputs={}; renderContentWizard();">
+            <div class="wizard-type-icon">${t.icon}</div>
+            <div class="wizard-type-title">${t.title}</div>
+            <div class="wizard-type-desc">${t.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    case 1:
+      return renderContentDetailsForm(cw.type) + `
+        ${cw.type !== 'seo' ? `
+          <div class="cw-divider" style="margin:20px 0"></div>
+          <div class="form-group">
+            <label>Poster Design Style</label>
+            <small class="text-muted" style="display:block;margin-bottom:8px">Choose a visual style for your content poster. Select "No Poster" for text only.</small>
+            <div class="poster-style-grid">
+              ${POSTER_STYLES.map(s => `
+                <div class="poster-style-card ${cw.posterStyle === s.id ? 'selected' : ''}"
+                  onclick="contentWizard.posterStyle='${s.id}'; renderContentWizard();">
+                  ${s.colors ? `
+                    <div class="poster-style-preview" style="background:${s.colors.length === 3 && s.id === 'gradient' ? `linear-gradient(135deg, ${s.colors[0]}, ${s.colors[1]})` : s.colors[0]}">
+                      <div style="color:${s.colors[2] || '#fff'};font-size:10px;font-weight:700">Aa</div>
+                      <div style="width:20px;height:3px;border-radius:2px;background:${s.colors[1]};margin-top:2px"></div>
+                    </div>
+                  ` : `<div class="poster-style-preview" style="background:var(--surface2);display:flex;align-items:center;justify-content:center"><span class="text-muted" style="font-size:10px">OFF</span></div>`}
+                  <div class="poster-style-label">${s.label}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+      `;
+
+    case 2:
+      if (cw.generating) return `
+        <div style="text-align:center;padding:40px">
+          <div style="font-size:36px;margin-bottom:16px;animation:pulse 1.5s infinite">&#9733;</div>
+          <h3 style="color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:8px">AI is generating your content...</h3>
+          <p class="text-muted">This usually takes a few seconds.</p>
+        </div>
+      `;
+      if (cw.result) {
+        const contentHtml = formatContentDisplay(
+          cw.type === 'social' ? 'social_post' : cw.type === 'ad' ? 'ad_copy' : cw.type === 'seo' ? 'seo_keywords' : cw.type,
+          cw.result
+        );
+        const posterHtml = cw.posterStyle !== 'none' && cw.type !== 'seo' ? renderPosterPreview(cw) : '';
+        return posterHtml + contentHtml;
+      }
+      return '<div class="empty">Something went wrong. Click "Regenerate" to try again.</div>';
+
+    case 3: return renderShareStep(cw);
+  }
+}
+
+function renderContentDetailsForm(type) {
+  const inp = contentWizard.inputs;
+  switch (type) {
+    case 'email': return `
+      <div class="form-group">
+        <label>What's the purpose of this email?</label>
+        <select id="cw-purpose" onchange="contentWizard.inputs.purpose=this.value">
+          ${['promotional','follow-up','nurture','announcement','welcome','re-engagement'].map(p => `<option value="${p}" ${inp.purpose===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
+        </select>
+        <small class="text-muted">This helps AI match the right tone and structure.</small>
+      </div>
+      <div class="form-group">
+        <label>Who is this email for?</label>
+        <input id="cw-audience" value="${inp.audience||''}" placeholder="e.g., SaaS founders, new signups, existing customers..."
+          oninput="contentWizard.inputs.audience=this.value">
+        <small class="text-muted">Describe your target audience so the message resonates.</small>
+      </div>
+      <div class="form-group">
+        <label>What tone should it have?</label>
+        <select id="cw-tone" onchange="contentWizard.inputs.tone=this.value">
+          ${['professional','casual','urgent','friendly','inspirational'].map(t => `<option value="${t}" ${inp.tone===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Describe your product or service</label>
+        <textarea id="cw-product" placeholder="What are you promoting? Include key benefits, features, or offers..."
+          oninput="contentWizard.inputs.productInfo=this.value" style="min-height:100px">${inp.productInfo||''}</textarea>
+        <small class="text-muted">The more details you give, the better the email will be.</small>
+      </div>
+    `;
+
+    case 'social': return `
+      <div class="form-group">
+        <label>Which platform?</label>
+        <div class="wizard-type-grid" style="grid-template-columns:repeat(4,1fr)">
+          ${['linkedin','twitter','instagram','facebook'].map(p => `
+            <div class="wizard-type-card ${(inp.platform||'linkedin')===p?'selected':''}" style="padding:12px"
+              onclick="contentWizard.inputs.platform='${p}'; renderContentWizard();">
+              <div class="wizard-type-title" style="font-size:13px">${p.charAt(0).toUpperCase()+p.slice(1)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>What should the post be about?</label>
+        <input id="cw-topic" value="${inp.topic||''}" placeholder="e.g., New product launch, industry insight, customer success story..."
+          oninput="contentWizard.inputs.topic=this.value">
+        <small class="text-muted">Describe the topic or key message you want to convey.</small>
+      </div>
+      <div class="form-group">
+        <label>What tone?</label>
+        <select id="cw-tone" onchange="contentWizard.inputs.tone=this.value">
+          ${['professional','casual','inspirational','educational','humorous'].map(t => `<option value="${t}" ${inp.tone===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
+        </select>
+      </div>
+    `;
+
+    case 'ad': return `
+      <div class="form-group">
+        <label>Which ad platform?</label>
+        <div class="wizard-type-grid" style="grid-template-columns:repeat(4,1fr)">
+          ${['google','facebook','linkedin','instagram'].map(p => `
+            <div class="wizard-type-card ${(inp.platform||'google')===p?'selected':''}" style="padding:12px"
+              onclick="contentWizard.inputs.platform='${p}'; renderContentWizard();">
+              <div class="wizard-type-title" style="font-size:13px">${p.charAt(0).toUpperCase()+p.slice(1)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>What's your campaign objective?</label>
+        <select id="cw-objective" onchange="contentWizard.inputs.objective=this.value">
+          ${['conversions','awareness','traffic','leads','app installs'].map(o => `<option value="${o}" ${inp.objective===o?'selected':''}>${o.charAt(0).toUpperCase()+o.slice(1)}</option>`).join('')}
+        </select>
+        <small class="text-muted">This shapes the ad copy style and call-to-action.</small>
+      </div>
+      <div class="form-group">
+        <label>Who are you targeting?</label>
+        <input id="cw-audience" value="${inp.audience||''}" placeholder="e.g., Small business owners, age 25-45, interested in marketing tools..."
+          oninput="contentWizard.inputs.audience=this.value">
+      </div>
+      <div class="form-group">
+        <label>Describe your product or service</label>
+        <textarea id="cw-product" placeholder="What are you advertising? Include key selling points..."
+          oninput="contentWizard.inputs.productInfo=this.value" style="min-height:100px">${inp.productInfo||''}</textarea>
+      </div>
+    `;
+
+    case 'seo': return `
+      <div class="form-group">
+        <label>What topic or niche?</label>
+        <input id="cw-topic" value="${inp.topic||''}" placeholder="e.g., AI marketing automation, organic skincare, cloud hosting..."
+          oninput="contentWizard.inputs.topic=this.value">
+        <small class="text-muted">The main topic you want to rank for.</small>
+      </div>
+      <div class="form-group">
+        <label>What industry are you in?</label>
+        <input id="cw-industry" value="${inp.industry||''}" placeholder="e.g., B2B SaaS, e-commerce, healthcare, food & beverage..."
+          oninput="contentWizard.inputs.industry=this.value">
+      </div>
+      <div class="form-group">
+        <label>Who are your competitors? (optional)</label>
+        <input id="cw-competitors" value="${inp.competitors||''}" placeholder="e.g., HubSpot, Salesforce, Mailchimp..."
+          oninput="contentWizard.inputs.competitors=this.value">
+        <small class="text-muted">Helps AI suggest keywords your competitors may be missing.</small>
+      </div>
+    `;
+  }
+}
+
+// Generate a beautiful poster as HTML
+function renderPosterPreview(cw) {
+  const style = POSTER_STYLES.find(s => s.id === cw.posterStyle);
+  if (!style || !style.colors) return '';
+
+  const data = cw.result || {};
+  let headline = '';
+  let subtitle = '';
+  let cta = '';
+
+  if (cw.type === 'email') {
+    headline = data.subject || 'Your Email Subject';
+    subtitle = data.preview_text || '';
+    cta = 'Read More';
+  } else if (cw.type === 'social') {
+    const text = data.post_text || '';
+    headline = text.split('\n')[0]?.substring(0, 80) || 'Social Post';
+    subtitle = (data.hashtags || []).slice(0, 4).join(' ');
+    cta = data.best_time_to_post ? `Post at ${data.best_time_to_post.substring(0, 20)}` : '';
+  } else if (cw.type === 'ad') {
+    headline = (data.headline_options || [])[0] || 'Your Ad Headline';
+    subtitle = (data.description_options || [])[0] || '';
+    cta = (data.cta_options || [])[0] || 'Learn More';
+  }
+
+  const bg = cw.posterStyle === 'gradient'
+    ? `linear-gradient(135deg, ${style.colors[0]}, ${style.colors[1]})`
+    : style.colors[0];
+  const textColor = style.colors[2] || '#ffffff';
+  const accentColor = style.colors[1];
+
+  return `
+    <div class="poster-container" id="poster-preview">
+      <div class="poster" style="background:${bg};color:${textColor}">
+        <div class="poster-badge" style="background:${accentColor};color:${cw.posterStyle === 'minimal' ? '#fff' : textColor}">
+          ${cw.type === 'email' ? 'EMAIL' : cw.type === 'social' ? 'SOCIAL' : 'AD'}
+        </div>
+        <div class="poster-headline" style="color:${textColor}">${headline}</div>
+        ${subtitle ? `<div class="poster-subtitle" style="color:${textColor};opacity:0.8">${subtitle}</div>` : ''}
+        ${cta ? `<div class="poster-cta" style="background:${accentColor};color:${cw.posterStyle === 'minimal' ? '#fff' : textColor}">${cta}</div>` : ''}
+        <div class="poster-brand" style="color:${textColor};opacity:0.5">SalesAgent AI</div>
+      </div>
+      <div class="text-sm text-muted" style="text-align:center;margin-top:8px">
+        Poster Style: ${style.label}
+        &nbsp;&middot;&nbsp;
+        <a href="#" onclick="event.preventDefault(); downloadPoster()" style="color:var(--primary)">Download as Image</a>
+      </div>
+    </div>
+    <div class="cw-divider" style="margin:16px 0"></div>
+  `;
+}
+
+// Download poster as image using canvas
+async function downloadPoster() {
+  const poster = document.querySelector('.poster');
+  if (!poster) return;
+
+  try {
+    // Use html2canvas-like approach with SVG foreignObject
+    const html = poster.outerHTML;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400">
+      <foreignObject width="100%" height="100%">
+        <div xmlns="http://www.w3.org/1999/xhtml">${html}</div>
+      </foreignObject>
+    </svg>`;
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'poster.svg';
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('Poster downloaded as SVG!', 'success');
+  } catch (e) {
+    showNotification('Error downloading: ' + e.message, 'error');
+  }
+}
+
+// Share step - social media publishing
+function renderShareStep(cw) {
+  const data = cw.result || {};
+  const postText = cw.type === 'social' ? (data.post_text || '') :
+                   cw.type === 'email' ? (data.subject || '') :
+                   cw.type === 'ad' ? ((data.headline_options || [])[0] || '') : '';
+  const hashtags = (data.hashtags || []).join(' ');
+  const shareText = encodeURIComponent(postText.substring(0, 280));
+
+  const socials = [
+    {
+      id: 'linkedin', name: 'LinkedIn', icon: 'in',
+      color: '#0077B5',
+      shareUrl: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.origin)}&summary=${shareText}`,
+      desc: 'Share as a LinkedIn post'
+    },
+    {
+      id: 'twitter', name: 'Twitter / X', icon: 'X',
+      color: '#1DA1F2',
+      shareUrl: `https://twitter.com/intent/tweet?text=${shareText}`,
+      desc: 'Tweet your content'
+    },
+    {
+      id: 'facebook', name: 'Facebook', icon: 'f',
+      color: '#1877F2',
+      shareUrl: `https://www.facebook.com/sharer/sharer.php?quote=${shareText}`,
+      desc: 'Share on Facebook'
+    },
+    {
+      id: 'whatsapp', name: 'WhatsApp', icon: 'W',
+      color: '#25D366',
+      shareUrl: `https://wa.me/?text=${shareText}`,
+      desc: 'Send via WhatsApp'
+    },
+    {
+      id: 'telegram', name: 'Telegram', icon: 'T',
+      color: '#0088cc',
+      shareUrl: `https://t.me/share/url?text=${shareText}`,
+      desc: 'Share on Telegram'
+    },
+    {
+      id: 'clipboard', name: 'Copy Text', icon: '&#9986;',
+      color: '#6c5ce7',
+      shareUrl: null,
+      desc: 'Copy content to clipboard'
+    },
+  ];
+
+  return `
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:32px;margin-bottom:8px">&#9992;</div>
+      <h3 style="color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:4px">Ready to Share!</h3>
+      <p class="text-muted text-sm">Choose where to publish your content</p>
+    </div>
+
+    ${cw.posterStyle !== 'none' && cw.type !== 'seo' ? `
+      <div style="margin-bottom:16px">
+        ${renderPosterPreview(cw)}
+      </div>
+    ` : ''}
+
+    <div class="share-preview">
+      <div class="cw-label" style="margin-bottom:6px">Content Preview</div>
+      <div class="share-preview-text">${postText.substring(0, 200)}${postText.length > 200 ? '...' : ''}</div>
+      ${hashtags ? `<div class="cw-tags" style="margin-top:8px">${(data.hashtags || []).map(h => `<span class="cw-tag">${h}</span>`).join(' ')}</div>` : ''}
+    </div>
+
+    <div class="cw-divider" style="margin:16px 0"></div>
+
+    <div class="share-grid">
+      ${socials.map(s => `
+        <button class="share-btn" style="--share-color:${s.color}"
+          onclick="${s.shareUrl ? `window.open('${s.shareUrl}', '_blank', 'width=600,height=500')` : `copyContentToClipboard()`}">
+          <div class="share-btn-icon" style="background:${s.color}">
+            <span>${s.icon}</span>
+          </div>
+          <div class="share-btn-info">
+            <div class="share-btn-name">${s.name}</div>
+            <div class="share-btn-desc">${s.desc}</div>
+          </div>
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function copyContentToClipboard() {
+  const cw = contentWizard;
+  if (!cw?.result) return;
+
+  const data = cw.result;
+  let text = '';
+  if (cw.type === 'social') text = data.post_text + '\n\n' + (data.hashtags || []).join(' ');
+  else if (cw.type === 'email') text = 'Subject: ' + data.subject + '\n\n' + (data.body_text || data.body_html || '');
+  else if (cw.type === 'ad') text = (data.headline_options || []).join('\n') + '\n\n' + (data.description_options || []).join('\n');
+  else text = JSON.stringify(data, null, 2);
+
+  navigator.clipboard.writeText(text).then(() => {
+    showNotification('Content copied to clipboard!', 'success');
+  }).catch(() => {
+    showNotification('Failed to copy', 'error');
+  });
+}
+
+function contentWizardSaveInputs() {
+  const ids = {
+    'cw-purpose': 'purpose', 'cw-audience': 'audience', 'cw-tone': 'tone',
+    'cw-product': 'productInfo', 'cw-topic': 'topic', 'cw-platform': 'platform',
+    'cw-objective': 'objective', 'cw-industry': 'industry', 'cw-competitors': 'competitors',
+  };
+  for (const [elId, key] of Object.entries(ids)) {
+    const el = document.getElementById(elId);
+    if (el) contentWizard.inputs[key] = el.value;
+  }
+}
+
+function contentWizardNext() {
+  contentWizardSaveInputs();
+  if (contentWizard.step === 0 && !contentWizard.type) {
+    showNotification('Please select a content type.', 'error');
+    return;
+  }
+  contentWizard.step++;
+  contentWizard.result = null;
+  renderContentWizard();
+}
+
+function contentWizardBack() {
+  contentWizardSaveInputs();
+  contentWizard.step--;
+  renderContentWizard();
+}
+
+function contentWizardGoTo(step) {
+  contentWizardSaveInputs();
+  contentWizard.step = step;
+  renderContentWizard();
+}
+
+function exitContentWizard() {
+  contentWizard = null;
+  loadContent();
+}
+
+async function contentWizardGenerate() {
+  const cw = contentWizard;
+  cw.generating = true;
+  cw.result = null;
+  renderContentWizard();
+
+  try {
+    const inp = cw.inputs;
+    let body = {};
+    if (cw.type === 'email') body = { purpose: inp.purpose||'promotional', audience: inp.audience, tone: inp.tone||'professional', productInfo: inp.productInfo };
+    if (cw.type === 'social') body = { platform: inp.platform||'linkedin', topic: inp.topic, tone: inp.tone||'professional' };
+    if (cw.type === 'ad') body = { platform: inp.platform||'google', objective: inp.objective||'conversions', audience: inp.audience, productInfo: inp.productInfo };
+    if (cw.type === 'seo') body = { topic: inp.topic, industry: inp.industry, competitors: inp.competitors };
+
+    const result = await api.post(`/agent/generate/${cw.type}`, body);
+    cw.result = result;
+    cw.generating = false;
+    showNotification('Content generated!', 'success');
+    renderContentWizard();
+  } catch (e) {
+    cw.generating = false;
+    showNotification('Error: ' + e.message, 'error');
+    renderContentWizard();
+  }
+}
+
+// Keep showGenerateModal for dashboard quick actions — redirect to wizard
+function showGenerateModal(type) {
+  navigate('content');
+  setTimeout(() => startContentWizard(type), 100);
+}
+
+function gv(id) { return document.getElementById(id)?.value || ''; }
+
+// ========== Chat ==========
+let chatMessages = [];
+
+function renderChatPage() {
+  return `
+    <div class="toolbar"><h2>AI Sales Assistant</h2></div>
+    <div class="chat-container">
+      <div class="chat-messages" id="chat-messages">
+        ${chatMessages.length ? chatMessages.map(m => `
+          <div class="chat-msg ${m.role}">${m.text}</div>
+        `).join('') : `
+          <div class="empty">
+            <h3 style="margin-bottom:8px">Chat with your AI Sales Assistant</h3>
+            <p class="text-muted">Ask about your leads, pipeline, campaigns, or get marketing advice.</p>
+            <div class="flex gap-2" style="justify-content:center;margin-top:16px;flex-wrap:wrap">
+              <button class="btn btn-outline" onclick="sendChat('What are my top priority leads right now?')">Top priority leads</button>
+              <button class="btn btn-outline" onclick="sendChat('Suggest 5 marketing actions I should take this week')">Weekly actions</button>
+              <button class="btn btn-outline" onclick="sendChat('How can I improve my email open rates?')">Improve open rates</button>
+              <button class="btn btn-outline" onclick="sendChat('Write a follow-up strategy for cold leads')">Cold lead strategy</button>
+            </div>
+          </div>
+        `}
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Ask the AI assistant anything about sales & marketing..." onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="btn btn-primary" onclick="sendChat()">Send</button>
+      </div>
+    </div>
+  `;
+}
+
+async function sendChat(text) {
+  const input = document.getElementById('chat-input');
+  const message = text || input?.value?.trim();
+  if (!message) return;
+
+  chatMessages.push({ role: 'user', text: message });
+  if (input) input.value = '';
+  renderChatMessages();
+
+  try {
+    const result = await api.post('/agent/chat', { message });
+    chatMessages.push({ role: 'ai', text: result.response });
+  } catch (e) {
+    chatMessages.push({ role: 'ai', text: `Error: ${e.message}` });
+  }
+  renderChatMessages();
+}
+
+function renderChatMessages() {
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  el.innerHTML = chatMessages.map(m => `<div class="chat-msg ${m.role}">${m.text}</div>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ========== Bulk Import ==========
+function showBulkImportModal() {
+  modal = {
+    title: 'Import Leads from CSV',
+    body: `
+      <div class="form-group">
+        <label>Paste CSV data (name,email,company,title,phone,source)</label>
+        <textarea id="f-csv" style="min-height:200px" placeholder="John Doe,john@example.com,Acme Inc,CEO,555-1234,linkedin
+Jane Smith,jane@example.com,TechCorp,CTO,555-5678,website"></textarea>
+      </div>
+    `,
+    onSave: async () => {
+      const csv = document.getElementById('f-csv').value.trim();
+      const lines = csv.split('\n').filter(l => l.trim());
+      let imported = 0;
+      for (const line of lines) {
+        const [name, email, company, title, phone, source] = line.split(',').map(s => s.trim());
+        if (name && email) {
+          try {
+            await api.post('/leads', { name, email, company, title, phone, source: source || 'import' });
+            imported++;
+          } catch (e) { /* skip duplicates */ }
+        }
+      }
+      modal = null;
+      showNotification(`Imported ${imported}/${lines.length} leads`, 'success');
+      navigate('leads');
+    },
+  };
+  render();
+}
+
+// ========== Modals & Notifications ==========
+function renderModal() {
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this){modal=null;render();}">
+      <div class="modal">
+        <h2>${modal.title}</h2>
+        <div>${modal.body}</div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="modal=null;render();">Cancel</button>
+          ${modal.onSave ? `<button class="btn btn-primary" onclick="modal.onSave()">${modal.saveLabel || 'Save'}</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function showResultModal(title, body) {
+  modal = { title, body };
+  render();
+}
+
+function showNotification(msg, type = 'info') {
+  const n = document.createElement('div');
+  n.style.cssText = `position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;z-index:200;font-size:14px;max-width:400px;animation:slideIn 0.3s;${
+    type === 'error' ? 'background:var(--danger);' : type === 'success' ? 'background:var(--success);' : 'background:var(--primary);'
+  }color:white;`;
+  n.textContent = msg;
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 4000);
+}
+
+// ========== Accounts (Superadmin) ==========
+async function loadAccounts() {
+  if (currentUser?.role !== 'superadmin') { navigate('dashboard'); return; }
+  try {
+    const users = await api.get('/users');
+    // Get overall AI cost
+    const costData = await api.get('/campaigns/ai-costs').catch(() => ({ overall: { total_cost: 0 } }));
+
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar">
+        <h2>Account Management</h2>
+        <button class="btn btn-primary" onclick="showCreateAccountModal()">+ Create Account</button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value blue">${users.length}</div>
+          <div class="stat-label">Total Accounts</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value green">${users.filter(u => u.status === 'active').length}</div>
+          <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value yellow">$${costData.overall.total_cost.toFixed(4)}</div>
+          <div class="stat-label">Total AI Spend</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value purple">$${users.reduce((s,u) => s + (u.monthly_system_cost || 0), 0).toFixed(2)}</div>
+          <div class="stat-label">Est. Monthly System Cost</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <tr><th>User</th><th>Role</th><th>Status</th><th>Leads</th><th>Campaigns</th><th>AI Spend</th><th>Budget</th><th>Monthly Cost</th><th>Total Cost</th><th>Actions</th></tr>
+          ${users.map(u => {
+            const totalCost = (u.ai_spend || 0) + (u.monthly_system_cost || 0);
+            const budgetPct = u.budget_limit > 0 ? Math.min((u.ai_spend / u.budget_limit) * 100, 100) : 0;
+            return `
+            <tr>
+              <td>
+                <strong>${u.display_name || u.username}</strong>
+                <div class="text-muted text-sm">${u.email}</div>
+              </td>
+              <td><span class="badge badge-${u.role === 'superadmin' ? 'active' : 'new'}">${u.role}</span></td>
+              <td><span class="badge badge-${u.status === 'active' ? 'active' : 'paused'}">${u.status}</span></td>
+              <td>${u.lead_count}</td>
+              <td>${u.campaign_count}</td>
+              <td>$${(u.ai_spend || 0).toFixed(4)}</td>
+              <td>
+                ${u.budget_limit > 0 ? `$${u.budget_limit.toFixed(2)}` : 'Unlimited'}
+                ${u.budget_limit > 0 ? `<div class="camp-budget-bar" style="margin-top:4px"><div class="camp-budget-fill ${budgetPct >= 100 ? 'over' : ''}" style="width:${budgetPct}%"></div></div>` : ''}
+              </td>
+              <td>$${(u.monthly_system_cost || 0).toFixed(2)}</td>
+              <td><strong>$${totalCost.toFixed(4)}</strong></td>
+              <td>
+                <div class="flex gap-2">
+                  <button class="btn btn-sm btn-outline" onclick="showEditAccountModal(${u.id})">Edit</button>
+                  ${u.role !== 'superadmin' ? `
+                    <button class="btn btn-sm btn-${u.status === 'active' ? 'warning' : 'success'}" style="background:${u.status === 'active' ? 'var(--warning)' : 'var(--success)'};color:white"
+                      onclick="toggleAccountStatus(${u.id}, '${u.status === 'active' ? 'suspended' : 'active'}')">
+                      ${u.status === 'active' ? 'Suspend' : 'Activate'}
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteAccount(${u.id}, '${u.username}')">X</button>
+                  ` : ''}
+                </div>
+              </td>
+            </tr>
+          `; }).join('')}
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+function showCreateAccountModal() {
+  modal = {
+    title: 'Create New Account',
+    body: `
+      <div class="form-group"><label>Username *</label><input id="f-username" placeholder="e.g. john"></div>
+      <div class="form-group"><label>Email *</label><input id="f-email" type="email" placeholder="john@company.com"></div>
+      <div class="form-group"><label>Display Name</label><input id="f-display" placeholder="John Smith"></div>
+      <div class="form-group"><label>Password *</label><input id="f-password" type="password" placeholder="Min 4 characters"></div>
+      <div class="form-group"><label>Role</label>
+        <select id="f-role"><option value="user">User</option><option value="superadmin">Super Admin</option></select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>AI Budget Limit ($)</label><input id="f-budget" type="number" step="0.01" value="0" placeholder="0 = unlimited"></div>
+        <div class="form-group"><label>Monthly System Cost ($)</label><input id="f-monthly" type="number" step="0.01" value="0" placeholder="Estimated monthly charge"></div>
+      </div>
+    `,
+    onSave: async () => {
+      const data = {
+        username: gv('f-username'), email: gv('f-email'), display_name: gv('f-display'),
+        password: document.getElementById('f-password')?.value,
+        role: gv('f-role'),
+        budget_limit: parseFloat(gv('f-budget')) || 0,
+        monthly_system_cost: parseFloat(gv('f-monthly')) || 0,
+      };
+      await api.post('/users', data);
+      modal = null;
+      showNotification('Account created!', 'success');
+      navigate('accounts');
+    },
+  };
+  render();
+}
+
+async function showEditAccountModal(userId) {
+  const user = await api.get(`/users/${userId}`);
+  modal = {
+    title: `Edit Account: ${user.display_name || user.username}`,
+    body: `
+      <div class="form-group"><label>Display Name</label><input id="f-display" value="${user.display_name || ''}"></div>
+      <div class="form-group"><label>Email</label><input id="f-email" value="${user.email}"></div>
+      <div class="form-group"><label>Role</label>
+        <select id="f-role">${['user','superadmin'].map(r => `<option value="${r}" ${user.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>AI Budget Limit ($)</label>
+          <input id="f-budget" type="number" step="0.01" value="${user.budget_limit || 0}">
+          <small class="text-muted">Current AI spend: $${(user.ai_spend || 0).toFixed(4)}</small>
+        </div>
+        <div class="form-group">
+          <label>Monthly System Cost ($)</label>
+          <input id="f-monthly" type="number" step="0.01" value="${user.monthly_system_cost || 0}">
+          <small class="text-muted">Estimated monthly access charge</small>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>New Password (leave empty to keep current)</label>
+        <input id="f-password" type="password" placeholder="Leave blank to keep">
+      </div>
+    `,
+    onSave: async () => {
+      await api.put(`/users/${userId}`, {
+        display_name: gv('f-display'), email: gv('f-email'), role: gv('f-role'),
+        budget_limit: parseFloat(gv('f-budget')) || 0,
+        monthly_system_cost: parseFloat(gv('f-monthly')) || 0,
+      });
+      const newPass = document.getElementById('f-password')?.value;
+      if (newPass) await api.put(`/users/${userId}/password`, { password: newPass });
+      modal = null;
+      showNotification('Account updated!', 'success');
+      navigate('accounts');
+    },
+  };
+  render();
+}
+
+async function toggleAccountStatus(userId, newStatus) {
+  if (!confirm(`${newStatus === 'suspended' ? 'Suspend' : 'Activate'} this account?`)) return;
+  await api.put(`/users/${userId}`, { status: newStatus });
+  showNotification(`Account ${newStatus}`, 'success');
+  loadAccounts();
+}
+
+async function deleteAccount(userId, username) {
+  if (!confirm(`Delete account "${username}" and ALL their data? This cannot be undone.`)) return;
+  await api.del(`/users/${userId}`);
+  showNotification('Account deleted', 'success');
+  loadAccounts();
+}
+
+// ========== Settings ==========
+async function loadSettings() {
+  try {
+    const settings = await api.get('/settings');
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar"><h2>Settings</h2></div>
+
+      <div class="card">
+        <h3>AI Configuration</h3>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span style="width:12px;height:12px;border-radius:50%;background:${settings._api_key_set ? 'var(--success)' : 'var(--danger)'};display:inline-block"></span>
+          <span class="text-sm">${settings._api_key_set ? 'API key is configured' : 'No API key set — AI features will not work'}</span>
+        </div>
+
+        <div class="form-group">
+          <label>AI Provider</label>
+          <select id="s-provider">
+            <option value="anthropic" ${settings.ai_provider === 'anthropic' ? 'selected' : ''}>Anthropic (Claude)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>AI Model</label>
+          <select id="s-model">
+            <option value="claude-sonnet-4-20250514" ${settings.ai_model === 'claude-sonnet-4-20250514' ? 'selected' : ''}>Claude Sonnet 4 (Recommended)</option>
+            <option value="claude-opus-4-20250514" ${settings.ai_model === 'claude-opus-4-20250514' ? 'selected' : ''}>Claude Opus 4 (Most capable)</option>
+            <option value="claude-haiku-4-5-20251001" ${settings.ai_model === 'claude-haiku-4-5-20251001' ? 'selected' : ''}>Claude Haiku 4.5 (Fastest)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>API Key</label>
+          <div class="flex gap-2">
+            <input id="s-apikey" type="password" value="${settings.api_key || ''}" placeholder="sk-ant-...">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('s-apikey').type = document.getElementById('s-apikey').type === 'password' ? 'text' : 'password'">Show</button>
+          </div>
+          <small class="text-muted">Get your API key from <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--primary)">console.anthropic.com</a></small>
+        </div>
+
+        <div class="flex gap-2" style="margin-top:16px">
+          <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+          <button class="btn btn-outline" onclick="testAiConnection()">Test Connection</button>
+        </div>
+        <div id="settings-status" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
+        <h3>Email / SMTP Configuration</h3>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>SMTP Host</label>
+            <input id="s-smtp-host" value="${settings.smtp_host || ''}" placeholder="smtp.gmail.com">
+          </div>
+          <div class="form-group">
+            <label>SMTP Port</label>
+            <input id="s-smtp-port" type="number" value="${settings.smtp_port || '587'}" placeholder="587">
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>SMTP User</label>
+            <input id="s-smtp-user" value="${settings.smtp_user || ''}" placeholder="your-email@gmail.com">
+          </div>
+          <div class="form-group">
+            <label>SMTP Password</label>
+            <input id="s-smtp-pass" type="password" value="${settings.smtp_pass || ''}" placeholder="App password">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>From Email</label>
+          <input id="s-from-email" value="${settings.from_email || ''}" placeholder="your-email@gmail.com">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:12px">Save Settings</button>
+      </div>
+
+      <div class="card">
+        <h3>Admin Security</h3>
+        <p class="text-muted text-sm mb-4">This password protects the System Logic page (super admin access).</p>
+        <div class="form-group">
+          <label>Admin Password</label>
+          <div class="flex gap-2">
+            <input id="s-admin-pass" type="password" value="${settings.admin_password || ''}" placeholder="Admin password">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('s-admin-pass').type = document.getElementById('s-admin-pass').type === 'password' ? 'text' : 'password'">Show</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:12px">Save Settings</button>
+      </div>
+    `;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error loading settings: ${e.message}</div>`;
+  }
+}
+
+async function saveSettings() {
+  const data = {
+    ai_provider: gv('s-provider'),
+    ai_model: gv('s-model'),
+    api_key: document.getElementById('s-apikey')?.value || '',
+    smtp_host: gv('s-smtp-host'),
+    smtp_port: gv('s-smtp-port'),
+    smtp_user: gv('s-smtp-user'),
+    smtp_pass: document.getElementById('s-smtp-pass')?.value || '',
+    from_email: gv('s-from-email'),
+    admin_password: document.getElementById('s-admin-pass')?.value || '',
+  };
+
+  try {
+    await api.put('/settings', data);
+    showNotification('Settings saved!', 'success');
+    loadSettings();
+  } catch (e) {
+    showNotification('Error saving: ' + e.message, 'error');
+  }
+}
+
+async function testAiConnection() {
+  const statusEl = document.getElementById('settings-status');
+  if (statusEl) statusEl.innerHTML = '<span class="text-muted">Testing connection...</span>';
+
+  try {
+    // Save first so the test uses latest key
+    await saveSettings();
+    const result = await api.post('/settings/test-ai');
+    if (statusEl) {
+      if (result.success) {
+        statusEl.innerHTML = `<span style="color:var(--success)">Connected successfully! Model: ${result.model}</span>`;
+      } else {
+        statusEl.innerHTML = `<span style="color:var(--danger)">Connection failed: ${result.error}</span>`;
+      }
+    }
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">Error: ${e.message}</span>`;
+  }
+}
+
+// ========== System Logic ==========
+let slAdminPassword = '';
+let slAuthenticated = true; // Auth handled by login now
+let slActiveTopic = null;
+let slAutoRefreshTimer = null;
+let slLastHash = '';
+
+function slAuthHeaders() {
+  return {}; // Auth handled by bearer token now
+}
+
+async function loadSystemLogic() {
+  // If not authenticated, show password gate
+  if (!slAuthenticated) {
+    document.getElementById('page').innerHTML = `
+      <div style="max-width:400px;margin:80px auto;text-align:center">
+        <div style="font-size:48px;margin-bottom:16px">&#9883;</div>
+        <h2 style="margin-bottom:8px">System Logic</h2>
+        <p class="text-muted mb-4">Super Admin access required</p>
+        <div class="card">
+          <div class="form-group">
+            <label>Admin Password</label>
+            <input id="sl-password" type="password" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')slLogin()">
+          </div>
+          <div id="sl-auth-error" style="color:var(--danger);font-size:13px;margin-bottom:12px;display:none"></div>
+          <button class="btn btn-primary" style="width:100%" onclick="slLogin()">Unlock</button>
+          <p class="text-muted text-sm" style="margin-top:12px">Default password: admin123 &mdash; change it in Settings</p>
+        </div>
+      </div>
+    `;
+    setTimeout(() => document.getElementById('sl-password')?.focus(), 100);
+    return;
+  }
+
+  // Authenticated — load the system logic page
+  try {
+    const data = await api.get('/system-logic', slAuthHeaders());
+    if (data.error) { slAuthenticated = false; loadSystemLogic(); return; }
+
+    const topics = Object.keys(data.grouped);
+    if (!slActiveTopic || !topics.includes(slActiveTopic)) slActiveTopic = topics[0] || null;
+
+    const topicEntries = slActiveTopic ? (data.grouped[slActiveTopic] || []) : [];
+
+    // Compute a hash to detect changes
+    const newHash = JSON.stringify(data.entries.map(e => e.updated_at));
+    const changed = slLastHash && slLastHash !== newHash;
+    slLastHash = newHash;
+
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar">
+        <h2>System Logic</h2>
+        <div class="flex gap-2">
+          <button class="btn btn-primary" onclick="slShowAddEntry()">+ Add Entry</button>
+          <button class="btn btn-outline" onclick="slLock()">Lock</button>
+          <div style="display:flex;align-items:center;gap:6px;margin-left:12px">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;animation:pulse 2s infinite"></span>
+            <span class="text-sm text-muted">Auto-updating</span>
+          </div>
+        </div>
+      </div>
+
+      ${changed ? '<div style="background:rgba(59,130,246,0.15);border:1px solid var(--primary);border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;font-size:13px">Content updated — changes detected from code.</div>' : ''}
+
+      <div style="display:flex;gap:16px">
+        <!-- Topic Sidebar -->
+        <div style="min-width:200px">
+          <div class="card" style="padding:12px">
+            <h3 style="margin-bottom:12px">Topics</h3>
+            ${topics.map(t => `
+              <div class="nav-item ${slActiveTopic === t ? 'active' : ''}" style="padding:8px 12px;border-radius:6px;margin-bottom:2px;font-size:13px;border-right:none;${slActiveTopic === t ? 'background:rgba(59,130,246,0.15);color:var(--primary)' : ''}" onclick="slActiveTopic='${t}';loadSystemLogic()">
+                ${t}
+                <span class="badge badge-new" style="margin-left:auto">${(data.grouped[t] || []).length}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Entries -->
+        <div style="flex:1">
+          ${slActiveTopic ? `<h3 style="margin-bottom:12px;font-size:16px">${slActiveTopic}</h3>` : ''}
+          ${topicEntries.length ? topicEntries.map(entry => `
+            <div class="card" style="border-left:3px solid var(--primary)">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div>
+                  <h3 style="color:var(--text);text-transform:none;letter-spacing:0;font-size:15px;margin-bottom:4px">${escHtml(entry.title)}</h3>
+                  ${entry.description ? `<p class="text-muted text-sm" style="margin-bottom:6px">${escHtml(entry.description)}</p>` : ''}
+                  ${entry.code_ref ? `<code style="font-size:11px;background:var(--bg);padding:2px 6px;border-radius:4px;color:var(--primary)">${escHtml(entry.code_ref)}</code>` : ''}
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn btn-sm btn-outline" onclick="slEditEntry(${entry.id})">Edit</button>
+                  <button class="btn btn-sm btn-danger" onclick="slDeleteEntry(${entry.id})">X</button>
+                </div>
+              </div>
+              <div style="margin-top:12px;white-space:pre-wrap;font-size:13px;line-height:1.6;color:var(--text);background:var(--bg);padding:14px;border-radius:6px">${escHtml(entry.content)}</div>
+              <div class="text-muted text-sm" style="margin-top:8px">Updated: ${new Date(entry.updated_at).toLocaleString()}</div>
+            </div>
+          `).join('') : '<div class="empty">No entries in this topic.</div>'}
+        </div>
+      </div>
+    `;
+
+    // Start auto-refresh polling
+    slStartAutoRefresh();
+
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function slLogin() {
+  const pw = document.getElementById('sl-password')?.value;
+  if (!pw) return;
+  try {
+    const result = await api.post('/system-logic/auth', { password: pw });
+    if (result.success) {
+      slAdminPassword = pw;
+      slAuthenticated = true;
+      sessionStorage.setItem('sl_admin_pw', pw);
+      loadSystemLogic();
+    } else {
+      const errEl = document.getElementById('sl-auth-error');
+      if (errEl) { errEl.textContent = 'Wrong password'; errEl.style.display = 'block'; }
+    }
+  } catch (e) {
+    const errEl = document.getElementById('sl-auth-error');
+    if (errEl) { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
+  }
+}
+
+function slLock() {
+  slAuthenticated = false;
+  slAdminPassword = '';
+  sessionStorage.removeItem('sl_admin_pw');
+  slStopAutoRefresh();
+  loadSystemLogic();
+}
+
+function slStartAutoRefresh() {
+  slStopAutoRefresh();
+  slAutoRefreshTimer = setInterval(async () => {
+    if (currentPage !== 'system-logic' || !slAuthenticated) { slStopAutoRefresh(); return; }
+    // Silently re-fetch and check for changes
+    try {
+      const data = await api.get('/system-logic', slAuthHeaders());
+      if (data.error) return;
+      const newHash = JSON.stringify(data.entries.map(e => e.updated_at));
+      if (newHash !== slLastHash) {
+        loadSystemLogic(); // Re-render with change indicator
+      }
+    } catch (e) { /* silent */ }
+  }, 3000); // Poll every 3 seconds
+}
+
+function slStopAutoRefresh() {
+  if (slAutoRefreshTimer) { clearInterval(slAutoRefreshTimer); slAutoRefreshTimer = null; }
+}
+
+async function slShowAddEntry() {
+  const topicsData = await api.get('/system-logic/topics', slAuthHeaders());
+  const existingTopics = topicsData.map ? topicsData.map(t => t.topic) : [];
+
+  modal = {
+    title: 'Add System Logic Entry',
+    body: `
+      <div class="form-group">
+        <label>Topic</label>
+        <input id="sl-topic" list="sl-topics" value="${slActiveTopic || ''}" placeholder="e.g., AI Engine, API Layer, Services">
+        <datalist id="sl-topics">${existingTopics.map(t => `<option value="${t}">`).join('')}</datalist>
+      </div>
+      <div class="form-group"><label>Title</label><input id="sl-title" placeholder="Entry title"></div>
+      <div class="form-group"><label>Description</label><input id="sl-desc" placeholder="Short description"></div>
+      <div class="form-group"><label>Code Reference</label><input id="sl-coderef" placeholder="e.g., src/services/ai-agent.js"></div>
+      <div class="form-group"><label>Content</label><textarea id="sl-content" style="min-height:150px" placeholder="Detailed explanation of how this part of the system works"></textarea></div>
+      <div class="form-group"><label>Sort Order</label><input id="sl-sort" type="number" value="0"></div>
+    `,
+    onSave: async () => {
+      await api.post('/system-logic', {
+        topic: gv('sl-topic'), title: gv('sl-title'), description: gv('sl-desc'),
+        code_ref: gv('sl-coderef'), content: gv('sl-content'), sort_order: parseInt(gv('sl-sort') || '0'),
+      }, slAuthHeaders());
+      modal = null;
+      slActiveTopic = gv('sl-topic') || slActiveTopic;
+      navigate('system-logic');
+    },
+  };
+  render();
+}
+
+async function slEditEntry(id) {
+  const entry = await api.get(`/system-logic/${id}`, slAuthHeaders());
+  if (entry.error) { showNotification(entry.error, 'error'); return; }
+
+  const topicsData = await api.get('/system-logic/topics', slAuthHeaders());
+  const existingTopics = topicsData.map ? topicsData.map(t => t.topic) : [];
+
+  modal = {
+    title: 'Edit System Logic Entry',
+    body: `
+      <div class="form-group">
+        <label>Topic</label>
+        <input id="sl-topic" list="sl-topics" value="${entry.topic}" placeholder="e.g., AI Engine">
+        <datalist id="sl-topics">${existingTopics.map(t => `<option value="${t}">`).join('')}</datalist>
+      </div>
+      <div class="form-group"><label>Title</label><input id="sl-title" value="${escHtml(entry.title)}"></div>
+      <div class="form-group"><label>Description</label><input id="sl-desc" value="${escHtml(entry.description || '')}"></div>
+      <div class="form-group"><label>Code Reference</label><input id="sl-coderef" value="${escHtml(entry.code_ref || '')}"></div>
+      <div class="form-group"><label>Content</label><textarea id="sl-content" style="min-height:150px">${escHtml(entry.content)}</textarea></div>
+      <div class="form-group"><label>Sort Order</label><input id="sl-sort" type="number" value="${entry.sort_order}"></div>
+    `,
+    onSave: async () => {
+      await api.put(`/system-logic/${id}`, {
+        topic: gv('sl-topic'), title: gv('sl-title'), description: gv('sl-desc'),
+        code_ref: gv('sl-coderef'), content: gv('sl-content'), sort_order: parseInt(gv('sl-sort') || '0'),
+      }, slAuthHeaders());
+      modal = null;
+      slActiveTopic = gv('sl-topic') || slActiveTopic;
+      navigate('system-logic');
+    },
+  };
+  render();
+}
+
+async function slDeleteEntry(id) {
+  if (!confirm('Delete this system logic entry?')) return;
+  await api.del(`/system-logic/${id}`, slAuthHeaders());
+  loadSystemLogic();
+}
+
+// ========== Init ==========
+async function init() {
+  if (authToken) {
+    try {
+      currentUser = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      }).then(r => r.json());
+      if (currentUser.error) throw new Error();
+    } catch {
+      authToken = null; currentUser = null;
+      sessionStorage.removeItem('auth_token');
+    }
+  }
+  render();
+}
+init();
