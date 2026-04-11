@@ -175,6 +175,8 @@ export function initializeDatabase(db) {
     insert.run('smtp_pass', '');
     insert.run('from_email', '');
     insert.run('admin_password', 'admin123');
+    insert.run('stripe_secret_key', '');
+    insert.run('stripe_publishable_key', '');
   }
 
   // Ensure admin_password exists for existing DBs

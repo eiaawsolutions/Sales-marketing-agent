@@ -9,6 +9,7 @@ import { config } from './config/index.js';
 import db from './db/index.js';
 import { requireAuth } from './middleware/auth.js';
 import authRouter from './routes/auth.js';
+import billingRouter from './routes/billing.js';
 import usersRouter from './routes/users.js';
 import leadsRouter from './routes/leads.js';
 import campaignsRouter from './routes/campaigns.js';
@@ -50,6 +51,7 @@ app.get('/api/health', (req, res) => {
 
 // Public routes (no auth)
 app.use('/api/auth', authRouter);
+app.use('/api/billing', billingRouter);
 
 // Protected routes
 app.use('/api/users', usersRouter);
@@ -101,14 +103,22 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
   });
 });
 
-// Landing page
-app.get('/landing', (req, res) => {
+// App (login/dashboard) at /app
+app.get('/app', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+app.get('/app/*', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
+// Landing page as homepage
+app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'landing.html'));
 });
 
-// SPA fallback
+// SPA fallback for any other routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'landing.html'));
 });
 
 const PORT = process.env.PORT || config.port;

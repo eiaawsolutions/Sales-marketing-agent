@@ -2466,6 +2466,23 @@ async function loadSettings() {
       </div>
 
       <div class="card">
+        <h3>Stripe / Billing</h3>
+        <p class="text-muted text-sm mb-4">Connect your Stripe account for subscription billing. Get keys from <a href="https://dashboard.stripe.com/apikeys" target="_blank" style="color:var(--primary)">dashboard.stripe.com</a></p>
+        <div class="form-group">
+          <label>Stripe Secret Key</label>
+          <div class="flex gap-2">
+            <input id="s-stripe-secret" type="password" value="${settings.stripe_secret_key || ''}" placeholder="sk_live_...">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('s-stripe-secret').type = document.getElementById('s-stripe-secret').type === 'password' ? 'text' : 'password'">Show</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Stripe Publishable Key</label>
+          <input id="s-stripe-pub" value="${settings.stripe_publishable_key || ''}" placeholder="pk_live_...">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:12px">Save Settings</button>
+      </div>
+
+      <div class="card">
         <h3>Admin Security</h3>
         <p class="text-muted text-sm mb-4">This password protects the System Logic page (super admin access).</p>
         <div class="form-group">
@@ -2494,6 +2511,8 @@ async function saveSettings() {
     smtp_pass: document.getElementById('s-smtp-pass')?.value || '',
     from_email: gv('s-from-email'),
     admin_password: document.getElementById('s-admin-pass')?.value || '',
+    stripe_secret_key: document.getElementById('s-stripe-secret')?.value || '',
+    stripe_publishable_key: gv('s-stripe-pub'),
   };
 
   try {

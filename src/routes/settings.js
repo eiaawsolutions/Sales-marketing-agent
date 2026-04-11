@@ -21,6 +21,10 @@ router.get('/', (req, res) => {
       settings[row.key] = row.value ? '••••••••' : '';
     } else if (row.key === 'admin_password' && row.value) {
       settings[row.key] = row.value ? '••••••••' : '';
+    } else if (row.key === 'stripe_secret_key' && row.value) {
+      settings[row.key] = row.value.length > 12
+        ? row.value.substring(0, 8) + '...' + row.value.substring(row.value.length - 4)
+        : row.value ? '••••••••' : '';
     } else {
       settings[row.key] = row.value;
     }
@@ -33,7 +37,7 @@ router.get('/', (req, res) => {
 
 // PUT /api/settings — update settings
 router.put('/', (req, res) => {
-  const allowedKeys = ['ai_provider', 'ai_model', 'api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'from_email', 'admin_password'];
+  const allowedKeys = ['ai_provider', 'ai_model', 'api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'from_email', 'admin_password', 'stripe_secret_key', 'stripe_publishable_key'];
   const upsert = db.prepare(
     'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP'
   );
