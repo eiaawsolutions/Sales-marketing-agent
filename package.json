@@ -14,9 +14,13 @@
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.5",
+    "dompurify": "^3.3.3",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^8.3.2",
-    "nodemailer": "^6.9.16"
+    "helmet": "^8.1.0",
+    "jsdom": "^29.0.2",
+    "nodemailer": "^6.9.16",
+    "uuid": "^13.0.0"
   }
 }
