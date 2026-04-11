@@ -3,28 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Sales & Marketing Agent</title>
+  <title>EIAAW SalesAgent AI — AI-Human Sales Partnerships</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0f172a;
-      --surface: #1e293b;
-      --surface2: #334155;
-      --border: #475569;
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
+      --bg: #0b1929;
+      --surface: #132337;
+      --surface2: #1e3a52;
+      --border: #2a5470;
+      --text: #e8f4f8;
+      --text-muted: #7fb5c9;
+      --primary: #2ec4b6;
+      --primary-hover: #25a99d;
+      --primary-light: rgba(46,196,182,0.12);
       --success: #22c55e;
       --warning: #f59e0b;
       --danger: #ef4444;
-      --purple: #a855f7;
+      --purple: #0e8b7d;
+      --teal-dark: #0a6b5f;
+      --teal-gradient: linear-gradient(135deg, #2ec4b6, #0e8b7d);
       --radius: 8px;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -50,8 +55,8 @@
     }
 
     .sidebar-logo h1 {
-      font-size: 18px;
-      background: linear-gradient(135deg, var(--primary), var(--purple));
+      font-size: 17px;
+      background: var(--teal-gradient);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
@@ -70,7 +75,7 @@
     }
 
     .nav-item:hover { background: var(--surface2); color: var(--text); }
-    .nav-item.active { color: var(--primary); background: rgba(59,130,246,0.1); border-right: 3px solid var(--primary); }
+    .nav-item.active { color: var(--primary); background: var(--primary-light); border-right: 3px solid var(--primary); }
 
     .main { margin-left: 240px; flex: 1; padding: 24px; }
 
@@ -110,7 +115,7 @@
     table { width: 100%; border-collapse: collapse; }
     th { text-align: left; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
     td { padding: 10px 12px; border-bottom: 1px solid rgba(71,85,105,0.3); font-size: 14px; }
-    tr:hover td { background: rgba(59,130,246,0.05); }
+    tr:hover td { background: rgba(46,196,182,0.05); }
 
     /* Badges */
     .badge {
@@ -122,7 +127,7 @@
       text-transform: uppercase;
     }
 
-    .badge-new { background: rgba(59,130,246,0.2); color: var(--primary); }
+    .badge-new { background: rgba(46,196,182,0.2); color: var(--primary); }
     .badge-contacted { background: rgba(245,158,11,0.2); color: var(--warning); }
     .badge-qualified { background: rgba(34,197,94,0.2); color: var(--success); }
     .badge-proposal { background: rgba(168,85,247,0.2); color: var(--purple); }
@@ -331,7 +336,7 @@
       background: var(--primary);
       color: white;
       border-color: var(--primary);
-      box-shadow: 0 0 12px rgba(59,130,246,0.4);
+      box-shadow: 0 0 12px rgba(46,196,182,0.4);
     }
 
     .wizard-step.completed .wizard-step-circle {
@@ -401,8 +406,8 @@
       transition: all 0.2s;
     }
 
-    .wizard-type-card:hover { border-color: var(--primary); background: rgba(59,130,246,0.05); }
-    .wizard-type-card.selected { border-color: var(--primary); background: rgba(59,130,246,0.1); }
+    .wizard-type-card:hover { border-color: var(--primary); background: rgba(46,196,182,0.05); }
+    .wizard-type-card.selected { border-color: var(--primary); background: rgba(46,196,182,0.1); }
 
     .wizard-type-icon { font-size: 24px; margin-bottom: 6px; }
     .wizard-type-title { font-weight: 600; font-size: 14px; }
@@ -414,8 +419,8 @@
       align-items: center;
       gap: 16px;
       padding: 16px;
-      background: rgba(59,130,246,0.08);
-      border: 1px solid rgba(59,130,246,0.2);
+      background: rgba(46,196,182,0.08);
+      border: 1px solid rgba(46,196,182,0.2);
       border-radius: var(--radius);
       margin-top: 12px;
     }
@@ -438,8 +443,8 @@
       transition: background 0.15s;
     }
 
-    .wizard-lead-item:hover { background: rgba(59,130,246,0.05); }
-    .wizard-lead-item.selected { background: rgba(59,130,246,0.08); }
+    .wizard-lead-item:hover { background: rgba(46,196,182,0.05); }
+    .wizard-lead-item.selected { background: rgba(46,196,182,0.08); }
     .wizard-lead-item:last-child { border-bottom: none; }
 
     .wizard-lead-item input[type="checkbox"] {
@@ -568,7 +573,7 @@
     }
 
     .poster-style-card:hover { border-color: var(--primary); }
-    .poster-style-card.selected { border-color: var(--primary); background: rgba(59,130,246,0.1); }
+    .poster-style-card.selected { border-color: var(--primary); background: rgba(46,196,182,0.1); }
 
     .poster-style-preview {
       height: 36px;
@@ -739,7 +744,7 @@
     .cw-tag {
       display: inline-block;
       padding: 4px 10px;
-      background: rgba(59,130,246,0.15);
+      background: rgba(46,196,182,0.15);
       color: var(--primary);
       border-radius: 14px;
       font-size: 12px;

@@ -46,7 +46,8 @@ function navigate(page) {
 function renderLoginPage() {
   return `
     <div style="max-width:400px;margin:100px auto;text-align:center">
-      <h1 style="background:linear-gradient(135deg,var(--primary),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;font-size:28px">SalesAgent AI</h1>
+      <h1 style="background:linear-gradient(135deg,#2ec4b6,#0e8b7d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;font-size:28px">EIAAW SalesAgent</h1>
+      <p class="text-muted" style="font-size:12px;margin-bottom:16px">AI-Human Sales Partnerships</p>
       <p class="text-muted mb-4">Sign in to your account</p>
       <div class="card">
         <div class="form-group"><label>Username</label><input id="login-user" placeholder="Username" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()"></div>
@@ -121,8 +122,8 @@ function renderSidebar() {
   return `
     <div class="sidebar">
       <div class="sidebar-logo">
-        <h1>SalesAgent AI</h1>
-        <small>Marketing & Sales Automation</small>
+        <h1>EIAAW SalesAgent</h1>
+        <small>AI-Human Sales Partnerships</small>
       </div>
       ${items.map(i => `
         <div class="nav-item ${currentPage === i.id ? 'active' : ''}" onclick="navigate('${i.id}')">

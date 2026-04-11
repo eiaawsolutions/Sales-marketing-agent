@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EIAAW SalesAgent AI — Close More Deals with AI-Human Partnerships</title>
+  <meta name="description" content="AI-powered sales and marketing automation. Generate leads, score prospects, auto-outreach, and close deals faster. By EIAAW Solutions.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1929;
+      --surface: #132337;
+      --surface2: #1e3a52;
+      --border: #2a5470;
+      --text: #e8f4f8;
+      --text-muted: #7fb5c9;
+      --primary: #2ec4b6;
+      --primary-dark: #0e8b7d;
+      --primary-light: rgba(46,196,182,0.12);
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --gradient: linear-gradient(135deg, #2ec4b6, #0e8b7d);
+      --gradient-bg: linear-gradient(180deg, #0b1929 0%, #0f2235 50%, #132337 100%);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Nav */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 16px 40px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(11,25,41,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(46,196,182,0.1);
+    }
+    .nav-logo {
+      font-size: 20px; font-weight: 800;
+      background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .nav-logo small { font-size: 11px; font-weight: 500; display: block; -webkit-text-fill-color: var(--text-muted); }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--primary); }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.25s; border: none; text-decoration: none; }
+    .btn-primary { background: var(--gradient); color: #fff; box-shadow: 0 4px 20px rgba(46,196,182,0.3); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(46,196,182,0.4); }
+    .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-lg { padding: 14px 32px; font-size: 16px; border-radius: 10px; }
+    .btn-white { background: #fff; color: var(--bg); font-weight: 700; }
+    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(255,255,255,0.2); }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+      position: relative;
+      background: var(--gradient-bg);
+    }
+    .hero::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(ellipse at 50% 30%, rgba(46,196,182,0.08) 0%, transparent 60%);
+    }
+    .hero-content { position: relative; max-width: 800px; }
+    .hero-badge {
+      display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      background: var(--primary-light); color: var(--primary); border: 1px solid rgba(46,196,182,0.2);
+      margin-bottom: 24px; letter-spacing: 0.5px;
+    }
+    .hero h1 { font-size: 56px; font-weight: 900; line-height: 1.1; margin-bottom: 20px; letter-spacing: -1px; }
+    .hero h1 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { font-size: 18px; color: var(--text-muted); max-width: 600px; margin: 0 auto 36px; line-height: 1.7; }
+    .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .hero-stats {
+      display: flex; gap: 48px; justify-content: center; margin-top: 60px;
+      padding-top: 40px; border-top: 1px solid rgba(46,196,182,0.1);
+    }
+    .hero-stat-value { font-size: 32px; font-weight: 800; color: var(--primary); }
+    .hero-stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    /* Sections */
+    section { padding: 100px 24px; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .section-tag {
+      display: inline-block; padding: 5px 14px; border-radius: 16px; font-size: 11px; font-weight: 600;
+      background: var(--primary-light); color: var(--primary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .section-title { font-size: 38px; font-weight: 800; margin-bottom: 16px; letter-spacing: -0.5px; }
+    .section-desc { font-size: 16px; color: var(--text-muted); max-width: 600px; margin-bottom: 48px; }
+
+    /* Features */
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .feature-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 28px; transition: all 0.3s;
+    }
+    .feature-card:hover { border-color: var(--primary); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(46,196,182,0.08); }
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 10px; background: var(--primary-light);
+      display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 16px;
+    }
+    .feature-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .feature-card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+    /* How it Works */
+    .steps { display: flex; gap: 32px; counter-reset: step; }
+    .step {
+      flex: 1; position: relative; padding: 28px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 14px;
+    }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      width: 32px; height: 32px; border-radius: 50%; background: var(--gradient);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 800; color: #fff; margin-bottom: 14px;
+    }
+    .step h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .step p { font-size: 13px; color: var(--text-muted); }
+
+    /* Pricing */
+    #pricing { background: var(--surface); }
+    .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .price-card {
+      background: var(--bg); border: 1.5px solid var(--border); border-radius: 16px;
+      padding: 32px; position: relative; transition: all 0.3s;
+    }
+    .price-card.featured { border-color: var(--primary); box-shadow: 0 0 40px rgba(46,196,182,0.12); }
+    .price-card.featured::before {
+      content: 'MOST POPULAR'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--gradient); color: #fff; padding: 4px 16px; border-radius: 12px;
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    }
+    .price-card:hover { transform: translateY(-4px); }
+    .price-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .price-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+    .price-amount { font-size: 42px; font-weight: 900; margin-bottom: 4px; }
+    .price-amount span { font-size: 16px; font-weight: 500; color: var(--text-muted); }
+    .price-period { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+    .price-features { list-style: none; margin-bottom: 28px; }
+    .price-features li { padding: 8px 0; font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; }
+    .price-features li::before { content: '\2713'; color: var(--primary); font-weight: 700; font-size: 14px; }
+    .price-features li.disabled { opacity: 0.4; }
+    .price-features li.disabled::before { content: '\2717'; color: var(--text-muted); }
+
+    /* Testimonial */
+    .testimonial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .testimonial {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px;
+    }
+    .testimonial-text { font-size: 14px; line-height: 1.7; margin-bottom: 16px; font-style: italic; color: var(--text-muted); }
+    .testimonial-author { font-size: 13px; font-weight: 600; }
+    .testimonial-role { font-size: 12px; color: var(--text-muted); }
+
+    /* CTA */
+    .cta-section {
+      text-align: center; padding: 100px 24px;
+      background: radial-gradient(ellipse at 50% 50%, rgba(46,196,182,0.1) 0%, transparent 60%);
+    }
+    .cta-section h2 { font-size: 38px; font-weight: 800; margin-bottom: 16px; }
+    .cta-section p { color: var(--text-muted); font-size: 16px; margin-bottom: 32px; }
+
+    /* Footer */
+    footer {
+      padding: 40px 24px; text-align: center;
+      border-top: 1px solid var(--border); color: var(--text-muted); font-size: 13px;
+    }
+    footer a { color: var(--primary); text-decoration: none; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav { padding: 12px 20px; }
+      .nav-links a:not(.btn) { display: none; }
+      .hero h1 { font-size: 32px; }
+      .hero-stats { flex-direction: column; gap: 20px; }
+      .features-grid, .pricing-grid, .testimonial-grid, .steps { grid-template-columns: 1fr; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-logo">EIAAW SalesAgent<small>AI-Human Partnerships</small></div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how">How It Works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/index.html" class="btn btn-primary">Sign In</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-badge">Powered by EIAAW Solutions</div>
+    <h1>Close More Deals with <span>AI-Human Partnerships</span></h1>
+    <p>Your AI sales agent finds leads, scores prospects, writes personalized outreach, and helps you close deals — all on autopilot. Built for Malaysian sales teams.</p>
+    <div class="hero-cta">
+      <a href="/index.html" class="btn btn-primary btn-lg">Start Free Trial</a>
+      <a href="#pricing" class="btn btn-outline btn-lg">View Pricing</a>
+    </div>
+    <div class="hero-stats">
+      <div><div class="hero-stat-value">3x</div><div class="hero-stat-label">Faster Lead Generation</div></div>
+      <div><div class="hero-stat-value">40%</div><div class="hero-stat-label">More Deals Closed</div></div>
+      <div><div class="hero-stat-value">75%</div><div class="hero-stat-label">Less Manual Work</div></div>
+      <div><div class="hero-stat-value">24/7</div><div class="hero-stat-label">AI Working for You</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <div class="section-tag">Features</div>
+    <h2 class="section-title">Everything You Need to Sell Smarter</h2>
+    <p class="section-desc">AI handles the heavy lifting so you can focus on building relationships and closing deals.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">&#9679;</div>
+        <h3>AI Lead Generation</h3>
+        <p>Describe your target audience and AI automatically finds matching leads with company info, titles, and contact details.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#9733;</div>
+        <h3>Smart Lead Scoring</h3>
+        <p>AI scores every lead 0-100 based on engagement, fit, and buying signals. Focus on leads most likely to convert.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#9993;</div>
+        <h3>Auto-Outreach</h3>
+        <p>One click generates personalized multi-step outreach sequences for every lead. Step 1 sends immediately.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#9998;</div>
+        <h3>AI Content Studio</h3>
+        <p>Generate marketing emails, social posts, ad copy, and SEO keywords. Complete with poster designs for social sharing.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#9654;</div>
+        <h3>Sales Pipeline</h3>
+        <p>Visual Kanban board tracks every deal from prospecting to close. AI analyzes bottlenecks and forecasts revenue.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#10070;</div>
+        <h3>AI Sales Assistant</h3>
+        <p>Chat with an AI that knows your entire CRM — leads, deals, campaigns. Get instant advice and recommendations.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How It Works -->
+<section id="how" style="background:var(--surface)">
+  <div class="container">
+    <div class="section-tag">How It Works</div>
+    <h2 class="section-title">Up and Running in 5 Minutes</h2>
+    <p class="section-desc">No complex setup. No training needed. Start closing deals today.</p>
+
+    <div class="steps">
+      <div class="step">
+        <h3>Create a Campaign</h3>
+        <p>Step-by-step wizard guides you through naming, targeting, and writing content. AI helps at every step.</p>
+      </div>
+      <div class="step">
+        <h3>AI Finds Your Leads</h3>
+        <p>Click "Auto-Find Leads" and AI generates matching prospects based on your target audience. Scored automatically.</p>
+      </div>
+      <div class="step">
+        <h3>Launch Auto-Outreach</h3>
+        <p>One click sends personalized emails to all leads and schedules follow-ups. AI handles the entire sequence.</p>
+      </div>
+      <div class="step">
+        <h3>Close the Deal</h3>
+        <p>Track responses in your pipeline. AI scores engagement and tells you exactly who to follow up with and when.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section id="pricing">
+  <div class="container">
+    <div class="section-tag">Pricing</div>
+    <h2 class="section-title">Simple, Transparent Pricing</h2>
+    <p class="section-desc">Choose the plan that fits your sales team. Upgrade anytime as you grow.</p>
+
+    <div class="pricing-grid">
+      <div class="price-card">
+        <div class="price-name">Starter</div>
+        <div class="price-desc">For individual salespeople getting started</div>
+        <div class="price-amount">RM 99<span>/mo</span></div>
+        <div class="price-period">Billed monthly</div>
+        <ul class="price-features">
+          <li>100 leads</li>
+          <li>3 campaigns</li>
+          <li>50 AI actions/month</li>
+          <li>AI email & social content</li>
+          <li>Sales pipeline</li>
+          <li>AI chat assistant</li>
+          <li class="disabled">Auto-outreach sequences</li>
+          <li class="disabled">AI lead generation</li>
+        </ul>
+        <a href="/index.html" class="btn btn-outline" style="width:100%;justify-content:center">Get Started</a>
+      </div>
+
+      <div class="price-card featured">
+        <div class="price-name">Pro</div>
+        <div class="price-desc">For serious salespeople who want AI advantage</div>
+        <div class="price-amount">RM 199<span>/mo</span></div>
+        <div class="price-period">Billed monthly</div>
+        <ul class="price-features">
+          <li>500 leads</li>
+          <li>10 campaigns</li>
+          <li>200 AI actions/month</li>
+          <li>AI email, social, ads & SEO</li>
+          <li>Sales pipeline + AI analysis</li>
+          <li>AI chat assistant (full CRM context)</li>
+          <li>Auto-outreach sequences</li>
+          <li>AI lead generation</li>
+        </ul>
+        <a href="/index.html" class="btn btn-primary" style="width:100%;justify-content:center">Start Free Trial</a>
+      </div>
+
+      <div class="price-card">
+        <div class="price-name">Business</div>
+        <div class="price-desc">For sales teams and agencies</div>
+        <div class="price-amount">RM 399<span>/mo</span></div>
+        <div class="price-period">Billed monthly</div>
+        <ul class="price-features">
+          <li>Unlimited leads</li>
+          <li>Unlimited campaigns</li>
+          <li>1,000 AI actions/month</li>
+          <li>All AI content tools</li>
+          <li>Full pipeline + forecasting</li>
+          <li>Priority AI model (Claude Sonnet)</li>
+          <li>Auto-outreach + auto-leads</li>
+          <li>Up to 10 team users</li>
+        </ul>
+        <a href="/index.html" class="btn btn-outline" style="width:100%;justify-content:center">Contact Sales</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section>
+  <div class="container">
+    <div class="section-tag">Trusted by Sales Pros</div>
+    <h2 class="section-title">What Our Users Say</h2>
+    <p class="section-desc">Sales teams across Malaysia are closing more deals with AI.</p>
+
+    <div class="testimonial-grid">
+      <div class="testimonial">
+        <div class="testimonial-text">"I went from cold-calling 50 leads a day to having AI pre-qualify and reach out for me. My close rate doubled in the first month."</div>
+        <div class="testimonial-author">Ahmad R.</div>
+        <div class="testimonial-role">Insurance Agent, KL</div>
+      </div>
+      <div class="testimonial">
+        <div class="testimonial-text">"The auto-outreach feature is a game changer. I set up a campaign for my Sabah clients and AI sent personalized emails to 50 leads in seconds."</div>
+        <div class="testimonial-author">Sarah L.</div>
+        <div class="testimonial-role">FMCG Sales Manager, Kota Kinabalu</div>
+      </div>
+      <div class="testimonial">
+        <div class="testimonial-text">"Finally a sales tool that understands the Malaysian market. The AI generates content in our tone and targets the right audience."</div>
+        <div class="testimonial-author">David C.</div>
+        <div class="testimonial-role">Real Estate Agent, Kuching</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2>Ready to Sell Smarter?</h2>
+  <p>Join Malaysian sales teams who are closing more deals with AI-human partnerships.</p>
+  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+    <a href="/index.html" class="btn btn-white btn-lg">Start Free Trial</a>
+    <a href="mailto:eiaawsolutions@gmail.com" class="btn btn-outline btn-lg">Talk to Us</a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <p style="margin-bottom:8px"><strong style="color:var(--primary)">EIAAW SalesAgent AI</strong> by <a href="https://eiaawsolutions.com" target="_blank">EIAAW Solutions</a></p>
+    <p>AI-Human Partnerships for Sales & Marketing</p>
+    <p style="margin-top:12px">&copy; 2026 EIAAW Solutions. All rights reserved.</p>
+  </div>
+</footer>
+
+</body>
+</html>
