@@ -149,7 +149,50 @@ router.get('/success', async (req, res) => {
       "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', '+24 hours'))"
     ).run(token, userId);
 
-    // Redirect to app with auto-login token and temp password
+    // Send welcome email with credentials
+    try {
+      const nodemailer = (await import('nodemailer')).default;
+      const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value;
+      const smtpPort = db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || '587';
+      const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value;
+      const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value;
+      const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value;
+
+      if (smtpUser && smtpHost) {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost, port: parseInt(smtpPort), secure: parseInt(smtpPort) === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+        const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+        await transporter.sendMail({
+          from: fromEmail || smtpUser,
+          to: email,
+          subject: 'Welcome to EIAAW SalesAgent — Your Login Details',
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto">
+              <h1 style="color:#2ec4b6">Welcome to EIAAW SalesAgent!</h1>
+              <p>Hi ${displayName || username},</p>
+              <p>Your account is ready. Here are your login details:</p>
+              <div style="background:#f5f5f5;padding:20px;border-radius:8px;margin:20px 0">
+                <p><strong>Login URL:</strong> <a href="${baseUrl}/app">${baseUrl}/app</a></p>
+                <p><strong>Username:</strong> ${username}</p>
+                <p><strong>Password:</strong> ${tempPassword}</p>
+                <p><strong>Plan:</strong> ${PLANS[plan]?.name || plan} (14-day free trial)</p>
+              </div>
+              <p style="color:#e74c3c"><strong>Please change your password after your first login.</strong></p>
+              <p>Your 14-day free trial starts today. You won't be charged until the trial ends.</p>
+              <hr style="margin:24px 0">
+              <p style="color:#999;font-size:12px">EIAAW SalesAgent AI — AI-Human Sales Partnerships<br>
+              <a href="https://eiaawsolutions.com">eiaawsolutions.com</a></p>
+            </div>
+          `,
+        });
+      }
+    } catch (emailErr) {
+      console.error('Welcome email failed:', emailErr.message);
+    }
+
+    // Redirect to app with auto-login token (password sent via email, not URL)
     res.redirect(`/app?welcome=1&token=${token}&tempPassword=${encodeURIComponent(tempPassword)}`);
   } catch (err) {
     console.error('Billing success error:', err);

@@ -2780,6 +2780,15 @@ async function slDeleteEntry(id) {
 
 // ========== Init ==========
 async function init() {
+  // Handle post-signup redirect from Stripe
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('welcome') === '1' && params.get('token')) {
+    authToken = params.get('token');
+    sessionStorage.setItem('auth_token', authToken);
+    // Clean URL
+    window.history.replaceState({}, '', '/app');
+  }
+
   if (authToken) {
     try {
       currentUser = await fetch('/api/auth/me', {
@@ -2792,5 +2801,41 @@ async function init() {
     }
   }
   render();
+
+  // Show welcome modal for new signups
+  if (params.get('welcome') === '1' && currentUser) {
+    const tempPass = params.get('tempPassword');
+    modal = {
+      title: 'Welcome to EIAAW SalesAgent!',
+      body: `
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:48px;margin-bottom:8px">&#127881;</div>
+          <p style="color:var(--primary);font-weight:600">Your account is ready!</p>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:16px;margin-bottom:16px">
+          <p class="text-sm text-muted" style="margin-bottom:8px">Your login credentials:</p>
+          <div style="margin-bottom:8px"><strong>Username:</strong> ${esc(currentUser.username)}</div>
+          <div style="margin-bottom:8px"><strong>Email:</strong> ${esc(currentUser.email)}</div>
+          ${tempPass ? `<div style="margin-bottom:8px"><strong>Temporary Password:</strong> <code style="background:var(--surface2);padding:2px 8px;border-radius:4px">${esc(tempPass)}</code></div>` : ''}
+          <div><strong>Plan:</strong> <span class="badge badge-active">${esc((currentUser.plan || 'starter').toUpperCase())}</span> — 14-day free trial</div>
+        </div>
+        ${tempPass ? `<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px;font-size:13px;color:var(--warning)">
+          <strong>Important:</strong> Save your password now and change it in Settings. You'll need it to log in next time.
+        </div>` : ''}
+        <div style="margin-top:16px">
+          <p class="text-sm text-muted">What to do next:</p>
+          <ol style="font-size:13px;color:var(--text-muted);padding-left:20px;margin-top:8px;line-height:2">
+            <li>Create your first campaign</li>
+            <li>Let AI find leads for you</li>
+            <li>Launch auto-outreach</li>
+            <li>Watch the deals come in!</li>
+          </ol>
+        </div>
+      `,
+      onSave: () => { modal = null; navigate('campaigns'); },
+      saveLabel: 'Get Started',
+    };
+    render();
+  }
 }
 init();
