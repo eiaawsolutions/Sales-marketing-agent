@@ -105,10 +105,10 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
 
 // App (login/dashboard) at /app
 app.get('/app', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'app.html'));
 });
 app.get('/app/*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'app.html'));
 });
 
 // Landing page as homepage
