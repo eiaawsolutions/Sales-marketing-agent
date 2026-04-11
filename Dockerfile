@@ -19,7 +19,7 @@ RUN mkdir -p /app/data
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD node -e "fetch('http://localhost:3000/api/auth/me').then(r=>{if(r.status===401)process.exit(0);else process.exit(1)}).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
+  CMD node -e "fetch('http://localhost:3000/api/health').then(r=>{if(r.ok)process.exit(0);else process.exit(1)}).catch(()=>process.exit(1))"
 
 CMD ["node", "src/server.js"]

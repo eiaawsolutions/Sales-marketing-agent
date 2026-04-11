@@ -38,6 +38,16 @@ app.use('/api', rateLimit({ windowMs: 60000, max: 120, message: { error: 'Too ma
 app.use('/api/auth/login', rateLimit({ windowMs: 900000, max: 10, message: { error: 'Too many login attempts. Try again in 15 minutes.' } }));
 app.use('/api/agent', rateLimit({ windowMs: 60000, max: 10, message: { error: 'AI rate limit reached. Wait a moment.' } }));
 
+// Health check (no auth)
+app.get('/api/health', (req, res) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  } catch (e) {
+    res.status(503).json({ status: 'error', error: e.message });
+  }
+});
+
 // Public routes (no auth)
 app.use('/api/auth', authRouter);
 
