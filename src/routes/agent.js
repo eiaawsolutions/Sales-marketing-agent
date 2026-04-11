@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { runAgent, freeformChat } from '../services/ai-agent.js';
+import { checkPlanLimit } from '../middleware/auth.js';
 import db from '../db/index.js';
 
 const router = Router();
 
 router.post('/chat', async (req, res) => {
   try {
+    checkPlanLimit(req, 'ai_action');
     const userId = req.user.role === 'superadmin' ? null : req.user.id;
     const response = await freeformChat(userId, req.body.message);
     res.json({ response });
@@ -16,6 +18,7 @@ router.post('/chat', async (req, res) => {
 
 router.post('/generate/email', async (req, res) => {
   try {
+    checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'generate_email', req.body);
     res.json(result);
   } catch (err) {
@@ -25,6 +28,7 @@ router.post('/generate/email', async (req, res) => {
 
 router.post('/generate/social', async (req, res) => {
   try {
+    checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'generate_social', req.body);
     res.json(result);
   } catch (err) {
@@ -34,6 +38,7 @@ router.post('/generate/social', async (req, res) => {
 
 router.post('/generate/ad', async (req, res) => {
   try {
+    checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'generate_ad', req.body);
     res.json(result);
   } catch (err) {
@@ -43,6 +48,7 @@ router.post('/generate/ad', async (req, res) => {
 
 router.post('/generate/seo', async (req, res) => {
   try {
+    checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'generate_seo', req.body);
     res.json(result);
   } catch (err) {

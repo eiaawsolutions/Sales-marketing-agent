@@ -23,18 +23,21 @@ router.get('/', (req, res) => {
 
 // POST /api/users — create user
 router.post('/', (req, res) => {
-  const { username, email, password, role, display_name, budget_limit, monthly_system_cost } = req.body;
+  const { username, email, password, role, display_name, budget_limit, monthly_system_cost, plan } = req.body;
 
   if (!username || !email || !password) {
     return res.status(400).json({ error: 'Username, email, and password required' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
 
   try {
     const hash = hashPassword(password);
     const result = db.prepare(`
-      INSERT INTO users (username, email, password_hash, role, display_name, budget_limit, monthly_system_cost)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(username, email, hash, role || 'user', display_name || username, budget_limit || 0, monthly_system_cost || 0);
+      INSERT INTO users (username, email, password_hash, role, display_name, budget_limit, monthly_system_cost, plan)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(username, email, hash, role || 'user', display_name || username, budget_limit || 0, monthly_system_cost || 0, plan || 'starter');
 
     const user = db.prepare('SELECT id, username, email, role, display_name, budget_limit, monthly_system_cost, status, created_at FROM users WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(user);
@@ -73,13 +76,14 @@ router.get('/:id', (req, res) => {
 
 // PUT /api/users/:id — update user
 router.put('/:id', (req, res) => {
-  const { display_name, email, role, budget_limit, monthly_system_cost, status } = req.body;
+  const { display_name, email, role, budget_limit, monthly_system_cost, status, plan } = req.body;
   const fields = [];
   const params = [];
 
   if (display_name !== undefined) { fields.push('display_name = ?'); params.push(display_name); }
   if (email !== undefined) { fields.push('email = ?'); params.push(email); }
   if (role !== undefined) { fields.push('role = ?'); params.push(role); }
+  if (plan !== undefined) { fields.push('plan = ?'); params.push(plan); }
   if (budget_limit !== undefined) { fields.push('budget_limit = ?'); params.push(parseFloat(budget_limit) || 0); }
   if (monthly_system_cost !== undefined) { fields.push('monthly_system_cost = ?'); params.push(parseFloat(monthly_system_cost) || 0); }
   if (status !== undefined) { fields.push('status = ?'); params.push(status); }

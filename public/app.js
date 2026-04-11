@@ -1,3 +1,9 @@
+// ========== XSS Protection ==========
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // ========== Auth State ==========
 let authToken = sessionStorage.getItem('auth_token') || null;
 let currentUser = null;
@@ -124,8 +130,8 @@ function renderSidebar() {
         </div>
       `).join('')}
       <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface)">
-        <div class="text-sm" style="font-weight:600">${currentUser?.displayName || currentUser?.username || ''}</div>
-        <div class="text-muted text-sm">${currentUser?.role === 'superadmin' ? 'Super Admin' : 'User'}</div>
+        <div class="text-sm" style="font-weight:600">${esc(currentUser?.displayName || currentUser?.username || '')}</div>
+        <div class="text-muted text-sm">${currentUser?.role === 'superadmin' ? 'Super Admin' : `${(currentUser?.plan||'starter').toUpperCase()} Plan`}</div>
         <button class="btn btn-sm btn-outline" style="margin-top:8px;width:100%" onclick="doLogout()">Sign Out</button>
       </div>
     </div>
@@ -2235,7 +2241,7 @@ async function loadAccounts() {
 
       <div class="card">
         <table>
-          <tr><th>User</th><th>Role</th><th>Status</th><th>Leads</th><th>Campaigns</th><th>AI Spend</th><th>Budget</th><th>Monthly Cost</th><th>Total Cost</th><th>Actions</th></tr>
+          <tr><th>User</th><th>Plan</th><th>Status</th><th>Leads</th><th>Campaigns</th><th>AI Spend</th><th>Budget</th><th>Monthly Fee</th><th>Total Cost</th><th>Actions</th></tr>
           ${users.map(u => {
             const totalCost = (u.ai_spend || 0) + (u.monthly_system_cost || 0);
             const budgetPct = u.budget_limit > 0 ? Math.min((u.ai_spend / u.budget_limit) * 100, 100) : 0;
@@ -2245,7 +2251,7 @@ async function loadAccounts() {
                 <strong>${u.display_name || u.username}</strong>
                 <div class="text-muted text-sm">${u.email}</div>
               </td>
-              <td><span class="badge badge-${u.role === 'superadmin' ? 'active' : 'new'}">${u.role}</span></td>
+              <td><span class="badge badge-${(u.plan||'starter') === 'business' ? 'active' : (u.plan||'starter') === 'pro' ? 'qualified' : 'new'}">${(u.plan||'starter').toUpperCase()}</span>${u.role === 'superadmin' ? ' <span class="badge badge-active">ADMIN</span>' : ''}</td>
               <td><span class="badge badge-${u.status === 'active' ? 'active' : 'paused'}">${u.status}</span></td>
               <td>${u.lead_count}</td>
               <td>${u.campaign_count}</td>
@@ -2285,20 +2291,29 @@ function showCreateAccountModal() {
       <div class="form-group"><label>Username *</label><input id="f-username" placeholder="e.g. john"></div>
       <div class="form-group"><label>Email *</label><input id="f-email" type="email" placeholder="john@company.com"></div>
       <div class="form-group"><label>Display Name</label><input id="f-display" placeholder="John Smith"></div>
-      <div class="form-group"><label>Password *</label><input id="f-password" type="password" placeholder="Min 4 characters"></div>
-      <div class="form-group"><label>Role</label>
-        <select id="f-role"><option value="user">User</option><option value="superadmin">Super Admin</option></select>
+      <div class="form-group"><label>Password *</label><input id="f-password" type="password" placeholder="Min 8 characters"></div>
+      <div class="grid-2">
+        <div class="form-group"><label>Role</label>
+          <select id="f-role"><option value="user">User</option><option value="superadmin">Super Admin</option></select>
+        </div>
+        <div class="form-group"><label>Subscription Plan</label>
+          <select id="f-plan">
+            <option value="starter">Starter (RM 99/mo)</option>
+            <option value="pro" selected>Pro (RM 199/mo)</option>
+            <option value="business">Business (RM 399/mo)</option>
+          </select>
+        </div>
       </div>
       <div class="grid-2">
         <div class="form-group"><label>AI Budget Limit ($)</label><input id="f-budget" type="number" step="0.01" value="0" placeholder="0 = unlimited"></div>
-        <div class="form-group"><label>Monthly System Cost ($)</label><input id="f-monthly" type="number" step="0.01" value="0" placeholder="Estimated monthly charge"></div>
+        <div class="form-group"><label>Monthly System Cost (RM)</label><input id="f-monthly" type="number" step="0.01" value="99" placeholder="Subscription fee"></div>
       </div>
     `,
     onSave: async () => {
       const data = {
         username: gv('f-username'), email: gv('f-email'), display_name: gv('f-display'),
         password: document.getElementById('f-password')?.value,
-        role: gv('f-role'),
+        role: gv('f-role'), plan: gv('f-plan'),
         budget_limit: parseFloat(gv('f-budget')) || 0,
         monthly_system_cost: parseFloat(gv('f-monthly')) || 0,
       };
@@ -2318,8 +2333,13 @@ async function showEditAccountModal(userId) {
     body: `
       <div class="form-group"><label>Display Name</label><input id="f-display" value="${user.display_name || ''}"></div>
       <div class="form-group"><label>Email</label><input id="f-email" value="${user.email}"></div>
-      <div class="form-group"><label>Role</label>
-        <select id="f-role">${['user','superadmin'].map(r => `<option value="${r}" ${user.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
+      <div class="grid-2">
+        <div class="form-group"><label>Role</label>
+          <select id="f-role">${['user','superadmin'].map(r => `<option value="${r}" ${user.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
+        </div>
+        <div class="form-group"><label>Subscription Plan</label>
+          <select id="f-plan">${['starter','pro','business'].map(p => `<option value="${p}" ${(user.plan||'starter') === p ? 'selected' : ''}>${p.charAt(0).toUpperCase()+p.slice(1)}${p==='starter'?' (RM 99)':p==='pro'?' (RM 199)':' (RM 399)'}</option>`).join('')}</select>
+        </div>
       </div>
       <div class="grid-2">
         <div class="form-group">
@@ -2328,9 +2348,9 @@ async function showEditAccountModal(userId) {
           <small class="text-muted">Current AI spend: $${(user.ai_spend || 0).toFixed(4)}</small>
         </div>
         <div class="form-group">
-          <label>Monthly System Cost ($)</label>
+          <label>Monthly System Cost (RM)</label>
           <input id="f-monthly" type="number" step="0.01" value="${user.monthly_system_cost || 0}">
-          <small class="text-muted">Estimated monthly access charge</small>
+          <small class="text-muted">Subscription fee charged to user</small>
         </div>
       </div>
       <div class="form-group">
@@ -2341,6 +2361,7 @@ async function showEditAccountModal(userId) {
     onSave: async () => {
       await api.put(`/users/${userId}`, {
         display_name: gv('f-display'), email: gv('f-email'), role: gv('f-role'),
+        plan: gv('f-plan'),
         budget_limit: parseFloat(gv('f-budget')) || 0,
         monthly_system_cost: parseFloat(gv('f-monthly')) || 0,
       });

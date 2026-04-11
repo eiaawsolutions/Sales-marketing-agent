@@ -183,6 +183,11 @@ export function initializeDatabase(db) {
   // Add budget_limit column to campaigns if missing
   try { db.exec('ALTER TABLE campaigns ADD COLUMN budget_limit REAL DEFAULT 0'); } catch (e) { /* already exists */ }
 
+  // Add plan column to users if missing
+  try { db.exec("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'starter'"); } catch (e) { /* already exists */ }
+  // Set superadmin to business plan
+  db.prepare("UPDATE users SET plan = 'business' WHERE role = 'superadmin' AND (plan IS NULL OR plan = 'starter')").run();
+
   // Add user_id to all data tables
   const tablesNeedingUserId = ['leads', 'campaigns', 'pipeline', 'activities', 'generated_content', 'agent_tasks', 'ai_cost_log', 'outreach_queue'];
   for (const table of tablesNeedingUserId) {

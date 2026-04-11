@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { campaignsService } from '../services/campaigns.js';
 import { runAgent, getAICostStats, getAICostByCampaign, getAICostLog, getOutreachQueue } from '../services/ai-agent.js';
+import { checkPlanLimit } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -31,6 +32,7 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
+    checkPlanLimit(req, 'campaigns');
     const campaign = campaignsService.create(req.user.id, req.body);
     res.status(201).json(campaign);
   } catch (err) {
@@ -62,6 +64,8 @@ router.post('/:id/leads', (req, res) => {
 
 router.post('/:id/generate-leads', async (req, res) => {
   try {
+    checkPlanLimit(req, 'auto_leads');
+    checkPlanLimit(req, 'ai_action');
     const userId = req.user.role === 'superadmin' ? null : req.user.id;
     const campaign = campaignsService.getById(userId, req.params.id);
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
@@ -78,6 +82,8 @@ router.post('/:id/generate-leads', async (req, res) => {
 
 router.post('/:id/auto-outreach', async (req, res) => {
   try {
+    checkPlanLimit(req, 'auto_outreach');
+    checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'auto_outreach', {
       campaignId: parseInt(req.params.id),
     });

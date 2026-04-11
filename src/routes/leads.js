@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { leadsService } from '../services/leads.js';
 import { runAgent } from '../services/ai-agent.js';
+import { checkPlanLimit } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
+    checkPlanLimit(req, 'leads');
     const lead = leadsService.create(req.user.id, req.body);
     res.status(201).json(lead);
   } catch (err) {
@@ -55,6 +57,7 @@ router.post('/:id/activities', (req, res) => {
 
 router.post('/:id/score', async (req, res) => {
   try {
+    checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'score_lead', { leadId: parseInt(req.params.id), campaignId: null });
     res.json(result);
   } catch (err) {
