@@ -186,6 +186,8 @@
       .hero h1 { font-size: 32px; }
       .hero-stats { flex-direction: column; gap: 20px; }
       .features-grid, .pricing-grid, .testimonial-grid, .steps { grid-template-columns: 1fr; flex-direction: column; }
+      #compare table th:nth-child(n+4), #compare table td:nth-child(n+4) { display: none; }
+      #compare > div > div:first-child { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -197,6 +199,7 @@
   <div class="nav-links">
     <a href="#features">Features</a>
     <a href="#how">How It Works</a>
+    <a href="#compare">Why Us</a>
     <a href="#pricing">Pricing</a>
     <a href="/app" class="btn btn-primary">Sign In</a>
   </div>
@@ -287,6 +290,123 @@
         <h3>Close the Deal</h3>
         <p>Track responses in your pipeline. AI scores engagement and tells you exactly who to follow up with and when.</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- Why Us -->
+<section id="compare">
+  <div class="container">
+    <div class="section-tag">Why Choose Us</div>
+    <h2 class="section-title">Other Tools Store Data. <span style="color:var(--primary)">We Close Deals.</span></h2>
+    <p class="section-desc">Most CRMs make you do the work. We built an AI that actually sells for you.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:48px">
+      <!-- Problem -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px">
+        <div style="font-size:24px;margin-bottom:12px">&#10060;</div>
+        <h3 style="font-size:16px;margin-bottom:12px;color:var(--danger)">Other Sales Tools</h3>
+        <ul style="list-style:none;font-size:14px;color:var(--text-muted);line-height:2.2">
+          <li>&#8226; You manually enter every lead</li>
+          <li>&#8226; You write every email yourself</li>
+          <li>&#8226; You decide who to follow up with</li>
+          <li>&#8226; You score leads by gut feeling</li>
+          <li>&#8226; Separate tools for CRM, email, content</li>
+          <li>&#8226; RM 800-3,000+/month for enterprise features</li>
+          <li>&#8226; Weeks of setup and training</li>
+        </ul>
+      </div>
+      <!-- Solution -->
+      <div style="background:var(--surface);border:1.5px solid var(--primary);border-radius:14px;padding:28px;box-shadow:0 0 30px rgba(46,196,182,0.08)">
+        <div style="font-size:24px;margin-bottom:12px">&#10004;</div>
+        <h3 style="font-size:16px;margin-bottom:12px;color:var(--primary)">EIAAW SalesAgent AI</h3>
+        <ul style="list-style:none;font-size:14px;color:var(--text);line-height:2.2">
+          <li>&#10003; <strong>AI finds leads for you</strong> — describe your audience, done</li>
+          <li>&#10003; <strong>AI writes every email</strong> — personalized per lead</li>
+          <li>&#10003; <strong>AI auto-outreach</strong> — sends and follows up automatically</li>
+          <li>&#10003; <strong>AI scores leads 0-100</strong> — with reasoning you can read</li>
+          <li>&#10003; <strong>All-in-one</strong> — CRM + email + content + pipeline</li>
+          <li>&#10003; <strong>From RM 99/month</strong> — 10x cheaper than alternatives</li>
+          <li>&#10003; <strong>5 minutes to start</strong> — guided wizard, no training</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:14px 18px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:0.5px">Feature</th>
+            <th style="text-align:center;padding:14px 18px;background:rgba(46,196,182,0.08);color:var(--primary);font-weight:700">EIAAW SalesAgent</th>
+            <th style="text-align:center;padding:14px 18px;color:var(--text-muted)">HubSpot</th>
+            <th style="text-align:center;padding:14px 18px;color:var(--text-muted)">Apollo.io</th>
+            <th style="text-align:center;padding:14px 18px;color:var(--text-muted)">Instantly.ai</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">AI Lead Generation</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; Built-in</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Database only</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">AI Content Generation</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; Email, Social, Ads, SEO</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Paid add-on</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">AI Lead Scoring</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; With reasoning</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Enterprise only</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Basic</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">Auto-Outreach Sequences</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; AI-personalized</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Add-on</td>
+            <td style="text-align:center;padding:12px;color:var(--success)">&#10003;</td>
+            <td style="text-align:center;padding:12px;color:var(--success)">&#10003;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">AI Chat Assistant (CRM context)</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; Full CRM context</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Beta</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">Sales Pipeline</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; + AI Analysis</td>
+            <td style="text-align:center;padding:12px;color:var(--success)">&#10003;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Basic</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">Social Media Poster Design</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; Built-in</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr>
+            <td style="padding:14px 18px;font-weight:700">Starting Price</td>
+            <td style="text-align:center;padding:14px;background:rgba(46,196,182,0.08);color:var(--primary);font-weight:800;font-size:15px">RM 99/mo</td>
+            <td style="text-align:center;padding:14px;color:var(--text-muted)">Free - RM 3,600/mo</td>
+            <td style="text-align:center;padding:14px;color:var(--text-muted)">Free - $99/mo</td>
+            <td style="text-align:center;padding:14px;color:var(--text-muted)">$30-$77/mo</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="text-align:center;margin-top:32px">
+      <button class="btn btn-primary btn-lg" onclick="openSignup('pro')">Start Selling Smarter — 14 Days Free</button>
     </div>
   </div>
 </section>
