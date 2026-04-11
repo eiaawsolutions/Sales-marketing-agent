@@ -49,6 +49,53 @@ app.get('/api/health', (req, res) => {
   }
 });
 
+// Contact form (public, no auth)
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { name, email, phone, company, message } = req.body;
+    if (!name || !email || !message) return res.status(400).json({ error: 'Name, email, and message are required.' });
+
+    const nodemailer = (await import('nodemailer')).default;
+    const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value || process.env.SMTP_HOST;
+    const smtpPort = db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || process.env.SMTP_PORT || '587';
+    const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value || process.env.SMTP_USER;
+    const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value || process.env.SMTP_PASS;
+    const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value || process.env.FROM_EMAIL;
+
+    if (smtpUser && smtpHost) {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost, port: parseInt(smtpPort), secure: parseInt(smtpPort) === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+
+      await transporter.sendMail({
+        from: fromEmail || smtpUser,
+        to: 'eiaawsolutions@gmail.com',
+        replyTo: email,
+        subject: `[SalesAgent Enquiry] ${name} — ${company || 'Individual'}`,
+        html: `
+          <h2>New Enquiry from SalesAgent Landing Page</h2>
+          <table style="border-collapse:collapse;width:100%;max-width:500px">
+            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Name</td><td style="padding:8px;border-bottom:1px solid #ddd">${name}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Email</td><td style="padding:8px;border-bottom:1px solid #ddd"><a href="mailto:${email}">${email}</a></td></tr>
+            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Phone</td><td style="padding:8px;border-bottom:1px solid #ddd">${phone || 'Not provided'}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Company</td><td style="padding:8px;border-bottom:1px solid #ddd">${company || 'Not provided'}</td></tr>
+          </table>
+          <h3 style="margin-top:20px">Message</h3>
+          <p style="background:#f5f5f5;padding:16px;border-radius:8px;white-space:pre-wrap">${message}</p>
+          <hr style="margin-top:24px">
+          <p style="color:#999;font-size:12px">Sent from EIAAW SalesAgent landing page</p>
+        `,
+      });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Contact form error:', err.message);
+    res.json({ success: true }); // Don't reveal email errors to user
+  }
+});
+
 // Public routes (no auth)
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);

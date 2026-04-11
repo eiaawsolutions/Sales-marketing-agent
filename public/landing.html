@@ -356,40 +356,13 @@
   </div>
 </section>
 
-<!-- Testimonials -->
-<section>
-  <div class="container">
-    <div class="section-tag">Trusted by Sales Pros</div>
-    <h2 class="section-title">What Our Users Say</h2>
-    <p class="section-desc">Sales teams across Malaysia are closing more deals with AI.</p>
-
-    <div class="testimonial-grid">
-      <div class="testimonial">
-        <div class="testimonial-text">"I went from cold-calling 50 leads a day to having AI pre-qualify and reach out for me. My close rate doubled in the first month."</div>
-        <div class="testimonial-author">Ahmad R.</div>
-        <div class="testimonial-role">Insurance Agent, KL</div>
-      </div>
-      <div class="testimonial">
-        <div class="testimonial-text">"The auto-outreach feature is a game changer. I set up a campaign for my Sabah clients and AI sent personalized emails to 50 leads in seconds."</div>
-        <div class="testimonial-author">Sarah L.</div>
-        <div class="testimonial-role">FMCG Sales Manager, Kota Kinabalu</div>
-      </div>
-      <div class="testimonial">
-        <div class="testimonial-text">"Finally a sales tool that understands the Malaysian market. The AI generates content in our tone and targets the right audience."</div>
-        <div class="testimonial-author">David C.</div>
-        <div class="testimonial-role">Real Estate Agent, Kuching</div>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- CTA -->
 <section class="cta-section">
   <h2>Ready to Sell Smarter?</h2>
   <p>Join Malaysian sales teams who are closing more deals with AI-human partnerships.</p>
   <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
     <button class="btn btn-white btn-lg" onclick="openSignup('pro')">Start 14-Day Free Trial</button>
-    <a href="mailto:eiaawsolutions@gmail.com" class="btn btn-outline btn-lg">Talk to Us</a>
+    <button class="btn btn-outline btn-lg" onclick="openContact()">Talk to Us</button>
   </div>
 </section>
 
@@ -401,6 +374,49 @@
     <p style="margin-top:12px">&copy; 2026 EIAAW Solutions. All rights reserved.</p>
   </div>
 </footer>
+
+<!-- Contact Modal -->
+<div id="contact-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:32px;width:90%;max-width:480px;position:relative">
+    <button onclick="closeContact()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">&times;</button>
+    <div style="text-align:center;margin-bottom:24px">
+      <h2 style="font-size:22px;margin-bottom:4px">Get in Touch</h2>
+      <p style="color:var(--text-muted);font-size:13px">Have questions? We'd love to hear from you. Our team will get back to you within 24 hours.</p>
+    </div>
+    <div id="contact-form">
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Full Name *</label>
+        <input id="ct-name" placeholder="Your name" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Email *</label>
+        <input id="ct-email" type="email" placeholder="you@company.com" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Phone</label>
+        <input id="ct-phone" placeholder="+60 12-345 6789" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Company</label>
+        <input id="ct-company" placeholder="Your company name" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">How can we help? *</label>
+        <textarea id="ct-message" rows="4" placeholder="Tell us about your sales needs, team size, or any questions..." style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
+      </div>
+      <div id="ct-error" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none"></div>
+      <button id="ct-btn" onclick="submitContact()" class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px">
+        Send Enquiry
+      </button>
+    </div>
+    <div id="contact-success" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:48px;margin-bottom:12px">&#10003;</div>
+      <h3 style="margin-bottom:8px;color:var(--primary)">Message Sent!</h3>
+      <p style="color:var(--text-muted);font-size:14px">Thank you for reaching out. We'll get back to you within 24 hours.</p>
+      <button onclick="closeContact()" class="btn btn-outline" style="margin-top:20px">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- Signup Modal -->
 <div id="signup-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:none;align-items:center;justify-content:center">
@@ -516,10 +532,71 @@ async function startCheckout() {
   }
 }
 
-// Close modal on backdrop click
+// Close modals on backdrop click
 document.getElementById('signup-modal').addEventListener('click', function(e) {
   if (e.target === this) closeSignup();
 });
+document.getElementById('contact-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeContact();
+});
+
+// Contact form
+function openContact() {
+  document.getElementById('contact-form').style.display = 'block';
+  document.getElementById('contact-success').style.display = 'none';
+  document.getElementById('ct-error').style.display = 'none';
+  document.getElementById('contact-modal').style.display = 'flex';
+  document.getElementById('ct-name').focus();
+}
+
+function closeContact() {
+  document.getElementById('contact-modal').style.display = 'none';
+}
+
+async function submitContact() {
+  const name = document.getElementById('ct-name').value.trim();
+  const email = document.getElementById('ct-email').value.trim();
+  const phone = document.getElementById('ct-phone').value.trim();
+  const company = document.getElementById('ct-company').value.trim();
+  const message = document.getElementById('ct-message').value.trim();
+  const errEl = document.getElementById('ct-error');
+  const btn = document.getElementById('ct-btn');
+
+  if (!name || !email || !message) {
+    errEl.textContent = 'Please fill in your name, email, and message.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  try {
+    const res = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone, company, message }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      errEl.textContent = data.error;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Send Enquiry';
+      return;
+    }
+
+    document.getElementById('contact-form').style.display = 'none';
+    document.getElementById('contact-success').style.display = 'block';
+  } catch (e) {
+    errEl.textContent = 'Something went wrong. Please email us at eiaawsolutions@gmail.com';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Send Enquiry';
+  }
+}
 
 // Handle welcome redirect from successful signup
 if (window.location.search.includes('welcome=1')) {
