@@ -41,7 +41,7 @@ npm start
 # Visit http://localhost:3000
 ```
 
-Default login: `admin` / `admin123` (change immediately)
+Default login: `admin` / `Sys@dm1n$` (change immediately after first login)
 
 ## Environment Variables
 

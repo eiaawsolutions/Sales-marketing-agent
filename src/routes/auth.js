@@ -97,6 +97,89 @@ router.post('/reset-password', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// POST /api/auth/forgot-password — send password reset email
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  // Always return success (don't reveal if email exists)
+  if (!email) return res.json({ success: true });
+
+  const user = db.prepare('SELECT id, username, display_name, email FROM users WHERE email = ?').get(email);
+  if (!user) return res.json({ success: true }); // Silent — don't reveal
+
+  try {
+    // Generate reset token (valid 1 hour)
+    const resetToken = generateToken();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+      .run(`reset_token_${resetToken}`, JSON.stringify({ userId: user.id, expires: Date.now() + 3600000 }));
+
+    // Send reset email
+    const nodemailer = (await import('nodemailer')).default;
+    const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value;
+    const smtpPort = db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || '587';
+    const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value;
+    const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value;
+    const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value;
+
+    if (smtpUser && smtpHost) {
+      const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+      const resetUrl = `${baseUrl}/app?reset=${resetToken}`;
+      const transporter = nodemailer.createTransport({
+        host: smtpHost, port: parseInt(smtpPort), secure: parseInt(smtpPort) === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+
+      await transporter.sendMail({
+        from: fromEmail || smtpUser,
+        to: user.email,
+        subject: 'Password Reset — EIAAW SalesAgent',
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto">
+            <h1 style="color:#2ec4b6">Password Reset</h1>
+            <p>Hi ${user.display_name || user.username},</p>
+            <p>We received a request to reset your password. Click the link below to set a new password:</p>
+            <p style="margin:24px 0">
+              <a href="${resetUrl}" style="background:#2ec4b6;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Reset My Password</a>
+            </p>
+            <p style="color:#999;font-size:13px">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
+            <hr style="margin:24px 0">
+            <p style="color:#999;font-size:12px">EIAAW SalesAgent AI<br><a href="https://eiaawsolutions.com">eiaawsolutions.com</a></p>
+          </div>
+        `,
+      });
+    }
+  } catch (e) {
+    console.error('Password reset email failed:', e.message);
+  }
+
+  res.json({ success: true });
+});
+
+// POST /api/auth/reset-password-with-token — reset password using token from email
+router.post('/reset-password-with-token', (req, res) => {
+  const { token, newPassword } = req.body;
+  if (!token || !newPassword) return res.status(400).json({ error: 'Token and new password required.' });
+  if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(`reset_token_${token}`);
+  if (!row) return res.status(400).json({ error: 'Invalid or expired reset link.' });
+
+  let data;
+  try { data = JSON.parse(row.value); } catch { return res.status(400).json({ error: 'Invalid reset token.' }); }
+
+  if (Date.now() > data.expires) {
+    db.prepare("DELETE FROM settings WHERE key = ?").run(`reset_token_${token}`);
+    return res.status(400).json({ error: 'Reset link expired. Request a new one.' });
+  }
+
+  const hash = hashPassword(newPassword);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, data.userId);
+  db.prepare("DELETE FROM settings WHERE key = ?").run(`reset_token_${token}`);
+  // Kill existing sessions
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(data.userId);
+
+  res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
+});
+
 // POST /api/auth/verify-email — verify email with code
 router.post('/verify-email', requireAuth, (req, res) => {
   const { code } = req.body;

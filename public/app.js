@@ -49,14 +49,106 @@ function renderLoginPage() {
       <h1 style="background:linear-gradient(135deg,#2ec4b6,#0e8b7d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;font-size:28px">EIAAW SalesAgent</h1>
       <p class="text-muted" style="font-size:12px;margin-bottom:16px">AI-Human Sales Partnerships</p>
       <p class="text-muted mb-4">Sign in to your account</p>
-      <div class="card">
+      <div class="card" id="login-card">
         <div class="form-group"><label>Username</label><input id="login-user" placeholder="Username" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()"></div>
         <div class="form-group"><label>Password</label><input id="login-pass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"></div>
         <div id="login-error" style="color:var(--danger);font-size:13px;margin-bottom:12px;display:none"></div>
         <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Sign In</button>
+        <p style="text-align:center;margin-top:14px;font-size:13px">
+          <a href="#" onclick="event.preventDefault();showForgotPassword()" style="color:var(--primary);text-decoration:none">Forgot password?</a>
+        </p>
+      </div>
+      <div class="card" id="forgot-card" style="display:none">
+        <h3 style="color:var(--text);text-transform:none;letter-spacing:0;font-size:16px;margin-bottom:4px">Reset Password</h3>
+        <p class="text-muted text-sm mb-4">Enter your email and we'll send a reset link.</p>
+        <div class="form-group"><label>Email</label><input id="forgot-email" type="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')doForgotPassword()"></div>
+        <div id="forgot-msg" style="font-size:13px;margin-bottom:12px;display:none"></div>
+        <button class="btn btn-primary" style="width:100%" onclick="doForgotPassword()" id="forgot-btn">Send Reset Link</button>
+        <p style="text-align:center;margin-top:14px;font-size:13px">
+          <a href="#" onclick="event.preventDefault();showLoginForm()" style="color:var(--primary);text-decoration:none">Back to login</a>
+        </p>
       </div>
     </div>
   `;
+}
+
+function showForgotPassword() {
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('forgot-card').style.display = 'block';
+  document.getElementById('forgot-email')?.focus();
+}
+
+function showLoginForm() {
+  document.getElementById('login-card').style.display = 'block';
+  document.getElementById('forgot-card').style.display = 'none';
+}
+
+function showResetPasswordForm(resetToken) {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="max-width:400px;margin:100px auto;text-align:center">
+      <h1 style="background:linear-gradient(135deg,#2ec4b6,#0e8b7d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;font-size:28px">EIAAW SalesAgent</h1>
+      <p class="text-muted mb-4">Set your new password</p>
+      <div class="card">
+        <div class="form-group"><label>New Password</label><input id="reset-pass" type="password" placeholder="Min 8 characters" onkeydown="if(event.key==='Enter')document.getElementById('reset-pass2').focus()"></div>
+        <div class="form-group"><label>Confirm Password</label><input id="reset-pass2" type="password" placeholder="Confirm password" onkeydown="if(event.key==='Enter')doResetPassword('${resetToken}')"></div>
+        <div id="reset-msg" style="font-size:13px;margin-bottom:12px;display:none"></div>
+        <button class="btn btn-primary" style="width:100%" onclick="doResetPassword('${resetToken}')" id="reset-btn">Set New Password</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('reset-pass')?.focus();
+}
+
+async function doResetPassword(resetToken) {
+  const pass = document.getElementById('reset-pass')?.value;
+  const pass2 = document.getElementById('reset-pass2')?.value;
+  const msgEl = document.getElementById('reset-msg');
+  const btn = document.getElementById('reset-btn');
+
+  if (!pass || pass.length < 8) { msgEl.style.display='block'; msgEl.style.color='var(--danger)'; msgEl.textContent='Password must be at least 8 characters.'; return; }
+  if (pass !== pass2) { msgEl.style.display='block'; msgEl.style.color='var(--danger)'; msgEl.textContent='Passwords do not match.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Resetting...';
+  try {
+    const res = await fetch('/api/auth/reset-password-with-token', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: resetToken, newPassword: pass }),
+    }).then(r => r.json());
+
+    if (res.error) { msgEl.style.display='block'; msgEl.style.color='var(--danger)'; msgEl.textContent=res.error; btn.disabled=false; btn.textContent='Set New Password'; return; }
+
+    msgEl.style.display='block'; msgEl.style.color='var(--success)';
+    msgEl.textContent = 'Password reset! Redirecting to login...';
+    setTimeout(() => { window.location.href = '/app'; }, 2000);
+  } catch (e) {
+    msgEl.style.display='block'; msgEl.style.color='var(--danger)'; msgEl.textContent='Something went wrong. Try again.';
+    btn.disabled=false; btn.textContent='Set New Password';
+  }
+}
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgot-email')?.value?.trim();
+  const msgEl = document.getElementById('forgot-msg');
+  const btn = document.getElementById('forgot-btn');
+  if (!email) { msgEl.style.display = 'block'; msgEl.style.color = 'var(--danger)'; msgEl.textContent = 'Please enter your email.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Sending...';
+  try {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).then(r => r.json());
+
+    msgEl.style.display = 'block';
+    msgEl.style.color = 'var(--success)';
+    msgEl.textContent = 'If an account exists with that email, a reset link has been sent. Check your inbox.';
+    btn.textContent = 'Sent!';
+  } catch (e) {
+    msgEl.style.display = 'block'; msgEl.style.color = 'var(--success)';
+    msgEl.textContent = 'If an account exists with that email, a reset link has been sent.';
+    btn.disabled = false; btn.textContent = 'Send Reset Link';
+  }
 }
 
 async function doLogin() {
@@ -3455,8 +3547,17 @@ async function slDeleteEntry(id) {
 
 // ========== Init ==========
 async function init() {
-  // Handle post-signup redirect from Stripe
   const params = new URLSearchParams(window.location.search);
+
+  // Handle password reset link
+  if (params.get('reset')) {
+    const resetToken = params.get('reset');
+    window.history.replaceState({}, '', '/app');
+    showResetPasswordForm(resetToken);
+    return;
+  }
+
+  // Handle post-signup redirect from Stripe
   if (params.get('welcome') === '1' && params.get('token')) {
     authToken = params.get('token');
     sessionStorage.setItem('auth_token', authToken);
