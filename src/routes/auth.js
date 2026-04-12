@@ -97,6 +97,21 @@ router.post('/reset-password', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// POST /api/auth/lookup-email — get masked email for a username (for forgot password)
+router.post('/lookup-email', (req, res) => {
+  const { username } = req.body;
+  if (!username) return res.json({ email: null });
+
+  const user = db.prepare('SELECT email FROM users WHERE username = ?').get(username);
+  if (!user) return res.json({ email: null });
+
+  // Return masked email: a****s@gmail.com
+  const email = user.email;
+  const [local, domain] = email.split('@');
+  const masked = local.charAt(0) + '*'.repeat(Math.max(local.length - 2, 1)) + local.charAt(local.length - 1) + '@' + domain;
+  res.json({ email: masked, full: email });
+});
+
 // POST /api/auth/forgot-password — send password reset email
 router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;

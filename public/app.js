@@ -60,8 +60,12 @@ function renderLoginPage() {
       </div>
       <div class="card" id="forgot-card" style="display:none">
         <h3 style="color:var(--text);text-transform:none;letter-spacing:0;font-size:16px;margin-bottom:4px">Reset Password</h3>
-        <p class="text-muted text-sm mb-4">Enter your email and we'll send a reset link.</p>
-        <div class="form-group"><label>Email</label><input id="forgot-email" type="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')doForgotPassword()"></div>
+        <p class="text-muted text-sm mb-4">We'll send a reset link to your registered email.</p>
+        <div id="forgot-email-display" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;text-align:center">
+          <div class="text-sm text-muted">Reset link will be sent to:</div>
+          <div id="forgot-email-masked" style="font-size:16px;font-weight:600;color:var(--primary);margin-top:4px"></div>
+        </div>
+        <input id="forgot-email-hidden" type="hidden">
         <div id="forgot-msg" style="font-size:13px;margin-bottom:12px;display:none"></div>
         <button class="btn btn-primary" style="width:100%" onclick="doForgotPassword()" id="forgot-btn">Send Reset Link</button>
         <p style="text-align:center;margin-top:14px;font-size:13px">
@@ -72,10 +76,39 @@ function renderLoginPage() {
   `;
 }
 
-function showForgotPassword() {
+async function showForgotPassword() {
+  const username = document.getElementById('login-user')?.value?.trim();
   document.getElementById('login-card').style.display = 'none';
   document.getElementById('forgot-card').style.display = 'block';
-  document.getElementById('forgot-email')?.focus();
+
+  const msgEl = document.getElementById('forgot-msg');
+  const emailDisplay = document.getElementById('forgot-email-display');
+  const emailMasked = document.getElementById('forgot-email-masked');
+  const hiddenEmail = document.getElementById('forgot-email-hidden');
+
+  if (username) {
+    try {
+      const res = await fetch('/api/auth/lookup-email', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      }).then(r => r.json());
+
+      if (res.email && res.full) {
+        emailDisplay.style.display = 'block';
+        emailMasked.textContent = res.email;
+        hiddenEmail.value = res.full;
+      } else {
+        msgEl.style.display = 'block'; msgEl.style.color = 'var(--danger)';
+        msgEl.textContent = 'Username not found. Check your username and try again.';
+      }
+    } catch (e) {
+      msgEl.style.display = 'block'; msgEl.style.color = 'var(--danger)';
+      msgEl.textContent = 'Could not look up email. Try again.';
+    }
+  } else {
+    msgEl.style.display = 'block'; msgEl.style.color = 'var(--warning)';
+    msgEl.textContent = 'Enter your username on the login page first, then click Forgot password.';
+  }
 }
 
 function showLoginForm() {
@@ -128,10 +161,10 @@ async function doResetPassword(resetToken) {
 }
 
 async function doForgotPassword() {
-  const email = document.getElementById('forgot-email')?.value?.trim();
+  const email = document.getElementById('forgot-email-hidden')?.value?.trim();
   const msgEl = document.getElementById('forgot-msg');
   const btn = document.getElementById('forgot-btn');
-  if (!email) { msgEl.style.display = 'block'; msgEl.style.color = 'var(--danger)'; msgEl.textContent = 'Please enter your email.'; return; }
+  if (!email) { msgEl.style.display = 'block'; msgEl.style.color = 'var(--danger)'; msgEl.textContent = 'No email found. Enter your username on login page first.'; return; }
 
   btn.disabled = true; btn.textContent = 'Sending...';
   try {
