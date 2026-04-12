@@ -116,6 +116,7 @@ function renderSidebar() {
   if (isSuperadmin) {
     items.push({ id: 'settings', icon: '&#9881;', label: 'Settings' });
     items.push({ id: 'accounts', icon: '&#9775;', label: 'Accounts' });
+    items.push({ id: 'system-overview', icon: '&#9881;', label: 'System Overview' });
     items.push({ id: 'system-logic', icon: '&#9883;', label: 'System Logic' });
   }
 
@@ -149,6 +150,7 @@ function renderPage() {
     case 'chat': return renderChatPage();
     case 'settings': return '<div id="page" class="loading">Loading settings...</div>';
     case 'accounts': return '<div id="page" class="loading">Loading accounts...</div>';
+    case 'system-overview': return '<div id="page" class="loading">Loading overview...</div>';
     case 'system-logic': return '<div id="page" class="loading">Loading...</div>';
     default: return '<div>Page not found</div>';
   }
@@ -163,6 +165,7 @@ async function afterRender() {
     case 'content': return loadContent();
     case 'settings': return loadSettings();
     case 'accounts': return loadAccounts();
+    case 'system-overview': return loadSystemOverview();
     case 'system-logic': return loadSystemLogic();
   }
 }
@@ -2388,6 +2391,144 @@ async function deleteAccount(userId, username) {
   await api.del(`/users/${userId}`);
   showNotification('Account deleted', 'success');
   loadAccounts();
+}
+
+// ========== System Overview (Superadmin) ==========
+function loadSystemOverview() {
+  if (currentUser?.role !== 'superadmin') { navigate('dashboard'); return; }
+
+  document.getElementById('page').innerHTML = `
+    <div class="toolbar"><h2>System Overview</h2></div>
+
+    <!-- Pricing & Plans -->
+    <div class="card">
+      <h3>SUBSCRIPTION PLANS — WHAT CLIENTS GET</h3>
+      <table>
+        <tr><th>Feature</th><th style="text-align:center;color:var(--text-muted)">Starter<br><small>RM 99/mo</small></th><th style="text-align:center;color:var(--primary)">Pro<br><small>RM 199/mo</small></th><th style="text-align:center;color:var(--success)">Business<br><small>RM 399/mo</small></th></tr>
+        <tr><td>Leads</td><td style="text-align:center">100</td><td style="text-align:center">500</td><td style="text-align:center">Unlimited</td></tr>
+        <tr><td>Campaigns</td><td style="text-align:center">3</td><td style="text-align:center">10</td><td style="text-align:center">Unlimited</td></tr>
+        <tr><td>AI Actions/month</td><td style="text-align:center">50</td><td style="text-align:center">200</td><td style="text-align:center">1,000</td></tr>
+        <tr><td>AI Model</td><td style="text-align:center">Haiku (fast)</td><td style="text-align:center">Sonnet</td><td style="text-align:center">Sonnet (priority)</td></tr>
+        <tr><td>Team Users</td><td style="text-align:center">1</td><td style="text-align:center">3</td><td style="text-align:center">10</td></tr>
+        <tr><td>Lead Management</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>Campaign Wizard</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>AI Email Generation (AIDA)</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>AI Social Post Generation</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>Sales Pipeline Kanban</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>AI Lead Scoring</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>AI Chat Assistant</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>Poster Design</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>Social Sharing</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td><strong>Auto-Outreach (AI sequences)</strong></td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td><strong>AI Lead Generation</strong></td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>AI Ad Copy + A/B Test Plans</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>AI SEO Strategy</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>Pipeline AI Analysis</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>14-Day Free Trial</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+      </table>
+    </div>
+
+    <!-- Revenue Target -->
+    <div class="card">
+      <h3>REVENUE TARGET — RM 10,000/MONTH NET PROFIT</h3>
+      <table>
+        <tr><th>Scenario</th><th>Users</th><th>MRR</th><th>AI Cost</th><th>Infra</th><th>Net Profit</th></tr>
+        <tr><td>All Starter</td><td>115</td><td>RM 11,385</td><td>RM 1,380</td><td>RM 300</td><td style="color:var(--success)"><strong>RM 9,705</strong></td></tr>
+        <tr style="background:rgba(46,196,182,0.05)"><td><strong>Mixed (recommended)</strong></td><td><strong>65</strong></td><td><strong>RM 11,935</strong></td><td><strong>RM 1,185</strong></td><td><strong>RM 300</strong></td><td style="color:var(--success)"><strong>RM 10,450</strong></td></tr>
+        <tr><td>All Pro</td><td>58</td><td>RM 11,542</td><td>RM 1,044</td><td>RM 300</td><td style="color:var(--success)"><strong>RM 10,198</strong></td></tr>
+      </table>
+      <div style="margin-top:12px;font-size:13px;color:var(--text-muted)">
+        Mixed = 30 Starter + 25 Pro + 10 Business. AI cost ~RM 9-18/user/mo (Sonnet avg). Infra = Railway + domain.
+      </div>
+    </div>
+
+    <!-- Revenue Ramp -->
+    <div class="card">
+      <h3>REVENUE RAMP PROJECTION</h3>
+      <table>
+        <tr><th>Month</th><th>Users</th><th>MRR</th><th>Costs</th><th>Net Profit</th></tr>
+        <tr><td>Month 1</td><td>5</td><td>RM 750</td><td>RM 350</td><td>RM 400</td></tr>
+        <tr><td>Month 2</td><td>15</td><td>RM 2,250</td><td>RM 550</td><td>RM 1,700</td></tr>
+        <tr><td>Month 3</td><td>30</td><td>RM 4,500</td><td>RM 800</td><td>RM 3,700</td></tr>
+        <tr><td>Month 4</td><td>45</td><td>RM 7,000</td><td>RM 1,050</td><td>RM 5,950</td></tr>
+        <tr><td>Month 5</td><td>55</td><td>RM 8,500</td><td>RM 1,200</td><td>RM 7,300</td></tr>
+        <tr><td>Month 6</td><td>65</td><td>RM 10,500</td><td>RM 1,350</td><td style="color:var(--success)"><strong>RM 9,150</strong></td></tr>
+        <tr style="background:rgba(46,196,182,0.05)"><td><strong>Month 7</strong></td><td><strong>75</strong></td><td><strong>RM 12,000</strong></td><td><strong>RM 1,500</strong></td><td style="color:var(--success)"><strong>RM 10,500 &#10003;</strong></td></tr>
+      </table>
+    </div>
+
+    <!-- Super Sales Agent Skills -->
+    <div class="card">
+      <h3>SUPER SALES AGENT — AI CAPABILITIES</h3>
+      <p class="text-muted text-sm mb-4">Every AI interaction uses these elite sales skills. This is what makes your product better than competitors.</p>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">
+        ${[
+          { icon: '&#127919;', title: 'Sales Strategy & Closing', desc: 'SPIN Selling, Challenger Sale, MEDDIC, Sandler frameworks. Handles top 20 objections (price, timing, competition, authority, need). Creates urgency without being pushy.' },
+          { icon: '&#9733;', title: 'Lead Qualification & Scoring', desc: 'BANT framework with temperature tracking (cold → warm → hot → ready to buy). Scores 0-100 with clear reasoning the salesperson can read and act on.' },
+          { icon: '&#9993;', title: 'Outreach & Follow-up', desc: 'Day 0/3/7/14 cadence. Channel mix (email, LinkedIn, WhatsApp). Subject lines designed for 40%+ open rates. Every message has exactly ONE call-to-action.' },
+          { icon: '&#9998;', title: 'Content & Copywriting', desc: 'AIDA framework emails (Attention → Interest → Desire → Action). P.S. lines (most-read part of emails). Benefit-led, not feature-led. Ready to copy-paste.' },
+          { icon: '&#128269;', title: 'SEO & Digital Marketing', desc: 'Commercial intent keywords that drive SALES. Competitor gap analysis. Quick wins for THIS WEEK. Malaysian local SEO. Meta descriptions as ad copy for organic search.' },
+          { icon: '&#127912;', title: 'Social Media & Design', desc: 'Platform-specific: LinkedIn (long-form), Instagram (visual), Twitter (punchy), Facebook (community). Design suggestions with color psychology. Best times for MYT.' },
+          { icon: '&#128222;', title: 'Cold Call to Buyer Conversion', desc: 'Opening scripts with personal observations. Pain-discovery questions. Bridge-to-solution framework. Handles "send me an email" objection. Converts cold to warm.' },
+          { icon: '&#128200;', title: 'Pipeline Management', desc: 'Identifies stuck deals and at-risk opportunities. Activity-based scoring. Revenue forecasting (optimistic/realistic/pessimistic). Win/loss pattern analysis.' },
+        ].map(s => `
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px">
+            <div style="font-size:20px;margin-bottom:6px">${s.icon}</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px">${s.title}</div>
+            <div style="font-size:12px;color:var(--text-muted);line-height:1.6">${s.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Competitive Advantage -->
+    <div class="card">
+      <h3>COMPETITIVE ADVANTAGE VS MARKET</h3>
+      <table>
+        <tr><th>Feature</th><th style="text-align:center;color:var(--primary)">EIAAW SalesAgent</th><th style="text-align:center">HubSpot</th><th style="text-align:center">Apollo.io</th><th style="text-align:center">Instantly.ai</th></tr>
+        <tr><td>AI Lead Generation</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003; Built-in</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center">DB only</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
+        <tr><td>AI Content (email+social+ads+SEO)</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003; All 4</td><td style="text-align:center">Paid add-on</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
+        <tr><td>AI Lead Scoring + Reasoning</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center">Enterprise</td><td style="text-align:center">Basic</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
+        <tr><td>Auto-Outreach (AI-personalized)</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center">Add-on</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>AI Chat (full CRM context)</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center">Beta</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
+        <tr><td>Pipeline + AI Analysis</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center">Basic</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
+        <tr><td>Poster Design for Social</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
+        <tr><td>Cold Call Script Generator</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
+        <tr style="font-weight:700"><td>Starting Price</td><td style="text-align:center;color:var(--primary)">RM 99/mo</td><td style="text-align:center">Free-RM 3,600</td><td style="text-align:center">Free-$99</td><td style="text-align:center">$30-$77</td></tr>
+      </table>
+    </div>
+
+    <!-- Unit Economics -->
+    <div class="card">
+      <h3>UNIT ECONOMICS — COST PER USER</h3>
+      <table>
+        <tr><th>Cost Item</th><th>Per User/Month</th><th>Notes</th></tr>
+        <tr><td>AI API (Sonnet avg)</td><td>RM 9-18 ($2-4)</td><td>50-200 AI actions</td></tr>
+        <tr><td>Server (shared)</td><td>~RM 2</td><td>Railway $5/mo shared</td></tr>
+        <tr><td>SMTP (email)</td><td>~RM 0.45</td><td>Gmail/SendGrid</td></tr>
+        <tr style="font-weight:700"><td>Total Cost/User</td><td>RM 12-21</td><td></td></tr>
+        <tr style="font-weight:700;color:var(--success)"><td>Gross Margin</td><td>80-85%</td><td>At RM 99-399 pricing</td></tr>
+      </table>
+    </div>
+
+    <!-- AI Cost Per Action -->
+    <div class="card">
+      <h3>AI COST PER ACTION (SONNET)</h3>
+      <table>
+        <tr><th>Action</th><th>Input Tokens</th><th>Output Tokens</th><th>Cost (USD)</th></tr>
+        <tr><td>Lead Scoring</td><td>~600</td><td>~150</td><td>$0.011</td></tr>
+        <tr><td>Lead Qualification (BANT)</td><td>~400</td><td>~200</td><td>$0.009</td></tr>
+        <tr><td>Email Generation (AIDA)</td><td>~500</td><td>~400</td><td>$0.012</td></tr>
+        <tr><td>Social Post + Design Tips</td><td>~400</td><td>~300</td><td>$0.008</td></tr>
+        <tr><td>Ad Copy + A/B Plan</td><td>~400</td><td>~500</td><td>$0.013</td></tr>
+        <tr><td>SEO Strategy</td><td>~350</td><td>~400</td><td>$0.010</td></tr>
+        <tr><td>Pipeline Analysis</td><td>~2000</td><td>~300</td><td>$0.012</td></tr>
+        <tr><td>Auto-Outreach (per 3 leads)</td><td>~800</td><td>~600</td><td>$0.015</td></tr>
+        <tr><td>AI Chat (full CRM context)</td><td>~3000-8000</td><td>~500</td><td>$0.03-0.13</td></tr>
+        <tr><td>Auto-Generate 5 Leads</td><td>~400</td><td>~1000</td><td>$0.020</td></tr>
+      </table>
+    </div>
+  `;
 }
 
 // ========== Settings ==========
