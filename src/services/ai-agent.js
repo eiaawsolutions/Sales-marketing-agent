@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import db from '../db/index.js';
+import { decrypt } from '../utils/crypto.js';
 
 function getSettings() {
   const rows = db.prepare('SELECT key, value FROM settings').all();
@@ -10,7 +11,8 @@ function getSettings() {
 
 function getClient() {
   const settings = getSettings();
-  const apiKey = settings.api_key || process.env.ANTHROPIC_API_KEY;
+  // Decrypt API key (handles both encrypted and plaintext values)
+  const apiKey = decrypt(settings.api_key) || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('API key not configured. Go to Settings to add your Anthropic API key.');
   return new Anthropic({ apiKey });
 }

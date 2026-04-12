@@ -2972,7 +2972,7 @@ function loadSystemOverview() {
         <h3 style="margin-bottom:0">SECURITY REPORT CARD</h3>
         <div style="text-align:center">
           <div style="width:64px;height:64px;border-radius:50%;background:var(--teal-gradient);display:flex;align-items:center;justify-content:center;margin:0 auto">
-            <span style="font-size:22px;font-weight:900;color:#fff">8.5</span>
+            <span style="font-size:22px;font-weight:900;color:#fff">9.0</span>
           </div>
           <div class="text-sm text-muted" style="margin-top:4px">out of 10</div>
         </div>
@@ -2986,7 +2986,7 @@ function loadSystemOverview() {
           { area: 'API Security', score: 9, items: ['Per-user AI rate limiting (10/min)', 'Global API rate limit (120/min)', 'Campaign send rate limit (3/min)', 'Login brute-force protection'], color: 'var(--success)' },
           { area: 'Transport Security', score: 8, items: ['HTTPS enforced (Railway SSL)', 'HSTS header active', 'Restricted CORS (production domains)', 'CSRF origin validation'], color: 'var(--success)' },
           { area: 'Security Headers', score: 9, items: ['Content-Security-Policy (CSP)', 'X-Content-Type-Options: nosniff', 'X-Frame-Options (clickjacking)', 'Strict-Transport-Security (HSTS)'], color: 'var(--success)' },
-          { area: 'Payment Security', score: 7, items: ['Stripe Checkout (PCI compliant)', 'Webhook signature verification', 'Keys masked in Settings UI', 'Needs: encryption at rest for keys'], color: 'var(--warning)' },
+          { area: 'Payment Security', score: 9, items: ['Stripe Checkout (PCI compliant)', 'Webhook signature verification', 'Keys masked in Settings UI', 'AES-256-GCM encryption at rest for all secrets'], color: 'var(--success)' },
           { area: 'Account Security', score: 8, items: ['Email verification on signup', '8-char password minimum', 'Session cleanup on logout', 'Account suspension kills sessions'], color: 'var(--success)' },
         ].map(s => `
           <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px">
@@ -3013,7 +3013,7 @@ function loadSystemOverview() {
             <div style="font-size:10px;color:var(--text-muted)">CRITICAL FIXED</div>
           </div>
           <div style="background:var(--surface);border-radius:6px;padding:8px">
-            <div style="font-size:18px;font-weight:800;color:var(--success)">11/12</div>
+            <div style="font-size:18px;font-weight:800;color:var(--success)">12/12</div>
             <div style="font-size:10px;color:var(--text-muted)">HIGH FIXED</div>
           </div>
           <div style="background:var(--surface);border-radius:6px;padding:8px">
@@ -3037,7 +3037,7 @@ function loadSystemOverview() {
           <tr><td>DB errors leaked to client</td><td style="color:var(--warning)">HIGH</td><td style="color:var(--success)">FIXED</td><td>safeError() sanitizer</td></tr>
           <tr><td>CSP headers disabled</td><td style="color:var(--warning)">HIGH</td><td style="color:var(--success)">FIXED</td><td>Full CSP with Stripe + Fonts whitelisted</td></tr>
           <tr><td>No email verification</td><td style="color:var(--warning)">HIGH</td><td style="color:var(--success)">FIXED</td><td>Code emailed + verify endpoint</td></tr>
-          <tr><td>Stripe keys in plaintext DB</td><td style="color:var(--warning)">HIGH</td><td style="color:var(--text-muted)">NOTED</td><td>Use env vars — encryption at rest planned</td></tr>
+          <tr><td>Stripe keys in plaintext DB</td><td style="color:var(--warning)">HIGH</td><td style="color:var(--success)">FIXED</td><td>AES-256-GCM encryption at rest for all secrets</td></tr>
           <tr><td>Per-user AI rate limiting</td><td style="color:var(--primary)">MEDIUM</td><td style="color:var(--success)">FIXED</td><td>Keyed by user ID, 10/min per user</td></tr>
           <tr><td>Campaign send no limit</td><td style="color:var(--primary)">MEDIUM</td><td style="color:var(--success)">FIXED</td><td>3 sends/min rate limit</td></tr>
           <tr><td>No CSRF protection</td><td style="color:var(--primary)">MEDIUM</td><td style="color:var(--success)">FIXED</td><td>Origin-based validation</td></tr>

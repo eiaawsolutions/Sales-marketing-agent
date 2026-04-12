@@ -8,6 +8,7 @@ import { config } from './config/index.js';
 
 import db from './db/index.js';
 import { requireAuth } from './middleware/auth.js';
+import { decrypt } from './utils/crypto.js';
 import authRouter from './routes/auth.js';
 import billingRouter from './routes/billing.js';
 import usersRouter from './routes/users.js';
@@ -127,7 +128,7 @@ app.post('/api/contact', async (req, res) => {
     const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value || process.env.SMTP_HOST;
     const smtpPort = db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || process.env.SMTP_PORT || '587';
     const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value || process.env.SMTP_USER;
-    const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value || process.env.SMTP_PASS;
+    const smtpPass = decrypt(db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value) || process.env.SMTP_PASS;
     const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value || process.env.FROM_EMAIL;
 
     if (smtpUser && smtpHost) {

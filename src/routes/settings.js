@@ -1,37 +1,39 @@
 import { Router } from 'express';
 import db from '../db/index.js';
 import { requireSuperadmin } from '../middleware/auth.js';
+import { encrypt, decrypt, isSensitive } from '../utils/crypto.js';
 
 const router = Router();
 
 // All settings routes require superadmin
 router.use(requireSuperadmin);
 
-// GET /api/settings — get all settings (masks API key)
+// GET /api/settings — get all settings (masks sensitive values)
 router.get('/', (req, res) => {
   const rows = db.prepare('SELECT key, value, updated_at FROM settings').all();
   const settings = {};
   for (const row of rows) {
+    // Decrypt sensitive values first
+    const rawValue = isSensitive(row.key) ? decrypt(row.value) : row.value;
+
     // Mask sensitive values for display
-    if (row.key === 'api_key' && row.value) {
-      settings[row.key] = row.value.length > 12
-        ? row.value.substring(0, 8) + '...' + row.value.substring(row.value.length - 4)
-        : row.value ? '••••••••' : '';
-    } else if (row.key === 'smtp_pass' && row.value) {
-      settings[row.key] = row.value ? '••••••••' : '';
-    } else if (row.key === 'admin_password' && row.value) {
-      settings[row.key] = row.value ? '••••••••' : '';
-    } else if (row.key === 'stripe_secret_key' && row.value) {
-      settings[row.key] = row.value.length > 12
-        ? row.value.substring(0, 8) + '...' + row.value.substring(row.value.length - 4)
-        : row.value ? '••••••••' : '';
+    if (row.key === 'api_key' && rawValue) {
+      settings[row.key] = rawValue.length > 12
+        ? rawValue.substring(0, 8) + '...' + rawValue.substring(rawValue.length - 4)
+        : rawValue ? '••••••••' : '';
+    } else if (['smtp_pass', 'admin_password'].includes(row.key) && rawValue) {
+      settings[row.key] = rawValue ? '••••••••' : '';
+    } else if (row.key === 'stripe_secret_key' && rawValue) {
+      settings[row.key] = rawValue.length > 12
+        ? rawValue.substring(0, 8) + '...' + rawValue.substring(rawValue.length - 4)
+        : rawValue ? '••••••••' : '';
     } else {
-      settings[row.key] = row.value;
+      settings[row.key] = row.value; // Non-sensitive: return as-is
     }
   }
-  // Also return whether keys are actually set (for status indicators)
   const apiKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'api_key'").get();
-  settings._api_key_set = !!(apiKeyRow && apiKeyRow.value);
+  const decryptedKey = apiKeyRow?.value ? decrypt(apiKeyRow.value) : '';
+  settings._api_key_set = !!(decryptedKey && decryptedKey.length > 5);
   res.json(settings);
 });
 
@@ -46,8 +48,10 @@ router.put('/', (req, res) => {
   for (const [key, value] of Object.entries(req.body)) {
     if (!allowedKeys.includes(key)) continue;
     // Don't overwrite with masked values
-    if ((key === 'api_key' || key === 'smtp_pass' || key === 'admin_password') && (value.includes('•') || value.includes('...'))) continue;
-    upsert.run(key, value, value);
+    if (['api_key', 'smtp_pass', 'admin_password', 'stripe_secret_key'].includes(key) && (value.includes('•') || value.includes('...'))) continue;
+    // Encrypt sensitive values before storing
+    const storeValue = isSensitive(key) ? encrypt(value) : value;
+    upsert.run(key, storeValue, storeValue);
     updated.push(key);
   }
 
@@ -61,7 +65,8 @@ router.post('/test-ai', async (req, res) => {
     const apiKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'api_key'").get();
     const modelRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_model'").get();
 
-    const apiKey = apiKeyRow?.value || process.env.ANTHROPIC_API_KEY;
+    // Decrypt the API key
+    const apiKey = apiKeyRow?.value ? decrypt(apiKeyRow.value) : process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return res.json({ success: false, error: 'No API key configured' });
 
     const client = new Anthropic({ apiKey });
@@ -71,8 +76,7 @@ router.post('/test-ai', async (req, res) => {
       messages: [{ role: 'user', content: 'Reply with exactly: CONNECTION_OK' }],
     });
 
-    const text = response.content[0].text;
-    res.json({ success: true, model: response.model, response: text });
+    res.json({ success: true, model: response.model, response: response.content[0].text });
   } catch (err) {
     const msg = err.message || String(err);
     const jsonMatch = msg.match(/\{.*"message"\s*:\s*"([^"]+)"/);

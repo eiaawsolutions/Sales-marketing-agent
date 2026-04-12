@@ -2,12 +2,13 @@ import { Router } from 'express';
 import Stripe from 'stripe';
 import db from '../db/index.js';
 import { hashPassword, generateToken } from '../middleware/auth.js';
+import { decrypt } from '../utils/crypto.js';
 
 const router = Router();
 
 function getStripe() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'stripe_secret_key'").get();
-  const key = row?.value || process.env.STRIPE_SECRET_KEY;
+  const key = row?.value ? decrypt(row.value) : process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error('Stripe not configured. Add stripe_secret_key in Settings.');
   return new Stripe(key);
 }
