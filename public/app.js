@@ -2224,8 +2224,7 @@ async function loadAccounts() {
     const totalMRR = activeSubscribers.reduce((s, u) => s + (PLAN_PRICES[u.plan || 'starter'] || 0), 0);
     const totalAICost = costData.overall.total_cost || 0;
     const totalAICostMYR = totalAICost * 4.5; // USD to MYR approx
-    const infraCost = 25; // Railway ~RM 25/mo
-    const totalCosts = totalAICostMYR + infraCost;
+    const totalCosts = totalAICostMYR;
     const netProfit = totalMRR - totalCosts;
     const planCounts = { starter: 0, pro: 0, business: 0 };
     activeSubscribers.forEach(u => { planCounts[u.plan || 'starter'] = (planCounts[u.plan || 'starter'] || 0) + 1; });
