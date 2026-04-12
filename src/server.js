@@ -96,6 +96,20 @@ app.post('/api/contact', async (req, res) => {
   }
 });
 
+// AI usage stats (superadmin only)
+app.get('/api/admin/ai-usage', requireAuth, (req, res) => {
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Superadmin only' });
+
+  const total = db.prepare('SELECT COALESCE(SUM(cost_usd),0) as cost, COUNT(*) as calls, COALESCE(SUM(total_tokens),0) as tokens FROM ai_cost_log').get();
+  const thisMonth = db.prepare("SELECT COALESCE(SUM(cost_usd),0) as cost, COUNT(*) as calls FROM ai_cost_log WHERE created_at >= datetime('now','start of month')").get();
+  const lastMonth = db.prepare("SELECT COALESCE(SUM(cost_usd),0) as cost, COUNT(*) as calls FROM ai_cost_log WHERE created_at >= datetime('now','start of month','-1 month') AND created_at < datetime('now','start of month')").get();
+  const daily = db.prepare("SELECT date(created_at) as day, SUM(cost_usd) as cost, COUNT(*) as calls FROM ai_cost_log WHERE created_at >= datetime('now','-7 days') GROUP BY date(created_at) ORDER BY day").all();
+  const byModel = db.prepare("SELECT model, COUNT(*) as calls, SUM(cost_usd) as cost FROM ai_cost_log GROUP BY model ORDER BY cost DESC").all();
+  const byType = db.prepare("SELECT task_type, COUNT(*) as calls, SUM(cost_usd) as cost FROM ai_cost_log GROUP BY task_type ORDER BY cost DESC").all();
+
+  res.json({ total, thisMonth, lastMonth, daily, byModel, byType });
+});
+
 // Public routes (no auth)
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);

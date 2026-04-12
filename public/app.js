@@ -2216,6 +2216,7 @@ async function loadAccounts() {
   try {
     const users = await api.get('/users');
     const costData = await api.get('/campaigns/ai-costs').catch(() => ({ overall: { total_cost: 0 } }));
+    const aiUsage = await api.get('/admin/ai-usage').catch(() => ({ total: { cost: 0, calls: 0, tokens: 0 }, thisMonth: { cost: 0, calls: 0 }, lastMonth: { cost: 0, calls: 0 }, daily: [], byModel: [], byType: [] }));
 
     // Calculate revenue & profit
     const PLAN_PRICES = { starter: 99, pro: 199, business: 399 };
@@ -2224,7 +2225,9 @@ async function loadAccounts() {
     const totalMRR = activeSubscribers.reduce((s, u) => s + (PLAN_PRICES[u.plan || 'starter'] || 0), 0);
     const totalAICost = costData.overall.total_cost || 0;
     const totalAICostMYR = totalAICost * 4.5; // USD to MYR approx
-    const totalCosts = totalAICostMYR;
+    const stripeFees = totalMRR * 0.029 + activeSubscribers.length * 1; // 2.9% + RM1 per txn
+    const fixedCosts = 22.50 + 5; // Railway RM22.50 + Domain RM5
+    const totalCosts = totalAICostMYR + stripeFees + fixedCosts;
     const netProfit = totalMRR - totalCosts;
     const planCounts = { starter: 0, pro: 0, business: 0 };
     activeSubscribers.forEach(u => { planCounts[u.plan || 'starter'] = (planCounts[u.plan || 'starter'] || 0) + 1; });
@@ -2314,6 +2317,154 @@ async function loadAccounts() {
             ${netProfit >= 10000 ? 'TARGET ACHIEVED!' : `Need ${Math.ceil((10000 - netProfit) / 199)} more Pro subscribers or ${Math.ceil((10000 - netProfit) / 99)} Starter to reach target.`}
           </div>
         </div>
+      </div>
+
+      <!-- Operating Expenses -->
+      <div class="card">
+        <h3>OPERATING EXPENSES (MONTHLY)</h3>
+        <table>
+          <tr><th>Expense</th><th>Provider</th><th>Cost (MYR)</th><th>Cost (USD)</th><th>Status</th><th>Notes</th></tr>
+          <tr>
+            <td><strong>Cloud Hosting</strong></td>
+            <td>Railway (Hobby)</td>
+            <td>RM 22.50</td>
+            <td>$5.00</td>
+            <td><span class="badge badge-active">ACTIVE</span></td>
+            <td>Docker container, auto-deploy, volume storage</td>
+          </tr>
+          <tr>
+            <td><strong>AI API</strong></td>
+            <td>Anthropic (Claude)</td>
+            <td>RM ${(aiUsage.thisMonth.cost * 4.5).toFixed(2)}</td>
+            <td>$${aiUsage.thisMonth.cost.toFixed(4)}</td>
+            <td><span class="badge badge-${aiUsage.thisMonth.cost > 0 ? 'active' : 'draft'}">THIS MONTH</span></td>
+            <td>${aiUsage.thisMonth.calls} calls this month. Pay-per-use.</td>
+          </tr>
+          <tr>
+            <td><strong>Payment Processing</strong></td>
+            <td>Stripe</td>
+            <td>RM ${(totalMRR * 0.029 + activeSubscribers.length * 1).toFixed(2)}</td>
+            <td>—</td>
+            <td><span class="badge badge-active">ACTIVE</span></td>
+            <td>2.9% + RM 1 per transaction. Scales with subscribers.</td>
+          </tr>
+          <tr>
+            <td><strong>Domain</strong></td>
+            <td>Registrar</td>
+            <td>~RM 5</td>
+            <td>—</td>
+            <td><span class="badge badge-active">ACTIVE</span></td>
+            <td>eiaawsolutions.com — annual cost / 12</td>
+          </tr>
+          <tr>
+            <td><strong>DNS</strong></td>
+            <td>Cloudflare</td>
+            <td>RM 0</td>
+            <td>$0</td>
+            <td><span class="badge badge-active">FREE</span></td>
+            <td>Free tier — DNS, SSL, CDN</td>
+          </tr>
+          <tr>
+            <td><strong>Email (SMTP)</strong></td>
+            <td>Gmail</td>
+            <td>RM 0</td>
+            <td>$0</td>
+            <td><span class="badge badge-active">FREE</span></td>
+            <td>Free tier — 500 emails/day</td>
+          </tr>
+          <tr style="font-weight:700;border-top:2px solid var(--border)">
+            <td>TOTAL MONTHLY</td>
+            <td></td>
+            <td style="color:var(--warning)">RM ${(22.50 + (aiUsage.thisMonth.cost * 4.5) + (totalMRR * 0.029 + activeSubscribers.length) + 5).toFixed(2)}</td>
+            <td></td>
+            <td></td>
+            <td>Excludes one-time costs</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- AI API Tracker -->
+      <div class="card">
+        <h3>AI API USAGE TRACKER</h3>
+        <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+          <div class="stat-card">
+            <div class="stat-value yellow">$${aiUsage.total.cost.toFixed(4)}</div>
+            <div class="stat-label">Total AI Spend (all time)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value blue">$${aiUsage.thisMonth.cost.toFixed(4)}</div>
+            <div class="stat-label">This Month</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" style="color:var(--text-muted)">$${aiUsage.lastMonth.cost.toFixed(4)}</div>
+            <div class="stat-label">Last Month</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value green">${(aiUsage.total.tokens / 1000).toFixed(0)}k</div>
+            <div class="stat-label">Total Tokens</div>
+          </div>
+        </div>
+
+        <!-- Top-up Warning -->
+        <div style="background:${aiUsage.total.cost > 4 ? 'rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3)' : aiUsage.total.cost > 2 ? 'rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3)' : 'rgba(46,196,182,0.1);border:1px solid rgba(46,196,182,0.2)'};border-radius:8px;padding:14px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <strong style="color:${aiUsage.total.cost > 4 ? 'var(--danger)' : aiUsage.total.cost > 2 ? 'var(--warning)' : 'var(--primary)'}">
+                ${aiUsage.total.cost > 4 ? 'LOW BALANCE — Top up soon!' : aiUsage.total.cost > 2 ? 'Monitor — usage increasing' : 'Healthy — plenty of credits'}
+              </strong>
+              <div class="text-sm text-muted" style="margin-top:4px">
+                At current rate (~$${(aiUsage.thisMonth.cost || 0.01).toFixed(3)}/day avg), your $5 Anthropic credit lasts ~${Math.max(1, Math.round(5 / Math.max(aiUsage.thisMonth.cost / Math.max(new Date().getDate(), 1), 0.001)))} more days.
+                <a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--primary);margin-left:8px">Top up credits &rarr;</a>
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:20px;font-weight:800;color:var(--primary)">${aiUsage.total.calls}</div>
+              <div class="text-muted text-sm">total calls</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Usage by Model -->
+        ${aiUsage.byModel.length > 0 ? `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <div class="cw-label" style="margin-bottom:8px">By Model</div>
+              ${aiUsage.byModel.map(m => `
+                <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(42,84,112,0.3);font-size:13px">
+                  <span>${m.model?.split('-').slice(0,2).join(' ') || 'Unknown'}</span>
+                  <span>${m.calls} calls — <strong>$${m.cost.toFixed(4)}</strong></span>
+                </div>
+              `).join('')}
+            </div>
+            <div>
+              <div class="cw-label" style="margin-bottom:8px">By Action Type</div>
+              ${aiUsage.byType.map(t => `
+                <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(42,84,112,0.3);font-size:13px">
+                  <span>${t.task_type?.replace(/_/g, ' ') || 'Unknown'}</span>
+                  <span>${t.calls}x — <strong>$${t.cost.toFixed(4)}</strong></span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : '<div class="text-muted text-sm">No AI usage yet.</div>'}
+
+        <!-- Last 7 Days Chart -->
+        ${aiUsage.daily.length > 0 ? `
+          <div style="margin-top:16px">
+            <div class="cw-label" style="margin-bottom:8px">Last 7 Days</div>
+            <div style="display:flex;align-items:end;gap:4px;height:60px">
+              ${aiUsage.daily.map(d => {
+                const maxCost = Math.max(...aiUsage.daily.map(x => x.cost), 0.001);
+                const h = Math.max((d.cost / maxCost) * 100, 5);
+                return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="font-size:9px;color:var(--text-muted)">$${d.cost.toFixed(3)}</div>
+                  <div style="width:100%;height:${h}%;background:var(--teal-gradient);border-radius:3px;min-height:3px" title="${d.day}: $${d.cost.toFixed(4)} (${d.calls} calls)"></div>
+                  <div style="font-size:9px;color:var(--text-muted)">${d.day.slice(5)}</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
       </div>
 
       <!-- Subscriber Cards -->
