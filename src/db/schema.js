@@ -177,6 +177,7 @@ export function initializeDatabase(db) {
     insert.run('admin_password', 'admin123');
     insert.run('stripe_secret_key', '');
     insert.run('stripe_publishable_key', '');
+    insert.run('ai_credit_balance', '5.00');
   }
 
   // Ensure admin_password exists for existing DBs

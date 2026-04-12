@@ -2217,6 +2217,8 @@ async function loadAccounts() {
     const users = await api.get('/users');
     const costData = await api.get('/campaigns/ai-costs').catch(() => ({ overall: { total_cost: 0 } }));
     const aiUsage = await api.get('/admin/ai-usage').catch(() => ({ total: { cost: 0, calls: 0, tokens: 0 }, thisMonth: { cost: 0, calls: 0 }, lastMonth: { cost: 0, calls: 0 }, daily: [], byModel: [], byType: [] }));
+    const settingsData = await api.get('/settings').catch(() => ({}));
+    const aiCreditBalance = parseFloat(settingsData.ai_credit_balance || '5.00');
 
     // Calculate revenue & profit
     const PLAN_PRICES = { starter: 99, pro: 199, business: 399 };
@@ -2405,24 +2407,61 @@ async function loadAccounts() {
           </div>
         </div>
 
-        <!-- Top-up Warning -->
-        <div style="background:${aiUsage.total.cost > 4 ? 'rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3)' : aiUsage.total.cost > 2 ? 'rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3)' : 'rgba(46,196,182,0.1);border:1px solid rgba(46,196,182,0.2)'};border-radius:8px;padding:14px;margin-bottom:16px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
+        <!-- Credit Balance & Top-up Warning -->
+        ${(() => {
+          const remaining = Math.max(aiCreditBalance - aiUsage.total.cost, 0);
+          const pct = aiCreditBalance > 0 ? (remaining / aiCreditBalance) * 100 : 0;
+          const dailyRate = aiUsage.thisMonth.cost / Math.max(new Date().getDate(), 1);
+          const daysLeft = dailyRate > 0 ? Math.round(remaining / dailyRate) : 999;
+          const isLow = remaining < 1 || pct < 20;
+          const isWarning = remaining < 2 || pct < 40;
+          return `
+        <div style="background:${isLow ? 'rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3)' : isWarning ? 'rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3)' : 'rgba(46,196,182,0.1);border:1px solid rgba(46,196,182,0.2)'};border-radius:8px;padding:16px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
             <div>
-              <strong style="color:${aiUsage.total.cost > 4 ? 'var(--danger)' : aiUsage.total.cost > 2 ? 'var(--warning)' : 'var(--primary)'}">
-                ${aiUsage.total.cost > 4 ? 'LOW BALANCE — Top up soon!' : aiUsage.total.cost > 2 ? 'Monitor — usage increasing' : 'Healthy — plenty of credits'}
+              <strong style="font-size:16px;color:${isLow ? 'var(--danger)' : isWarning ? 'var(--warning)' : 'var(--primary)'}">
+                ${isLow ? 'LOW BALANCE — Top up now!' : isWarning ? 'Monitor — balance decreasing' : 'Healthy — credits available'}
               </strong>
               <div class="text-sm text-muted" style="margin-top:4px">
-                At current rate (~$${(aiUsage.thisMonth.cost || 0.01).toFixed(3)}/day avg), your $5 Anthropic credit lasts ~${Math.max(1, Math.round(5 / Math.max(aiUsage.thisMonth.cost / Math.max(new Date().getDate(), 1), 0.001)))} more days.
+                ~${daysLeft} days remaining at current rate (~$${dailyRate.toFixed(3)}/day).
                 <a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--primary);margin-left:8px">Top up credits &rarr;</a>
               </div>
             </div>
             <div style="text-align:right">
-              <div style="font-size:20px;font-weight:800;color:var(--primary)">${aiUsage.total.calls}</div>
-              <div class="text-muted text-sm">total calls</div>
+              <div style="font-size:22px;font-weight:800;color:${isLow ? 'var(--danger)' : isWarning ? 'var(--warning)' : 'var(--primary)'}">$${remaining.toFixed(2)}</div>
+              <div class="text-muted text-sm">remaining</div>
             </div>
           </div>
-        </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center">
+            <div style="background:var(--bg);border-radius:6px;padding:8px">
+              <div style="font-size:14px;font-weight:700;color:var(--primary)">$${aiCreditBalance.toFixed(2)}</div>
+              <div style="font-size:10px;color:var(--text-muted)">LOADED</div>
+            </div>
+            <div style="background:var(--bg);border-radius:6px;padding:8px">
+              <div style="font-size:14px;font-weight:700;color:var(--warning)">$${aiUsage.total.cost.toFixed(4)}</div>
+              <div style="font-size:10px;color:var(--text-muted)">USED</div>
+            </div>
+            <div style="background:var(--bg);border-radius:6px;padding:8px">
+              <div style="font-size:14px;font-weight:700;color:${isLow ? 'var(--danger)' : 'var(--success)'}">$${remaining.toFixed(2)}</div>
+              <div style="font-size:10px;color:var(--text-muted)">REMAINING</div>
+            </div>
+            <div style="background:var(--bg);border-radius:6px;padding:8px">
+              <div style="font-size:14px;font-weight:700">${aiUsage.total.calls}</div>
+              <div style="font-size:10px;color:var(--text-muted)">TOTAL CALLS</div>
+            </div>
+          </div>
+          <div style="margin-top:10px">
+            <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+              <div style="height:100%;width:${100 - pct}%;background:${isLow ? 'var(--danger)' : isWarning ? 'var(--warning)' : 'var(--primary)'};border-radius:4px;transition:width 0.3s"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-top:4px">
+              <span>$0</span>
+              <span>${Math.round(100 - pct)}% used</span>
+              <span>$${aiCreditBalance.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>`;
+        })()}
 
         <!-- Usage by Model -->
         ${aiUsage.byModel.length > 0 ? `
@@ -2950,6 +2989,12 @@ async function loadSettings() {
           <small class="text-muted">Get your API key from <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--primary)">console.anthropic.com</a></small>
         </div>
 
+        <div class="form-group" style="margin-top:14px">
+          <label>AI Credit Balance (USD)</label>
+          <input id="s-ai-balance" type="number" step="0.01" value="${settings.ai_credit_balance || '5.00'}" placeholder="Enter your current Anthropic credit balance">
+          <small class="text-muted">Update this after each top-up. Check balance at <a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--primary)">console.anthropic.com/billing</a></small>
+        </div>
+
         <div class="flex gap-2" style="margin-top:16px">
           <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
           <button class="btn btn-outline" onclick="testAiConnection()">Test Connection</button>
@@ -3034,6 +3079,7 @@ async function saveSettings() {
     admin_password: document.getElementById('s-admin-pass')?.value || '',
     stripe_secret_key: document.getElementById('s-stripe-secret')?.value || '',
     stripe_publishable_key: gv('s-stripe-pub'),
+    ai_credit_balance: gv('s-ai-balance') || '5.00',
   };
 
   try {
