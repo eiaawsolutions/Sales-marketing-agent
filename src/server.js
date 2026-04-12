@@ -47,10 +47,42 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // Trust proxy for Railway/reverse proxy
 app.set('trust proxy', 1);
 
+// CSRF protection — double-submit cookie pattern for SPA
+app.use((req, res, next) => {
+  // Skip for GET/HEAD/OPTIONS and public routes
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/contact')) return next();
+
+  // For authenticated requests, Bearer token in Authorization header provides CSRF protection
+  // because third-party sites cannot set custom headers in cross-origin requests
+  const hasAuthHeader = req.headers['authorization']?.startsWith('Bearer ');
+  if (hasAuthHeader) return next();
+
+  // For unauthenticated POST requests (checkout, etc.), check origin
+  const origin = req.headers['origin'] || req.headers['referer'] || '';
+  const allowed = ['https://sa.eiaawsolutions.com', 'https://sales-marketing-agent-production.up.railway.app', 'http://localhost:3000'];
+  if (allowed.some(a => origin.startsWith(a))) return next();
+
+  return res.status(403).json({ error: 'Request blocked — invalid origin.' });
+});
+
 // Rate limiting
 app.use('/api', rateLimit({ windowMs: 60000, max: 120, message: { error: 'Too many requests. Please slow down.' } }));
 app.use('/api/auth/login', rateLimit({ windowMs: 900000, max: 10, message: { error: 'Too many login attempts. Try again in 15 minutes.' } }));
-app.use('/api/agent', rateLimit({ windowMs: 60000, max: 10, message: { error: 'AI rate limit reached. Wait a moment.' } }));
+// Per-user AI rate limiting (keyed by user ID from auth token)
+app.use('/api/agent', rateLimit({
+  windowMs: 60000, max: 10,
+  keyGenerator: (req) => {
+    const token = req.headers['authorization']?.replace('Bearer ', '');
+    if (token) {
+      const session = db.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token);
+      return session ? `ai_user_${session.user_id}` : req.ip;
+    }
+    return req.ip;
+  },
+  message: { error: 'AI rate limit reached (10/min per user). Wait a moment.' },
+}));
+app.use('/api/campaigns/*/send', rateLimit({ windowMs: 60000, max: 3, message: { error: 'Send rate limit — max 3 per minute.' } }));
 
 // Health check (no auth)
 app.get('/api/health', (req, res) => {

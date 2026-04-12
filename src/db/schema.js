@@ -184,6 +184,14 @@ export function initializeDatabase(db) {
   // Ensure admin_password exists for existing DBs
   db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('admin_password', 'admin123')").run();
 
+  // Add email_verified column to users
+  try { db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch (e) { /* exists */ }
+  // Mark existing superadmins as verified
+  db.prepare("UPDATE users SET email_verified = 1 WHERE role = 'superadmin' AND email_verified = 0").run();
+
+  // Add last_activity column to sessions
+  try { db.exec("ALTER TABLE sessions ADD COLUMN last_activity DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (e) { /* exists */ }
+
   // Add budget_limit column to campaigns if missing
   try { db.exec('ALTER TABLE campaigns ADD COLUMN budget_limit REAL DEFAULT 0'); } catch (e) { /* already exists */ }
 

@@ -45,9 +45,26 @@ export function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired session' });
   }
 
+  // Idle timeout — 30 minutes of inactivity
+  if (session.last_activity) {
+    const lastActive = new Date(session.last_activity + 'Z').getTime();
+    const now = Date.now();
+    const idleMinutes = (now - lastActive) / 60000;
+    if (idleMinutes > 30) {
+      db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+      return res.status(401).json({ error: 'Session expired due to inactivity. Please log in again.' });
+    }
+  }
+
+  // Update last activity
+  db.prepare("UPDATE sessions SET last_activity = datetime('now') WHERE token = ?").run(token);
+
   if (session.user_status === 'suspended') {
     return res.status(403).json({ error: 'Account suspended. Contact your administrator.' });
   }
+
+  // Get email verification status
+  const userRow = db.prepare('SELECT email_verified FROM users WHERE id = ?').get(session.user_id);
 
   req.user = {
     id: session.user_id,
@@ -58,6 +75,7 @@ export function requireAuth(req, res, next) {
     displayName: session.display_name,
     budgetLimit: session.budget_limit,
     monthlySystemCost: session.monthly_system_cost,
+    emailVerified: !!(userRow?.email_verified),
   };
 
   next();

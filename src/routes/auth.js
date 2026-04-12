@@ -97,6 +97,31 @@ router.post('/reset-password', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// POST /api/auth/verify-email — verify email with code
+router.post('/verify-email', requireAuth, (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Verification code required' });
+
+  const key = `verify_code_${req.user.id}`;
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key);
+
+  if (!row) {
+    // Check if already verified
+    const user = db.prepare('SELECT email_verified FROM users WHERE id = ?').get(req.user.id);
+    if (user?.email_verified) return res.json({ success: true, message: 'Email already verified' });
+    return res.status(400).json({ error: 'No verification pending. Contact support.' });
+  }
+
+  if (row.value !== code.toUpperCase().trim()) {
+    return res.status(400).json({ error: 'Invalid verification code. Check your email.' });
+  }
+
+  db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(req.user.id);
+  db.prepare("DELETE FROM settings WHERE key = ?").run(key);
+
+  res.json({ success: true, message: 'Email verified successfully!' });
+});
+
 // GET /api/auth/temp-password — one-time retrieval of temp password after signup
 router.get('/temp-password', requireAuth, (req, res) => {
   const key = `temp_pass_${req.headers['authorization']?.replace('Bearer ', '')}`;

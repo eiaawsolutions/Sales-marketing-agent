@@ -126,9 +126,12 @@ router.get('/success', async (req, res) => {
     const trialEnd = new Date();
     trialEnd.setDate(trialEnd.getDate() + (PLANS[plan]?.trial_days || 14));
 
+    // Generate email verification code
+    const verifyCode = Math.random().toString(36).slice(-8).toUpperCase();
+
     const result = db.prepare(`
-      INSERT INTO users (username, email, password_hash, role, display_name, plan, budget_limit, monthly_system_cost, status)
-      VALUES (?, ?, ?, 'user', ?, ?, 0, ?, 'active')
+      INSERT INTO users (username, email, password_hash, role, display_name, plan, budget_limit, monthly_system_cost, status, email_verified)
+      VALUES (?, ?, ?, 'user', ?, ?, 0, ?, 'active', 0)
     `).run(
       username, email, hash, displayName || username, plan,
       PLANS[plan]?.price_myr || 99
@@ -136,6 +139,10 @@ router.get('/success', async (req, res) => {
 
     // Store Stripe customer and subscription IDs
     const userId = result.lastInsertRowid;
+
+    // Store verification code
+    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+      .run(`verify_code_${userId}`, verifyCode);
     db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
       .run(`stripe_customer_${userId}`, session.customer);
     db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
@@ -180,6 +187,7 @@ router.get('/success', async (req, res) => {
                 <p><strong>Plan:</strong> ${PLANS[plan]?.name || plan} (14-day free trial)</p>
               </div>
               <p style="color:#e74c3c"><strong>Please change your password after your first login.</strong></p>
+              <p style="background:#fff3cd;padding:12px;border-radius:6px;margin-top:12px"><strong>Verify your email:</strong> Enter code <strong style="font-size:18px;letter-spacing:2px">${verifyCode}</strong> in the app to activate full features.</p>
               <p>Your 14-day free trial starts today. You won't be charged until the trial ends.</p>
               <hr style="margin:24px 0">
               <p style="color:#999;font-size:12px">EIAAW SalesAgent AI — AI-Human Sales Partnerships<br>

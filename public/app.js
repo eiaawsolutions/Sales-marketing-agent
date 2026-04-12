@@ -79,6 +79,19 @@ async function doLogin() {
   }
 }
 
+async function verifyEmail() {
+  const code = document.getElementById('verify-code-input')?.value;
+  if (!code) { showNotification('Enter the verification code from your email.', 'error'); return; }
+  try {
+    const result = await api.post('/auth/verify-email', { code });
+    showNotification(result.message || 'Email verified!', 'success');
+    currentUser.emailVerified = true;
+    render();
+  } catch (e) {
+    showNotification(e.message, 'error');
+  }
+}
+
 function doLogout() {
   api.post('/auth/logout').catch(() => {});
   authToken = null; currentUser = null;
@@ -96,7 +109,21 @@ function render() {
   }
   app.innerHTML = `
     ${renderSidebar()}
-    <div class="main">${renderPage()}</div>
+    <div class="main">
+      ${currentUser && !currentUser.emailVerified && currentUser.role !== 'superadmin' ? `
+        <div id="verify-banner" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;justify-content:space-between">
+          <div>
+            <strong style="color:var(--warning)">Verify your email</strong>
+            <span class="text-sm text-muted"> — Check your inbox for the verification code.</span>
+          </div>
+          <div class="flex gap-2">
+            <input id="verify-code-input" placeholder="Enter code" style="width:120px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;text-transform:uppercase">
+            <button class="btn btn-sm btn-primary" onclick="verifyEmail()">Verify</button>
+          </div>
+        </div>
+      ` : ''}
+      ${renderPage()}
+    </div>
     ${modal ? renderModal() : ''}
   `;
   afterRender();
