@@ -46,25 +46,29 @@ export function requireAuth(req, res, next) {
   }
 
   // Idle timeout — 30 minutes of inactivity
-  if (session.last_activity) {
-    const lastActive = new Date(session.last_activity + 'Z').getTime();
-    const now = Date.now();
-    const idleMinutes = (now - lastActive) / 60000;
-    if (idleMinutes > 30) {
-      db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
-      return res.status(401).json({ error: 'Session expired due to inactivity. Please log in again.' });
+  try {
+    if (session.last_activity) {
+      const lastActive = new Date(session.last_activity + 'Z').getTime();
+      const now = Date.now();
+      const idleMinutes = (now - lastActive) / 60000;
+      if (idleMinutes > 30) {
+        db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+        return res.status(401).json({ error: 'Session expired due to inactivity. Please log in again.' });
+      }
     }
+    // Update last activity
+    db.prepare("UPDATE sessions SET last_activity = datetime('now') WHERE token = ?").run(token);
+  } catch (e) {
+    // Column may not exist yet on older DBs — skip idle timeout gracefully
   }
-
-  // Update last activity
-  db.prepare("UPDATE sessions SET last_activity = datetime('now') WHERE token = ?").run(token);
 
   if (session.user_status === 'suspended') {
     return res.status(403).json({ error: 'Account suspended. Contact your administrator.' });
   }
 
-  // Get email verification status
-  const userRow = db.prepare('SELECT email_verified FROM users WHERE id = ?').get(session.user_id);
+  // Get email verification status (column may not exist on older DBs)
+  let userRow;
+  try { userRow = db.prepare('SELECT email_verified FROM users WHERE id = ?').get(session.user_id); } catch (e) { userRow = null; }
 
   req.user = {
     id: session.user_id,

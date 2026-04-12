@@ -242,6 +242,15 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'landing.html'));
 });
 
+// Global error handler — catch unhandled errors, return safe JSON
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err.message);
+  if (req.path.startsWith('/api/')) {
+    return res.status(500).json({ error: safeError(err) });
+  }
+  next(err);
+});
+
 // SPA fallback for any other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'landing.html'));
