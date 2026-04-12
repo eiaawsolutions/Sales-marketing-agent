@@ -67,23 +67,25 @@ app.use((req, res, next) => {
   return res.status(403).json({ error: 'Request blocked — invalid origin.' });
 });
 
-// Rate limiting
-app.use('/api', rateLimit({ windowMs: 60000, max: 120, message: { error: 'Too many requests. Please slow down.' } }));
-app.use('/api/auth/login', rateLimit({ windowMs: 900000, max: 10, message: { error: 'Too many login attempts. Try again in 15 minutes.' } }));
-// Per-user AI rate limiting (keyed by user ID from auth token)
+// Rate limiting (validate:false to avoid IPv6 errors on Railway)
+app.use('/api', rateLimit({ windowMs: 60000, max: 120, message: { error: 'Too many requests. Please slow down.' }, validate: false }));
+app.use('/api/auth/login', rateLimit({ windowMs: 900000, max: 10, message: { error: 'Too many login attempts. Try again in 15 minutes.' }, validate: false }));
+// Per-user AI rate limiting
 app.use('/api/agent', rateLimit({
-  windowMs: 60000, max: 10,
+  windowMs: 60000, max: 10, validate: false,
   keyGenerator: (req) => {
-    const token = req.headers['authorization']?.replace('Bearer ', '');
-    if (token) {
-      const session = db.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token);
-      return session ? `ai_user_${session.user_id}` : req.ip;
-    }
-    return req.ip;
+    try {
+      const token = req.headers['authorization']?.replace('Bearer ', '');
+      if (token) {
+        const session = db.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token);
+        if (session) return `ai_user_${session.user_id}`;
+      }
+    } catch (e) { /* fallback to IP */ }
+    return req.ip || 'unknown';
   },
   message: { error: 'AI rate limit reached (10/min per user). Wait a moment.' },
 }));
-app.use('/api/campaigns/*/send', rateLimit({ windowMs: 60000, max: 3, message: { error: 'Send rate limit — max 3 per minute.' } }));
+app.use('/api/campaigns/*/send', rateLimit({ windowMs: 60000, max: 3, message: { error: 'Send rate limit — max 3 per minute.' }, validate: false }));
 
 // Health check (no auth)
 app.get('/api/health', (req, res) => {
