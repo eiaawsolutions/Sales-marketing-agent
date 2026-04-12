@@ -2215,8 +2215,20 @@ async function loadAccounts() {
   if (currentUser?.role !== 'superadmin') { navigate('dashboard'); return; }
   try {
     const users = await api.get('/users');
-    // Get overall AI cost
     const costData = await api.get('/campaigns/ai-costs').catch(() => ({ overall: { total_cost: 0 } }));
+
+    // Calculate revenue & profit
+    const PLAN_PRICES = { starter: 99, pro: 199, business: 399 };
+    const subscribers = users.filter(u => u.role !== 'superadmin');
+    const activeSubscribers = subscribers.filter(u => u.status === 'active');
+    const totalMRR = activeSubscribers.reduce((s, u) => s + (PLAN_PRICES[u.plan || 'starter'] || 0), 0);
+    const totalAICost = costData.overall.total_cost || 0;
+    const totalAICostMYR = totalAICost * 4.5; // USD to MYR approx
+    const infraCost = 25; // Railway ~RM 25/mo
+    const totalCosts = totalAICostMYR + infraCost;
+    const netProfit = totalMRR - totalCosts;
+    const planCounts = { starter: 0, pro: 0, business: 0 };
+    activeSubscribers.forEach(u => { planCounts[u.plan || 'starter'] = (planCounts[u.plan || 'starter'] || 0) + 1; });
 
     document.getElementById('page').innerHTML = `
       <div class="toolbar">
@@ -2224,59 +2236,165 @@ async function loadAccounts() {
         <button class="btn btn-primary" onclick="showCreateAccountModal()">+ Create Account</button>
       </div>
 
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value blue">${users.length}</div>
-          <div class="stat-label">Total Accounts</div>
+      <!-- Revenue Overview -->
+      <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
+        <div class="stat-card" style="border-color:var(--primary)">
+          <div class="stat-value" style="color:var(--primary)">RM ${totalMRR.toLocaleString()}</div>
+          <div class="stat-label">Monthly Revenue (MRR)</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value green">${users.filter(u => u.status === 'active').length}</div>
-          <div class="stat-label">Active</div>
+          <div class="stat-value yellow">RM ${totalCosts.toFixed(0)}</div>
+          <div class="stat-label">Total Costs</div>
+        </div>
+        <div class="stat-card" style="border-color:${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'}">
+          <div class="stat-value ${netProfit >= 0 ? 'green' : ''}" style="${netProfit < 0 ? 'color:var(--danger)' : ''}">RM ${netProfit.toFixed(0)}</div>
+          <div class="stat-label">Net Profit/Month</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value yellow">$${costData.overall.total_cost.toFixed(4)}</div>
-          <div class="stat-label">Total AI Spend</div>
+          <div class="stat-value blue">${activeSubscribers.length}</div>
+          <div class="stat-label">Active Subscribers</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value purple">$${users.reduce((s,u) => s + (u.monthly_system_cost || 0), 0).toFixed(2)}</div>
-          <div class="stat-label">Est. Monthly System Cost</div>
+          <div class="stat-value purple">${subscribers.length > 0 ? Math.round((netProfit / totalMRR) * 100) || 0 : 0}%</div>
+          <div class="stat-label">Profit Margin</div>
         </div>
       </div>
 
+      <!-- Plan Breakdown -->
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="stat-value blue">${planCounts.starter}</div>
+              <div class="stat-label">Starter (RM 99)</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:18px;font-weight:700;color:var(--primary)">RM ${planCounts.starter * 99}</div>
+              <div class="text-muted text-sm">revenue</div>
+            </div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="stat-value green">${planCounts.pro}</div>
+              <div class="stat-label">Pro (RM 199)</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:18px;font-weight:700;color:var(--primary)">RM ${planCounts.pro * 199}</div>
+              <div class="text-muted text-sm">revenue</div>
+            </div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="stat-value purple">${planCounts.business}</div>
+              <div class="stat-label">Business (RM 399)</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:18px;font-weight:700;color:var(--primary)">RM ${planCounts.business * 399}</div>
+              <div class="text-muted text-sm">revenue</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Target Progress -->
       <div class="card">
+        <h3>TARGET: RM 10,000/MONTH NET PROFIT</h3>
+        <div style="margin:12px 0">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+            <span>RM ${Math.max(netProfit, 0).toFixed(0)} / RM 10,000</span>
+            <span>${Math.min(Math.round((Math.max(netProfit, 0) / 10000) * 100), 100)}%</span>
+          </div>
+          <div style="height:12px;background:var(--surface2);border-radius:6px;overflow:hidden">
+            <div style="height:100%;width:${Math.min((Math.max(netProfit, 0) / 10000) * 100, 100)}%;background:var(--teal-gradient);border-radius:6px;transition:width 0.3s"></div>
+          </div>
+          <div class="text-muted text-sm" style="margin-top:6px">
+            ${netProfit >= 10000 ? 'TARGET ACHIEVED!' : `Need ${Math.ceil((10000 - netProfit) / 199)} more Pro subscribers or ${Math.ceil((10000 - netProfit) / 99)} Starter to reach target.`}
+          </div>
+        </div>
+      </div>
+
+      <!-- Subscriber Cards -->
+      ${subscribers.length > 0 ? `
+        <div class="card">
+          <h3>SUBSCRIBER EARNINGS & COSTS</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px">
+            ${subscribers.map(u => {
+              const planPrice = PLAN_PRICES[u.plan || 'starter'] || 99;
+              const aiCostMYR = (u.ai_spend || 0) * 4.5;
+              const profit = planPrice - aiCostMYR;
+              const profitPct = planPrice > 0 ? Math.round((profit / planPrice) * 100) : 0;
+              return `
+              <div style="background:var(--bg);border:1px solid ${u.status === 'active' ? 'var(--border)' : 'var(--danger)'};border-radius:10px;padding:16px">
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">
+                  <div>
+                    <strong style="font-size:14px">${esc(u.display_name || u.username)}</strong>
+                    <div class="text-muted text-sm">${esc(u.email)}</div>
+                  </div>
+                  <div style="text-align:right">
+                    <span class="badge badge-${(u.plan||'starter') === 'business' ? 'active' : (u.plan||'starter') === 'pro' ? 'qualified' : 'new'}">${(u.plan||'starter').toUpperCase()}</span>
+                    <div class="text-sm" style="margin-top:2px"><span class="badge badge-${u.status === 'active' ? 'active' : 'paused'}">${u.status}</span></div>
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;margin-bottom:10px">
+                  <div style="background:var(--surface);border-radius:6px;padding:8px">
+                    <div style="font-size:16px;font-weight:700;color:var(--primary)">RM ${planPrice}</div>
+                    <div class="text-muted" style="font-size:10px">EARNS/mo</div>
+                  </div>
+                  <div style="background:var(--surface);border-radius:6px;padding:8px">
+                    <div style="font-size:16px;font-weight:700;color:var(--warning)">RM ${aiCostMYR.toFixed(1)}</div>
+                    <div class="text-muted" style="font-size:10px">AI COST</div>
+                  </div>
+                  <div style="background:var(--surface);border-radius:6px;padding:8px">
+                    <div style="font-size:16px;font-weight:700;color:${profit >= 0 ? 'var(--success)' : 'var(--danger)'}">RM ${profit.toFixed(0)}</div>
+                    <div class="text-muted" style="font-size:10px">PROFIT (${profitPct}%)</div>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">
+                  <span>${u.lead_count} leads &middot; ${u.campaign_count} campaigns</span>
+                  <span>${u.ai_spend > 0 ? (u.total_tokens/1000).toFixed(0) + 'k tokens' : 'No AI usage'}</span>
+                </div>
+                <div style="display:flex;gap:6px;margin-top:10px">
+                  <button class="btn btn-sm btn-outline" style="flex:1" onclick="showEditAccountModal(${u.id})">Edit</button>
+                  <button class="btn btn-sm" style="flex:1;background:${u.status === 'active' ? 'var(--warning)' : 'var(--success)'};color:white"
+                    onclick="toggleAccountStatus(${u.id}, '${u.status === 'active' ? 'suspended' : 'active'}')">
+                    ${u.status === 'active' ? 'Suspend' : 'Activate'}
+                  </button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteAccount(${u.id}, '${u.username}')">X</button>
+                </div>
+              </div>
+            `; }).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- All Users Table -->
+      <div class="card">
+        <h3>ALL ACCOUNTS</h3>
         <table>
-          <tr><th>User</th><th>Plan</th><th>Status</th><th>Leads</th><th>Campaigns</th><th>AI Spend</th><th>Budget</th><th>Monthly Fee</th><th>Total Cost</th><th>Actions</th></tr>
+          <tr><th>User</th><th>Plan</th><th>Status</th><th>Earns</th><th>AI Cost</th><th>Profit</th><th>Leads</th><th>Campaigns</th><th>Actions</th></tr>
           ${users.map(u => {
-            const totalCost = (u.ai_spend || 0) + (u.monthly_system_cost || 0);
-            const budgetPct = u.budget_limit > 0 ? Math.min((u.ai_spend / u.budget_limit) * 100, 100) : 0;
+            const planPrice = u.role === 'superadmin' ? 0 : (PLAN_PRICES[u.plan || 'starter'] || 0);
+            const aiCostMYR = (u.ai_spend || 0) * 4.5;
+            const profit = planPrice - aiCostMYR;
             return `
             <tr>
               <td>
-                <strong>${u.display_name || u.username}</strong>
-                <div class="text-muted text-sm">${u.email}</div>
+                <strong>${esc(u.display_name || u.username)}</strong>
+                <div class="text-muted text-sm">${esc(u.email)}</div>
               </td>
               <td><span class="badge badge-${(u.plan||'starter') === 'business' ? 'active' : (u.plan||'starter') === 'pro' ? 'qualified' : 'new'}">${(u.plan||'starter').toUpperCase()}</span>${u.role === 'superadmin' ? ' <span class="badge badge-active">ADMIN</span>' : ''}</td>
               <td><span class="badge badge-${u.status === 'active' ? 'active' : 'paused'}">${u.status}</span></td>
+              <td style="color:var(--primary);font-weight:600">RM ${planPrice}</td>
+              <td style="color:var(--warning)">RM ${aiCostMYR.toFixed(1)}</td>
+              <td style="color:${profit >= 0 ? 'var(--success)' : 'var(--danger)'};font-weight:600">RM ${profit.toFixed(0)}</td>
               <td>${u.lead_count}</td>
               <td>${u.campaign_count}</td>
-              <td>$${(u.ai_spend || 0).toFixed(4)}</td>
               <td>
-                ${u.budget_limit > 0 ? `$${u.budget_limit.toFixed(2)}` : 'Unlimited'}
-                ${u.budget_limit > 0 ? `<div class="camp-budget-bar" style="margin-top:4px"><div class="camp-budget-fill ${budgetPct >= 100 ? 'over' : ''}" style="width:${budgetPct}%"></div></div>` : ''}
-              </td>
-              <td>$${(u.monthly_system_cost || 0).toFixed(2)}</td>
-              <td><strong>$${totalCost.toFixed(4)}</strong></td>
-              <td>
-                <div class="flex gap-2">
-                  <button class="btn btn-sm btn-outline" onclick="showEditAccountModal(${u.id})">Edit</button>
-                  ${u.role !== 'superadmin' ? `
-                    <button class="btn btn-sm btn-${u.status === 'active' ? 'warning' : 'success'}" style="background:${u.status === 'active' ? 'var(--warning)' : 'var(--success)'};color:white"
-                      onclick="toggleAccountStatus(${u.id}, '${u.status === 'active' ? 'suspended' : 'active'}')">
-                      ${u.status === 'active' ? 'Suspend' : 'Activate'}
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteAccount(${u.id}, '${u.username}')">X</button>
-                  ` : ''}
-                </div>
+                <button class="btn btn-sm btn-outline" onclick="showEditAccountModal(${u.id})">Edit</button>
               </td>
             </tr>
           `; }).join('')}
