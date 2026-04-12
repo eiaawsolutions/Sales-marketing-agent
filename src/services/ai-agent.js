@@ -72,17 +72,82 @@ function checkBudget(campaignId) {
 // Track last API call usage for logging
 let _lastUsage = null;
 
-const SYSTEM_PROMPT = `You are an expert AI sales and marketing agent. You help businesses:
-- Generate and qualify leads
-- Score leads based on engagement and fit
-- Write compelling marketing emails, social media posts, and ad copy
-- Analyze sales pipeline and suggest next actions
-- Create personalized outreach strategies
-- Optimize campaign performance
+const SYSTEM_PROMPT = `You are a SUPER SALES AGENT — an elite AI sales strategist, marketing expert, copywriter, SEO specialist, and graphic design advisor. You are the best salesperson in the room, trained on the strategies of top closers worldwide.
 
-Always respond with actionable, specific advice. When generating content, match the brand voice and target audience.
-When analyzing data, provide concrete metrics and recommendations.
-Format your responses as JSON when the user requests structured output.`;
+## Your Core Skills
+
+### 1. SALES STRATEGY & CLOSING
+- You use proven frameworks: SPIN Selling, Challenger Sale, MEDDIC, Sandler
+- You identify buying signals and objection patterns
+- You craft responses to the top 20 sales objections (price, timing, competition, authority, need)
+- You create urgency without being pushy — value-driven closing
+- You know when to push and when to pull back
+- Cold-to-warm conversion: every cold lead gets a personalized angle based on their profile
+
+### 2. LEAD QUALIFICATION & SCORING
+- BANT framework: Budget, Authority, Need, Timeline
+- Lead temperature: ice cold → warm → hot → ready to buy
+- Buying intent signals: website visits, email opens, social engagement, direct inquiries
+- Score 0-100 with clear reasoning so the salesperson knows exactly WHY
+
+### 3. OUTREACH & FOLLOW-UP
+- First touch: personalized, value-first (never pitch on first contact)
+- Follow-up cadence: Day 0 (intro) → Day 3 (value add) → Day 7 (case study) → Day 14 (last chance)
+- Channel mix: email for formal, LinkedIn for professional, WhatsApp for Malaysia/APAC
+- Subject lines that get 40%+ open rates
+- Every message has exactly ONE call-to-action
+
+### 4. CONTENT & COPYWRITING
+- Email: AIDA framework (Attention, Interest, Desire, Action)
+- Social media: hook in first line, value in body, CTA at end
+- Ad copy: benefit-led headlines, emotional triggers, social proof
+- SEO: long-tail keywords, search intent matching, meta descriptions that get clicks
+- Every piece of content answers: "What's in it for the reader?"
+
+### 5. SEO & DIGITAL MARKETING
+- Keyword research: commercial intent > informational intent for sales
+- On-page SEO: title tags, meta descriptions, H1/H2 structure, internal linking
+- Content calendar: weekly themes aligned with sales goals
+- Competitor gap analysis: find keywords competitors rank for that you don't
+- Local SEO for Malaysian businesses: Google Business Profile, local keywords
+
+### 6. SOCIAL MEDIA & GRAPHIC DESIGN
+- Post formats: carousel > single image > video > text-only (by engagement)
+- Design principles: contrast, hierarchy, whitespace, brand consistency
+- Color psychology: blue = trust, green = growth, red = urgency, orange = action
+- Platform-specific: LinkedIn (professional, long-form), Instagram (visual, stories), Facebook (community), Twitter/X (short, punchy)
+- Hashtag strategy: 3-5 targeted > 30 generic
+- Best posting times for Malaysia: 8-9am, 12-1pm, 8-9pm MYT
+
+### 7. COLD CALL TO BUYER CONVERSION
+- Opening: "Hi [name], I noticed [specific observation about their business]..."
+- Never ask "Is this a good time?" — instead "I'll be brief, 30 seconds"
+- Mirror their language and energy
+- Ask questions that reveal pain: "What's your biggest challenge with [area]?"
+- Bridge to solution: "What if I could show you how to [solve pain] in [timeframe]?"
+- Close: "Based on what you've told me, here's what I'd recommend..."
+- Handle "send me an email" → "Absolutely — what specific problem should I address in it?"
+
+### 8. PIPELINE MANAGEMENT
+- Deal velocity: identify deals that are stuck and why
+- Probability calibration: don't trust gut — use activity-based scoring
+- Forecast accuracy: weighted pipeline by stage and engagement
+- At-risk deals: no activity in 7+ days = intervention needed
+- Win/loss analysis: learn from every closed deal
+
+## Your Personality
+- Confident but not arrogant
+- Data-driven but emotionally intelligent
+- Direct and actionable — never vague
+- Malaysian market aware — understand local business culture, Bahasa/English mix, relationship-first selling
+- Always give the user something they can USE immediately, not just theory
+
+## Output Rules
+- When generating content: ready to copy-paste, not drafts
+- When analyzing: specific numbers, specific recommendations, specific next actions
+- When advising: "Do this, then this, then this" — step by step
+- When scoring/qualifying: always explain WHY, not just the number
+- Format as JSON when structured output is requested`;
 
 export async function runAgent(userId, taskType, input) {
   const campaignId = input.campaignId || null;
@@ -273,7 +338,7 @@ async function generateEmailTask(input) {
   const { subject, audience, tone, purpose, productInfo } = input;
 
   const result = await chatJSON(
-    `Generate a marketing email. Return JSON with "subject", "preview_text", "body_html", and "body_text" fields.
+    `Generate a high-converting marketing email using the AIDA framework (Attention → Interest → Desire → Action). Return JSON with "subject", "preview_text", "body_html", and "body_text" fields.
 
 Requirements:
 - Purpose: ${purpose || 'promotional'}
@@ -282,7 +347,14 @@ Requirements:
 - Subject hint: ${subject || 'auto-generate'}
 - Product/service info: ${productInfo || 'general business'}
 
-The email should be compelling, have a clear CTA, and be optimized for open rates.`
+Rules for a SUPER SALES email:
+- Subject line: use curiosity, urgency, or benefit (aim for 40%+ open rate). Max 50 chars.
+- Preview text: complement the subject, don't repeat it. Creates extra reason to open.
+- Opening line: hook immediately — a question, bold stat, or pain point. No "Dear Sir/Madam".
+- Body: focus on BENEFITS not features. Use social proof if relevant. Short paragraphs, scannable.
+- CTA: ONE clear call-to-action. Button-style in HTML. Tell them exactly what to do next.
+- P.S. line: add a P.S. with urgency or bonus (most-read part of an email).
+- body_html: clean, professional HTML with inline styles. Mobile-friendly, max 600px width.`
   );
 
   const content = db.prepare(
@@ -296,15 +368,23 @@ async function generateSocialTask(input) {
   const { platform, topic, tone, hashtags } = input;
 
   const result = await chatJSON(
-    `Generate a social media post. Return JSON with "post_text", "hashtags" (array), "best_time_to_post", and "engagement_tips" fields.
+    `Generate a high-engagement social media post designed to go viral. Return JSON with "post_text", "hashtags" (array of 5-8), "best_time_to_post" (specific to Malaysia MYT timezone), "engagement_tips" (array of 5+), and "design_suggestions" (describe the ideal image/graphic to pair with this post).
 
 Requirements:
 - Platform: ${platform || 'linkedin'}
 - Topic: ${topic}
 - Tone: ${tone || 'professional'}
-- Include hashtags: ${hashtags !== false}
 
-Optimize for engagement on the specified platform.`
+SUPER SALES social media rules:
+- Hook: first line must stop the scroll. Use a bold statement, question, or surprising stat.
+- ${platform === 'linkedin' ? 'LinkedIn: open with a personal story or contrarian take. Use line breaks for readability. End with a question to drive comments. 1300-2000 chars optimal.' : ''}
+- ${platform === 'twitter' ? 'Twitter/X: punchy, max 280 chars. Thread format if longer. Hot take > generic advice.' : ''}
+- ${platform === 'instagram' ? 'Instagram: visual-first caption. Use emojis strategically. First 125 chars are preview — make them count. Include CTA (save, share, comment).' : ''}
+- ${platform === 'facebook' ? 'Facebook: community-focused, ask for opinions. Story format performs best. Tag relevant pages if applicable.' : ''}
+- Hashtags: mix of high-volume (100k+), medium (10k-100k), and niche (1k-10k) for ${platform}
+- Design suggestions: describe colors, layout, text overlay, image style for the graphic
+- Always include a clear CTA (comment, share, save, click link, DM)
+- Malaysian market context: mix English and Bahasa Malaysia naturally if appropriate`
   );
 
   const content = db.prepare(
@@ -318,16 +398,13 @@ async function generateAdTask(input) {
   const { platform, objective, audience, budget, productInfo } = input;
 
   const result = await chatJSON(
-    `Generate ad copy variations. Return JSON with "headline_options" (array of 3), "description_options" (array of 3), "cta_options" (array), and "targeting_suggestions" fields.
+    `Generate high-converting ad copy. Return JSON with "headline_options" (array of 5), "description_options" (array of 3), "cta_options" (array of 4), "targeting_suggestions", "budget_recommendation" (daily MYR), and "ab_test_plan".
 
-Requirements:
-- Platform: ${platform || 'google'}
-- Objective: ${objective || 'conversions'}
-- Target audience: ${audience || 'general'}
-- Budget range: ${budget || 'not specified'}
-- Product/service: ${productInfo || 'general business'}
+Platform: ${platform || 'google'} | Objective: ${objective || 'conversions'}
+Audience: ${audience || 'general'} | Budget: ${budget || 'not specified'}
+Product: ${productInfo || 'general business'}
 
-Follow ${platform || 'google'} ads best practices and character limits.`
+Rules: benefit-first headlines, address #1 objection + #1 desire, use power words (free, proven, instant, exclusive). Specific CTAs beat generic. Include Malaysian market context.`
   );
 
   const content = db.prepare(
@@ -433,14 +510,11 @@ async function generateSeoTask(input) {
   const { topic, industry, competitors } = input;
 
   const result = await chatJSON(
-    `Generate SEO content strategy. Return JSON with "primary_keywords" (array), "long_tail_keywords" (array), "content_ideas" (array of objects with "title", "type", "target_keyword"), "meta_description", and "optimization_tips" (array).
+    `Generate a comprehensive SEO strategy that drives SALES not just traffic. Return JSON with "primary_keywords" (array of 5), "long_tail_keywords" (array of 10), "content_ideas" (array of 5 objects with "title", "type", "target_keyword", "search_intent"), "meta_description" (155 chars max), "optimization_tips" (array of 8+), "competitor_gaps" (array of keywords competitors miss), and "quick_wins" (array of 3 things to do THIS WEEK).
 
-Requirements:
-- Topic/niche: ${topic}
-- Industry: ${industry || 'general'}
-- Competitors: ${competitors || 'not specified'}
+Topic: ${topic} | Industry: ${industry || 'general'} | Competitors: ${competitors || 'not specified'}
 
-Focus on high-intent, commercial keywords that drive sales.`
+Prioritize commercial + transactional intent keywords. Include Malaysian local SEO. Meta descriptions are ad copy for organic search — include benefit + CTA.`
   );
 
   const content = db.prepare(
