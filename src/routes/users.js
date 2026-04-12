@@ -76,10 +76,11 @@ router.get('/:id', (req, res) => {
 
 // PUT /api/users/:id — update user
 router.put('/:id', (req, res) => {
-  const { display_name, email, role, budget_limit, monthly_system_cost, status, plan } = req.body;
+  const { username, display_name, email, role, budget_limit, monthly_system_cost, status, plan } = req.body;
   const fields = [];
   const params = [];
 
+  if (username !== undefined) { fields.push('username = ?'); params.push(username); }
   if (display_name !== undefined) { fields.push('display_name = ?'); params.push(display_name); }
   if (email !== undefined) { fields.push('email = ?'); params.push(email); }
   if (role !== undefined) { fields.push('role = ?'); params.push(role); }

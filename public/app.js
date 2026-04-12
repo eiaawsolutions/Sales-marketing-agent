@@ -155,19 +155,30 @@ async function doLogin() {
   const username = document.getElementById('login-user')?.value;
   const password = document.getElementById('login-pass')?.value;
   const errEl = document.getElementById('login-error');
+  if (!username || !password) {
+    if (errEl) { errEl.style.display = 'block'; errEl.style.color = 'var(--danger)'; errEl.textContent = 'Please enter username and password.'; }
+    return;
+  }
   try {
-    const result = await fetch('/api/auth/login', {
+    const r = await fetch('/api/auth/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
-    }).then(r => r.json());
-    if (result.error) throw new Error(result.error);
+    });
+    const result = await r.json();
 
+    if (result.error) {
+      if (errEl) { errEl.style.display = 'block'; errEl.style.color = 'var(--danger)'; errEl.textContent = `Login failed (${r.status}): ${result.error}`; }
+      return;
+    }
+
+    // Success
+    if (errEl) { errEl.style.display = 'block'; errEl.style.color = 'var(--success)'; errEl.textContent = `Login successful! Welcome ${result.user?.displayName || result.user?.username}. Redirecting...`; }
     authToken = result.token;
     currentUser = result.user;
     sessionStorage.setItem('auth_token', authToken);
-    navigate('dashboard');
+    setTimeout(() => navigate('dashboard'), 800);
   } catch (e) {
-    if (errEl) { errEl.style.display = 'block'; errEl.textContent = e.message; }
+    if (errEl) { errEl.style.display = 'block'; errEl.style.color = 'var(--danger)'; errEl.textContent = `Connection error: ${e.message}`; }
   }
 }
 
