@@ -23,11 +23,24 @@ const app = express();
 
 // Security headers
 app.use(helmet({
-  contentSecurityPolicy: false, // SPA needs inline scripts
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://checkout.stripe.com", "https://api.stripe.com"],
+      frameSrc: ["https://js.stripe.com", "https://checkout.stripe.com"],
+    },
+  },
   crossOriginEmbedderPolicy: false,
 }));
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['https://sa.eiaawsolutions.com', 'https://sales-marketing-agent-production.up.railway.app', 'http://localhost:3000'],
+  credentials: true,
+}));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -49,11 +62,31 @@ app.get('/api/health', (req, res) => {
   }
 });
 
+// Sanitize errors — never leak DB schema or internal details
+function safeError(err) {
+  const msg = err.message || String(err);
+  if (msg.includes('UNIQUE constraint')) return 'This record already exists.';
+  if (msg.includes('FOREIGN KEY')) return 'Related record not found.';
+  if (msg.includes('NOT NULL')) return 'Required field is missing.';
+  if (msg.includes('CHECK constraint')) return 'Invalid value provided.';
+  if (msg.includes('no such table') || msg.includes('no such column')) return 'System error. Please try again.';
+  if (msg.includes('SQLITE')) return 'Database error. Please try again.';
+  return msg;
+}
+
+// HTML escaper for email templates
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // Contact form (public, no auth)
 app.post('/api/contact', async (req, res) => {
   try {
     const { name, email, phone, company, message } = req.body;
     if (!name || !email || !message) return res.status(400).json({ error: 'Name, email, and message are required.' });
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address.' });
 
     const nodemailer = (await import('nodemailer')).default;
     const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value || process.env.SMTP_HOST;
@@ -72,17 +105,17 @@ app.post('/api/contact', async (req, res) => {
         from: fromEmail || smtpUser,
         to: 'eiaawsolutions@gmail.com',
         replyTo: email,
-        subject: `[SalesAgent Enquiry] ${name} — ${company || 'Individual'}`,
+        subject: `[SalesAgent Enquiry] ${escHtml(name)} — ${escHtml(company || 'Individual')}`,
         html: `
           <h2>New Enquiry from SalesAgent Landing Page</h2>
           <table style="border-collapse:collapse;width:100%;max-width:500px">
-            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Name</td><td style="padding:8px;border-bottom:1px solid #ddd">${name}</td></tr>
-            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Email</td><td style="padding:8px;border-bottom:1px solid #ddd"><a href="mailto:${email}">${email}</a></td></tr>
-            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Phone</td><td style="padding:8px;border-bottom:1px solid #ddd">${phone || 'Not provided'}</td></tr>
-            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Company</td><td style="padding:8px;border-bottom:1px solid #ddd">${company || 'Not provided'}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Name</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(name)}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Email</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(email)}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Phone</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(phone || 'Not provided')}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Company</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(company || 'Not provided')}</td></tr>
           </table>
           <h3 style="margin-top:20px">Message</h3>
-          <p style="background:#f5f5f5;padding:16px;border-radius:8px;white-space:pre-wrap">${message}</p>
+          <p style="background:#f5f5f5;padding:16px;border-radius:8px;white-space:pre-wrap">${escHtml(message)}</p>
           <hr style="margin-top:24px">
           <p style="color:#999;font-size:12px">Sent from EIAAW SalesAgent landing page</p>
         `,

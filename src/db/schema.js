@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 export function initializeDatabase(db) {
   db.exec(`
@@ -200,7 +201,7 @@ export function initializeDatabase(db) {
   // Seed default superadmin
   const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
   if (userCount.c === 0) {
-    const hash = crypto.createHash('sha256').update('admin123').digest('hex');
+    const hash = bcrypt.hashSync('admin123', 10);
     db.prepare(
       `INSERT INTO users (username, email, password_hash, role, display_name, budget_limit)
        VALUES (?, ?, ?, ?, ?, ?)`

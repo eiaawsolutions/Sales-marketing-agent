@@ -3371,7 +3371,9 @@ async function init() {
 
   // Show welcome modal for new signups
   if (params.get('welcome') === '1' && currentUser) {
-    const tempPass = params.get('tempPassword');
+    // Fetch temp password securely (one-time retrieval)
+    const tempData = await api.get('/auth/temp-password').catch(() => ({}));
+    const tempPass = tempData?.tempPassword;
     modal = {
       title: 'Welcome to EIAAW SalesAgent!',
       body: `

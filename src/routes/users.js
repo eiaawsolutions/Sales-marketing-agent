@@ -111,7 +111,7 @@ router.put('/:id', (req, res) => {
 // PUT /api/users/:id/password — reset password
 router.put('/:id/password', (req, res) => {
   const { password } = req.body;
-  if (!password || password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  if (!password || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
   const hash = hashPassword(password);
   db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(hash, req.params.id);

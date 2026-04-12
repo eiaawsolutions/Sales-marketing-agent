@@ -192,8 +192,12 @@ router.get('/success', async (req, res) => {
       console.error('Welcome email failed:', emailErr.message);
     }
 
-    // Redirect to app with auto-login token (password sent via email, not URL)
-    res.redirect(`/app?welcome=1&token=${token}&tempPassword=${encodeURIComponent(tempPassword)}`);
+    // Store temp password for one-time retrieval (NOT in URL)
+    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+      .run(`temp_pass_${token}`, tempPassword);
+
+    // Redirect with token only — password retrieved securely via API
+    res.redirect(`/app?welcome=1&token=${token}`);
   } catch (err) {
     console.error('Billing success error:', err);
     res.redirect('/?error=setup_failed');
@@ -202,9 +206,22 @@ router.get('/success', async (req, res) => {
 
 // POST /api/billing/webhook — Stripe webhook for subscription events
 router.post('/webhook', async (req, res) => {
-  // Handle subscription updates, cancellations, payment failures
   try {
-    const event = req.body;
+    let event = req.body;
+
+    // Verify Stripe signature if webhook secret is configured
+    const webhookSecret = db.prepare("SELECT value FROM settings WHERE key = 'stripe_webhook_secret'").get()?.value
+      || process.env.STRIPE_WEBHOOK_SECRET;
+    if (webhookSecret && req.headers['stripe-signature']) {
+      try {
+        const stripe = getStripe();
+        event = stripe.webhooks.constructEvent(
+          JSON.stringify(req.body), req.headers['stripe-signature'], webhookSecret
+        );
+      } catch (sigErr) {
+        return res.status(401).json({ error: 'Invalid webhook signature' });
+      }
+    }
 
     switch (event.type) {
       case 'customer.subscription.deleted': {

@@ -97,4 +97,17 @@ router.post('/reset-password', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// GET /api/auth/temp-password — one-time retrieval of temp password after signup
+router.get('/temp-password', requireAuth, (req, res) => {
+  const key = `temp_pass_${req.headers['authorization']?.replace('Bearer ', '')}`;
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key);
+  if (row) {
+    // Delete after retrieval (one-time use)
+    db.prepare("DELETE FROM settings WHERE key = ?").run(key);
+    res.json({ tempPassword: row.value });
+  } else {
+    res.json({ tempPassword: null });
+  }
+});
+
 export default router;
