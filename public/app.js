@@ -1674,6 +1674,14 @@ async function deleteContent(contentId) {
   }
 }
 
+// Render color palette swatches from an array of hex codes
+function renderColorPalette(colors) {
+  if (!colors || !Array.isArray(colors) || !colors.length) return '';
+  return `<div class="cw-color-palette">
+    ${colors.map(c => `<div class="cw-color-swatch" style="background:${c}" title="${c}"></div><span class="cw-color-hex">${c}</span>`).join('')}
+  </div>`;
+}
+
 // Format content nicely based on type instead of raw JSON
 function formatContentDisplay(type, data) {
   if (typeof data === 'string') return `<div class="cw-rendered">${data}</div>`;
@@ -1681,75 +1689,248 @@ function formatContentDisplay(type, data) {
   switch (type) {
     case 'email': return `
       <div class="cw-rendered">
-        <div class="cw-field"><span class="cw-label">Subject:</span> ${data.subject || ''}</div>
-        <div class="cw-field"><span class="cw-label">Preview:</span> ${data.preview_text || ''}</div>
+        <div class="cw-section-header">
+          <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(59,130,246,0.1))">&#9993;</div>
+          <span class="cw-label">Email Preview</span>
+        </div>
+        <div class="cw-field" style="padding:10px 14px;background:var(--bg);border-radius:var(--radius);border-left:3px solid #3b82f6">
+          <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">${data.subject || ''}</div>
+          <div style="font-size:13px;color:var(--text-muted)">${data.preview_text || ''}</div>
+        </div>
         <div class="cw-divider"></div>
         <div class="cw-body">${data.body_html || data.body_text || ''}</div>
+        ${data.design_notes ? `
+          <div class="cw-design-notes">
+            <strong>Design Notes:</strong> ${data.design_notes}
+          </div>
+        ` : ''}
       </div>`;
 
-    case 'social_post': return `
+    case 'social_post': {
+      const brief = data.design_brief || data.design_suggestions || null;
+      const hasBrief = brief && typeof brief === 'object';
+      return `
       <div class="cw-rendered">
-        <div class="cw-body" style="font-size:15px;line-height:1.6;white-space:pre-wrap">${data.post_text || ''}</div>
-        ${data.hashtags?.length ? `<div class="cw-tags">${data.hashtags.map(h => `<span class="cw-tag">${h}</span>`).join(' ')}</div>` : ''}
-        ${data.best_time_to_post ? `<div class="cw-field" style="margin-top:12px"><span class="cw-label">Best time to post:</span> ${data.best_time_to_post}</div>` : ''}
+        <div class="cw-section-header">
+          <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.1))">&#128172;</div>
+          <span class="cw-label">Post Copy</span>
+        </div>
+        <div class="cw-body" style="font-size:15px;line-height:1.7;white-space:pre-wrap;padding:14px 16px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.post_text || ''}</div>
+        ${data.hashtags?.length ? `
+          <div class="cw-section-header"><span class="cw-label">Hashtags</span></div>
+          <div class="cw-tags">${data.hashtags.map(h => `<span class="cw-tag">${h.startsWith('#') ? '' : '#'}${h}</span>`).join('')}</div>
+        ` : ''}
+        ${data.best_time_to_post ? `
+          <div class="cw-field" style="margin-top:14px;padding:10px 14px;background:rgba(34,197,94,0.08);border-radius:var(--radius);border-left:3px solid #22c55e">
+            <span style="font-size:14px">&#9200;</span> <span class="cw-label" style="color:#22c55e">Best time to post:</span>
+            <span style="color:var(--text);font-weight:600">${data.best_time_to_post}</span>
+          </div>
+        ` : ''}
+        ${hasBrief ? `
+          <div class="cw-divider"></div>
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(236,72,153,0.15))">&#127912;</div>
+            <span class="cw-label" style="color:#a855f7">Visual Design Brief</span>
+          </div>
+          <div class="cw-design-notes">
+            ${brief.concept ? `<div style="margin-bottom:8px"><strong>Concept:</strong> ${brief.concept}</div>` : ''}
+            ${brief.color_palette ? `<div style="margin-bottom:8px"><strong>Color Palette:</strong>${renderColorPalette(brief.color_palette)}</div>` : ''}
+            ${brief.layout_type ? `<div style="margin-bottom:8px"><strong>Layout:</strong> ${brief.layout_type}</div>` : ''}
+            ${brief.text_overlay ? `<div style="margin-bottom:8px"><strong>Text Overlay:</strong> <em>"${brief.text_overlay}"</em></div>` : ''}
+            ${brief.font_style ? `<div style="margin-bottom:8px"><strong>Font:</strong> ${brief.font_style}</div>` : ''}
+            ${brief.mood ? `<div style="margin-bottom:8px"><strong>Mood:</strong> ${brief.mood}</div>` : ''}
+            ${brief.dimensions ? `<div><strong>Dimensions:</strong> ${brief.dimensions}</div>` : ''}
+          </div>
+        ` : (typeof brief === 'string' && brief ? `
+          <div class="cw-design-notes"><strong>Design Suggestions:</strong> ${brief}</div>
+        ` : '')}
         ${data.engagement_tips?.length ? `
           <div class="cw-divider"></div>
-          <div class="cw-label" style="margin-bottom:6px">Engagement Tips:</div>
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(46,196,182,0.2),rgba(46,196,182,0.1))">&#128161;</div>
+            <span class="cw-label">Engagement Tips</span>
+          </div>
           <ul class="cw-tips">${data.engagement_tips.map(t => `<li>${t}</li>`).join('')}</ul>
         ` : ''}
       </div>`;
+    }
 
-    case 'ad_copy': return `
+    case 'ad_copy': {
+      const cb = data.creative_brief || null;
+      const hasCb = cb && typeof cb === 'object';
+      return `
       <div class="cw-rendered">
         ${data.headline_options?.length ? `
-          <div class="cw-label" style="margin-bottom:6px">Headlines:</div>
-          <div class="cw-options">${data.headline_options.map((h,i) => `<div class="cw-option"><span class="cw-num">${i+1}</span> ${h}</div>`).join('')}</div>
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(245,158,11,0.1))">&#128240;</div>
+            <span class="cw-label">Headlines</span>
+          </div>
+          <div class="cw-options">${data.headline_options.map((h,i) => `<div class="cw-option"><span class="cw-num">${i+1}</span><div style="flex:1">${h}</div></div>`).join('')}</div>
         ` : ''}
         ${data.description_options?.length ? `
-          <div class="cw-label" style="margin-top:12px;margin-bottom:6px">Descriptions:</div>
-          <div class="cw-options">${data.description_options.map((d,i) => `<div class="cw-option"><span class="cw-num">${i+1}</span> ${d}</div>`).join('')}</div>
+          <div class="cw-section-header" style="margin-top:16px">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(59,130,246,0.1))">&#9997;</div>
+            <span class="cw-label">Descriptions</span>
+          </div>
+          <div class="cw-options">${data.description_options.map((d,i) => `<div class="cw-option"><span class="cw-num" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">${i+1}</span><div style="flex:1">${d}</div></div>`).join('')}</div>
         ` : ''}
         ${data.cta_options?.length ? `
-          <div class="cw-label" style="margin-top:12px;margin-bottom:6px">Call to Action:</div>
-          <div class="cw-tags">${data.cta_options.map(c => `<span class="cw-tag">${c}</span>`).join(' ')}</div>
+          <div class="cw-section-header" style="margin-top:16px">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(34,197,94,0.2),rgba(34,197,94,0.1))">&#127919;</div>
+            <span class="cw-label">Call to Action</span>
+          </div>
+          <div class="cw-tags">${data.cta_options.map(c => `<span class="cw-tag" style="background:linear-gradient(135deg,rgba(34,197,94,0.15),rgba(34,197,94,0.08));color:#22c55e;border-color:rgba(34,197,94,0.2)">${c}</span>`).join('')}</div>
         ` : ''}
         ${data.targeting_suggestions ? `
           <div class="cw-divider"></div>
-          <div class="cw-field"><span class="cw-label">Targeting:</span> ${data.targeting_suggestions}</div>
+          <div class="cw-field" style="padding:10px 14px;background:var(--bg);border-radius:var(--radius);border-left:3px solid var(--warning)">
+            <span class="cw-label" style="color:var(--warning)">Targeting:</span>
+            <div style="margin-top:4px;color:var(--text);font-size:13px;line-height:1.6">${data.targeting_suggestions}</div>
+          </div>
+        ` : ''}
+        ${data.budget_recommendation ? `
+          <div class="cw-field" style="margin-top:10px;padding:10px 14px;background:rgba(34,197,94,0.06);border-radius:var(--radius);border-left:3px solid #22c55e">
+            <span class="cw-label" style="color:#22c55e">Budget:</span>
+            <div style="margin-top:4px;color:var(--text);font-size:13px">${typeof data.budget_recommendation === 'string' ? data.budget_recommendation : `MYR ${data.budget_recommendation}/day`}</div>
+          </div>
+        ` : ''}
+        ${hasCb ? `
+          <div class="cw-divider"></div>
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(236,72,153,0.15))">&#127912;</div>
+            <span class="cw-label" style="color:#a855f7">Creative Brief</span>
+          </div>
+          <div class="cw-design-notes">
+            ${cb.visual_concept ? `<div style="margin-bottom:8px"><strong>Visual Concept:</strong> ${cb.visual_concept}</div>` : ''}
+            ${cb.color_palette ? `<div style="margin-bottom:8px"><strong>Color Palette:</strong>${renderColorPalette(cb.color_palette)}</div>` : ''}
+            ${cb.ad_format ? `<div style="margin-bottom:8px"><strong>Format:</strong> ${cb.ad_format}</div>` : ''}
+            ${cb.mood ? `<div><strong>Mood:</strong> ${cb.mood}</div>` : ''}
+          </div>
+        ` : ''}
+        ${data.ab_test_plan ? `
+          <div class="cw-field" style="margin-top:10px;padding:10px 14px;background:rgba(168,85,247,0.06);border-radius:var(--radius);border-left:3px solid #a855f7">
+            <span class="cw-label" style="color:#a855f7">A/B Test Plan:</span>
+            <div style="margin-top:4px;color:var(--text);font-size:13px;line-height:1.6">${data.ab_test_plan}</div>
+          </div>
         ` : ''}
       </div>`;
+    }
 
-    case 'seo_keywords': return `
+    case 'seo_keywords': {
+      // Support both old format (array of strings) and new GEO format (array of objects)
+      const primaryKws = data.primary_keywords || [];
+      const hasGeoFormat = primaryKws.length > 0 && typeof primaryKws[0] === 'object';
+
+      return `
       <div class="cw-rendered">
-        ${data.primary_keywords?.length ? `
-          <div class="cw-label" style="margin-bottom:6px">Primary Keywords:</div>
-          <div class="cw-tags">${data.primary_keywords.map(k => `<span class="cw-tag">${k}</span>`).join(' ')}</div>
+        ${primaryKws.length ? `
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(59,130,246,0.1))">&#128269;</div>
+            <span class="cw-label">Primary Keywords</span>
+            ${hasGeoFormat ? '<span class="cw-geo-badge">GEO</span>' : ''}
+          </div>
+          ${hasGeoFormat ? `
+            <div class="cw-options">${primaryKws.map((k,i) => `
+              <div class="cw-option">
+                <span class="cw-num">${i+1}</span>
+                <div style="flex:1">
+                  <div style="font-weight:600;color:var(--text)">${k.keyword || k}</div>
+                  <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
+                    ${k.intent ? `<span class="cw-tag-intent ${k.intent}">${k.intent}</span>` : ''}
+                    ${k.difficulty ? `<span class="cw-tag-intent" style="background:rgba(var(--text-muted),0.1);color:var(--text-muted)">${k.difficulty}</span>` : ''}
+                    ${k.geo_priority === 'high' ? `<span class="cw-geo-badge">GEO Priority</span>` : ''}
+                  </div>
+                </div>
+              </div>
+            `).join('')}</div>
+          ` : `
+            <div class="cw-tags">${primaryKws.map(k => `<span class="cw-tag">${typeof k === 'string' ? k : k.keyword || k}</span>`).join('')}</div>
+          `}
         ` : ''}
         ${data.long_tail_keywords?.length ? `
-          <div class="cw-label" style="margin-top:12px;margin-bottom:6px">Long-Tail Keywords:</div>
-          <div class="cw-tags">${data.long_tail_keywords.map(k => `<span class="cw-tag cw-tag-alt">${k}</span>`).join(' ')}</div>
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.1))">&#128279;</div>
+            <span class="cw-label">Long-Tail Keywords</span>
+          </div>
+          <div class="cw-tags">${data.long_tail_keywords.map(k => `<span class="cw-tag cw-tag-alt">${k}</span>`).join('')}</div>
+        ` : ''}
+        ${data.geo_questions?.length ? `
+          <div class="cw-divider"></div>
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(234,88,12,0.15))">&#129302;</div>
+            <span class="cw-label" style="color:#f59e0b">AI Engine Questions</span>
+            <span class="cw-geo-badge">GEO</span>
+          </div>
+          <div class="cw-options">${data.geo_questions.map((q,i) => `
+            <div class="cw-option" style="border-left:3px solid #f59e0b">
+              <span class="cw-num" style="background:linear-gradient(135deg,#f59e0b,#ea580c)">${i+1}</span>
+              <div style="flex:1;font-style:italic;color:var(--text)">"${q}"</div>
+            </div>
+          `).join('')}</div>
         ` : ''}
         ${data.content_ideas?.length ? `
           <div class="cw-divider"></div>
-          <div class="cw-label" style="margin-bottom:6px">Content Ideas:</div>
-          ${data.content_ideas.map(idea => `
-            <div class="cw-option" style="margin-bottom:6px">
-              <strong>${idea.title || idea}</strong>
-              ${idea.type ? `<span class="badge badge-active" style="margin-left:8px">${idea.type}</span>` : ''}
-              ${idea.target_keyword ? `<div class="text-sm text-muted">Target: ${idea.target_keyword}</div>` : ''}
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(34,197,94,0.2),rgba(34,197,94,0.1))">&#128218;</div>
+            <span class="cw-label">Content Ideas</span>
+          </div>
+          ${data.content_ideas.map((idea,i) => `
+            <div class="cw-option" style="margin-bottom:4px;flex-direction:column">
+              <div style="display:flex;align-items:center;gap:10px;width:100%">
+                <span class="cw-num" style="background:linear-gradient(135deg,#22c55e,#16a34a)">${i+1}</span>
+                <strong style="color:var(--text);flex:1">${idea.title || idea}</strong>
+                ${idea.type ? `<span class="cw-tag" style="font-size:10px;padding:2px 8px">${idea.type}</span>` : ''}
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;padding-left:34px">
+                ${idea.target_keyword ? `<span class="text-sm text-muted">Target: <strong>${idea.target_keyword}</strong></span>` : ''}
+                ${idea.search_intent ? `<span class="cw-tag-intent ${idea.search_intent}">${idea.search_intent}</span>` : ''}
+                ${idea.geo_angle ? `<span class="text-sm" style="color:#f59e0b">GEO: ${idea.geo_angle}</span>` : ''}
+              </div>
             </div>
           `).join('')}
         ` : ''}
         ${data.meta_description ? `
           <div class="cw-divider"></div>
-          <div class="cw-field"><span class="cw-label">Meta Description:</span> ${data.meta_description}</div>
+          <div class="cw-field" style="padding:12px 16px;background:var(--bg);border-radius:var(--radius);border-left:3px solid var(--primary)">
+            <span class="cw-label">Meta Description</span>
+            <div style="margin-top:6px;color:var(--text);font-size:14px;line-height:1.6">${data.meta_description}</div>
+            <div style="margin-top:4px;font-size:11px;color:var(--text-muted)">${(data.meta_description || '').length}/155 characters</div>
+          </div>
+        ` : ''}
+        ${data.schema_suggestions?.length ? `
+          <div class="cw-divider"></div>
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(99,102,241,0.1))">&#128736;</div>
+            <span class="cw-label">Schema Markup Suggestions</span>
+          </div>
+          <div class="cw-tags">${data.schema_suggestions.map(s => `<span class="cw-tag" style="background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(99,102,241,0.08));color:#6366f1;border-color:rgba(99,102,241,0.2)">${s}</span>`).join('')}</div>
         ` : ''}
         ${data.optimization_tips?.length ? `
           <div class="cw-divider"></div>
-          <div class="cw-label" style="margin-bottom:6px">Optimization Tips:</div>
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(46,196,182,0.2),rgba(46,196,182,0.1))">&#9889;</div>
+            <span class="cw-label">Optimization Tips</span>
+          </div>
           <ul class="cw-tips">${data.optimization_tips.map(t => `<li>${t}</li>`).join('')}</ul>
         ` : ''}
+        ${data.competitor_gaps?.length ? `
+          <div class="cw-divider"></div>
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(239,68,68,0.2),rgba(239,68,68,0.1))">&#128165;</div>
+            <span class="cw-label">Competitor Gaps</span>
+          </div>
+          <div class="cw-tags">${data.competitor_gaps.map(g => `<span class="cw-tag" style="background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.06));color:#ef4444;border-color:rgba(239,68,68,0.2)">${g}</span>`).join('')}</div>
+        ` : ''}
+        ${data.quick_wins?.length ? `
+          <div class="cw-divider"></div>
+          <div class="cw-section-header">
+            <div class="cw-section-icon" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(245,158,11,0.1))">&#128640;</div>
+            <span class="cw-label">Quick Wins (This Week)</span>
+          </div>
+          <ul class="cw-tips">${data.quick_wins.map(w => `<li><strong>${w}</strong></li>`).join('')}</ul>
+        ` : ''}
       </div>`;
+    }
 
     default: return `<pre style="white-space:pre-wrap">${JSON.stringify(data, null, 2)}</pre>`;
   }
@@ -1770,6 +1951,8 @@ const POSTER_STYLES = [
   { id: 'gradient', label: 'Gradient Glow', desc: 'Vibrant gradient', colors: ['#667eea', '#764ba2', '#ffffff'] },
   { id: 'nature', label: 'Warm & Natural', desc: 'Earthy tones', colors: ['#2d3436', '#e17055', '#ffeaa7'] },
   { id: 'tech', label: 'Tech & Digital', desc: 'Cyber blue, futuristic', colors: ['#0a0a2a', '#00d2ff', '#ffffff'] },
+  { id: 'luxury', label: 'Premium Gold', desc: 'Black & gold elegance', colors: ['#0f0f0f', '#d4a574', '#fafaf9'] },
+  { id: 'coral', label: 'Sunset Coral', desc: 'Warm coral energy', colors: ['#1A1A2E', '#FF6B6B', '#FFF5EE'] },
 ];
 
 function startContentWizard(presetType) {
@@ -1869,7 +2052,7 @@ function renderContentWizardStep(step) {
           { val: 'email', icon: '&#9993;', title: 'Marketing Email', desc: 'Promotional emails, newsletters, follow-ups' },
           { val: 'social', icon: '&#128172;', title: 'Social Media Post', desc: 'LinkedIn, Twitter, Instagram, Facebook' },
           { val: 'ad', icon: '&#128226;', title: 'Ad Copy', desc: 'Google Ads, Facebook Ads, LinkedIn Ads' },
-          { val: 'seo', icon: '&#128269;', title: 'SEO Strategy', desc: 'Keywords, content ideas, meta descriptions' },
+          { val: 'seo', icon: '&#128269;', title: 'GEO Strategy', desc: 'SEO + AI engine optimization, keywords, content ideas' },
         ].map(t => `
           <div class="wizard-type-card ${cw.type === t.val ? 'selected' : ''}"
             onclick="contentWizard.type='${t.val}'; contentWizard.inputs={}; renderContentWizard();">
@@ -2075,13 +2258,17 @@ function renderPosterPreview(cw) {
         <div class="poster-badge" style="background:${accentColor};color:${cw.posterStyle === 'minimal' ? '#fff' : textColor}">
           ${cw.type === 'email' ? 'EMAIL' : cw.type === 'social' ? 'SOCIAL' : 'AD'}
         </div>
+        <div class="poster-accent-line" style="background:${accentColor}"></div>
         <div class="poster-headline" style="color:${textColor}">${headline}</div>
-        ${subtitle ? `<div class="poster-subtitle" style="color:${textColor};opacity:0.8">${subtitle}</div>` : ''}
+        ${subtitle ? `<div class="poster-subtitle" style="color:${textColor};opacity:0.75">${subtitle}</div>` : ''}
         ${cta ? `<div class="poster-cta" style="background:${accentColor};color:${cw.posterStyle === 'minimal' ? '#fff' : textColor}">${cta}</div>` : ''}
-        <div class="poster-brand" style="color:${textColor};opacity:0.5">SalesAgent AI</div>
+        <div class="poster-brand" style="color:${textColor};opacity:0.4">SalesAgent AI</div>
+        <div class="poster-decorative-dots" style="color:${textColor}">
+          ${Array(9).fill('<span></span>').join('')}
+        </div>
       </div>
-      <div class="text-sm text-muted" style="text-align:center;margin-top:8px">
-        Poster Style: ${style.label}
+      <div class="text-sm text-muted" style="text-align:center;margin-top:10px">
+        Poster Style: <strong>${style.label}</strong>
         &nbsp;&middot;&nbsp;
         <a href="#" onclick="event.preventDefault(); downloadPoster()" style="color:var(--primary)">Download as Image</a>
       </div>
