@@ -2140,6 +2140,12 @@ function renderContentDetailsForm(type) {
           oninput="contentWizard.inputs.productInfo=this.value" style="min-height:100px">${inp.productInfo||''}</textarea>
         <small class="text-muted">The more details you give, the better the email will be.</small>
       </div>
+      <div class="form-group">
+        <label>CTA Link URL</label>
+        <input id="cw-cta-url" value="${inp.ctaUrl||''}" placeholder="e.g., https://yoursite.com/signup or https://yoursite.com/offer"
+          oninput="contentWizard.inputs.ctaUrl=this.value">
+        <small class="text-muted">Where should the CTA button link to? This URL will be embedded in the email's call-to-action button.</small>
+      </div>
     `;
 
     case 'social': return `
@@ -2165,6 +2171,12 @@ function renderContentDetailsForm(type) {
         <select id="cw-tone" onchange="contentWizard.inputs.tone=this.value">
           ${['professional','casual','inspirational','educational','humorous'].map(t => `<option value="${t}" ${inp.tone===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
         </select>
+      </div>
+      <div class="form-group">
+        <label>CTA Link URL <span class="text-muted">(optional)</span></label>
+        <input id="cw-cta-url" value="${inp.ctaUrl||''}" placeholder="e.g., https://yoursite.com/signup — included in 'link in bio' or post CTA"
+          oninput="contentWizard.inputs.ctaUrl=this.value">
+        <small class="text-muted">If you want to drive traffic, include the URL the CTA should reference (e.g., "Link in bio" or direct link).</small>
       </div>
     `;
 
@@ -2196,6 +2208,12 @@ function renderContentDetailsForm(type) {
         <label>Describe your product or service</label>
         <textarea id="cw-product" placeholder="What are you advertising? Include key selling points..."
           oninput="contentWizard.inputs.productInfo=this.value" style="min-height:100px">${inp.productInfo||''}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Landing Page URL</label>
+        <input id="cw-cta-url" value="${inp.ctaUrl||''}" placeholder="e.g., https://yoursite.com/offer — where the ad should drive traffic"
+          oninput="contentWizard.inputs.ctaUrl=this.value">
+        <small class="text-muted">The destination URL for your ad. This will be referenced in the ad copy and CTA.</small>
       </div>
     `;
 
@@ -2456,9 +2474,9 @@ async function contentWizardGenerate() {
   try {
     const inp = cw.inputs;
     let body = {};
-    if (cw.type === 'email') body = { purpose: inp.purpose||'promotional', audience: inp.audience, tone: inp.tone||'professional', productInfo: inp.productInfo };
-    if (cw.type === 'social') body = { platform: inp.platform||'linkedin', topic: inp.topic, tone: inp.tone||'professional' };
-    if (cw.type === 'ad') body = { platform: inp.platform||'google', objective: inp.objective||'conversions', audience: inp.audience, productInfo: inp.productInfo };
+    if (cw.type === 'email') body = { purpose: inp.purpose||'promotional', audience: inp.audience, tone: inp.tone||'professional', productInfo: inp.productInfo, ctaUrl: inp.ctaUrl };
+    if (cw.type === 'social') body = { platform: inp.platform||'linkedin', topic: inp.topic, tone: inp.tone||'professional', ctaUrl: inp.ctaUrl };
+    if (cw.type === 'ad') body = { platform: inp.platform||'google', objective: inp.objective||'conversions', audience: inp.audience, productInfo: inp.productInfo, ctaUrl: inp.ctaUrl };
     if (cw.type === 'seo') body = { topic: inp.topic, industry: inp.industry, competitors: inp.competitors };
 
     const result = await api.post(`/agent/generate/${cw.type}`, body);
@@ -3711,6 +3729,11 @@ async function loadSettings() {
           <label>Stripe Publishable Key</label>
           <input id="s-stripe-pub" value="${settings.stripe_publishable_key || ''}" placeholder="pk_live_...">
         </div>
+        <div class="form-group" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+          <label>Default Landing Page / Website URL</label>
+          <input id="s-landing-url" value="${settings.landing_url || ''}" placeholder="e.g., https://yoursite.com — used as default CTA link in generated content">
+          <small class="text-muted">AI-generated content (emails, outreach, ads) will use this URL in call-to-action links when no specific URL is provided during generation.</small>
+        </div>
         <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:12px">Save Settings</button>
       </div>
 
@@ -3745,6 +3768,7 @@ async function saveSettings() {
     admin_password: document.getElementById('s-admin-pass')?.value || '',
     stripe_secret_key: document.getElementById('s-stripe-secret')?.value || '',
     stripe_publishable_key: gv('s-stripe-pub'),
+    landing_url: gv('s-landing-url') || '',
     ai_credit_balance: gv('s-ai-balance') || '5.00',
     voice_ai_provider: gv('s-voice-provider') || 'retell',
     voice_ai_api_key: document.getElementById('s-voice-key')?.value || '',

@@ -39,7 +39,7 @@ router.get('/', (req, res) => {
 
 // PUT /api/settings — update settings
 router.put('/', (req, res) => {
-  const allowedKeys = ['ai_provider', 'ai_model', 'api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'from_email', 'admin_password', 'stripe_secret_key', 'stripe_publishable_key', 'ai_credit_balance', 'voice_ai_provider', 'voice_ai_api_key', 'voice_ai_agent_id'];
+  const allowedKeys = ['ai_provider', 'ai_model', 'api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'from_email', 'admin_password', 'stripe_secret_key', 'stripe_publishable_key', 'ai_credit_balance', 'voice_ai_provider', 'voice_ai_api_key', 'voice_ai_agent_id', 'landing_url'];
   const upsert = db.prepare(
     'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP'
   );

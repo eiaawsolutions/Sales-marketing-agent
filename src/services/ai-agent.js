@@ -359,7 +359,8 @@ ${activities.map(a => `- [${a.type}] ${a.description} (${a.created_at})`).join('
 }
 
 async function generateEmailTask(input) {
-  const { subject, audience, tone, purpose, productInfo } = input;
+  const { subject, audience, tone, purpose, productInfo, ctaUrl } = input;
+  const defaultUrl = ctaUrl || db.prepare("SELECT value FROM settings WHERE key = 'landing_url'").get()?.value || '';
 
   const result = await chatJSON(
     `You are now in SUPER COPYWRITER + SUPER DESIGNER mode. Generate a high-converting marketing email that looks AND reads like it was crafted by a world-class agency. Return JSON with "subject", "preview_text", "body_html", "body_text", and "design_notes" fields.
@@ -370,6 +371,8 @@ Requirements:
 - Tone: ${tone || 'professional'}
 - Subject hint: ${subject || 'auto-generate'}
 - Product/service info: ${productInfo || 'general business'}
+${defaultUrl ? `- CTA destination URL: ${defaultUrl}
+IMPORTANT: The CTA button in body_html MUST link to this URL using a proper <a href="${defaultUrl}"> tag. Every clickable button and link in the email must point to this URL. Do NOT use href="#" or omit the href.` : `IMPORTANT: Use a placeholder href="[YOUR_LINK]" for the CTA button — the user will replace it with their actual URL before sending. Do NOT use href="#".`}
 
 ## SUPER COPYWRITER Rules:
 - Subject line: pattern interrupt — curiosity gap, bold number, or unexpected angle. Max 50 chars. Aim for 40%+ open rate. Examples of great patterns: "The $2.7M mistake nobody talks about", "I was wrong about [topic]", "[Name], quick question"
@@ -404,7 +407,8 @@ Requirements:
 }
 
 async function generateSocialTask(input) {
-  const { platform, topic, tone, hashtags } = input;
+  const { platform, topic, tone, hashtags, ctaUrl } = input;
+  const defaultUrl = ctaUrl || db.prepare("SELECT value FROM settings WHERE key = 'landing_url'").get()?.value || '';
 
   const result = await chatJSON(
     `You are now in SUPER COPYWRITER + SUPER VISUAL DESIGNER mode. Generate a scroll-stopping social media post that people NEED to engage with. Return JSON with "post_text", "hashtags" (array of 5-8), "best_time_to_post" (specific to Malaysia MYT timezone), "engagement_tips" (array of 5+), and "design_brief" (object with "concept", "color_palette" array of 3 hex codes, "layout_type", "text_overlay", "font_style", "mood", and "dimensions").
@@ -413,6 +417,8 @@ Requirements:
 - Platform: ${platform || 'linkedin'}
 - Topic: ${topic}
 - Tone: ${tone || 'professional'}
+${defaultUrl ? `- CTA Link URL: ${defaultUrl}
+IMPORTANT: Include this URL naturally in the post. For LinkedIn/Facebook/Twitter, embed the link directly in the post text near the CTA. For Instagram, mention "Link in bio" and reference the URL in the engagement tips. The post MUST drive traffic to this specific URL.` : ''}
 
 ## SUPER COPYWRITER Rules:
 - **Hook (Line 1)**: This is EVERYTHING. Use one of these proven patterns:
@@ -454,7 +460,8 @@ Requirements:
 }
 
 async function generateAdTask(input) {
-  const { platform, objective, audience, budget, productInfo } = input;
+  const { platform, objective, audience, budget, productInfo, ctaUrl } = input;
+  const defaultUrl = ctaUrl || db.prepare("SELECT value FROM settings WHERE key = 'landing_url'").get()?.value || '';
 
   const result = await chatJSON(
     `You are now in SUPER COPYWRITER + CONVERSION DESIGNER mode. Generate ad copy that DEMANDS clicks. Return JSON with "headline_options" (array of 5), "description_options" (array of 3), "cta_options" (array of 4), "targeting_suggestions", "budget_recommendation" (string with daily MYR amount + reasoning), "ab_test_plan" (string), and "creative_brief" (object with "visual_concept", "color_palette" array of 3 hex codes, "ad_format", "mood").
@@ -462,6 +469,8 @@ async function generateAdTask(input) {
 Platform: ${platform || 'google'} | Objective: ${objective || 'conversions'}
 Audience: ${audience || 'general'} | Budget: ${budget || 'not specified'}
 Product: ${productInfo || 'general business'}
+${defaultUrl ? `Landing Page URL: ${defaultUrl}
+IMPORTANT: Reference this landing page URL in the ad descriptions and targeting suggestions. The ad's final URL / destination must be this URL. Include it in at least one description option.` : ''}
 
 ## SUPER COPYWRITER Rules:
 - **Headlines**: Each must pass the "would I click this?" test. Use these proven formulas:
@@ -623,6 +632,9 @@ async function craftOutreachTask(input) {
   const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(input.leadId);
   if (!lead) throw new Error('Lead not found');
 
+  // Try to get the user's website/landing URL from settings
+  const landingUrl = db.prepare("SELECT value FROM settings WHERE key = 'landing_url'").get()?.value || '';
+
   const result = await chatJSON(
     `Craft a personalized outreach sequence for this lead. Return JSON with "sequence" array of objects, each having "step" (number), "channel" (email/linkedin/call), "delay_days", "subject" (if email), "message", and "goal".
 
@@ -633,8 +645,10 @@ Lead:
 - Source: ${lead.source}
 ${input.context ? `- Context: ${input.context}` : ''}
 ${input.valueProposition ? `- Our value proposition: ${input.valueProposition}` : ''}
+${input.ctaUrl || landingUrl ? `- CTA/Landing page URL: ${input.ctaUrl || landingUrl}` : ''}
 
-Create a 4-5 step sequence that feels personal, not automated.`
+Create a 4-5 step sequence that feels personal, not automated.
+${input.ctaUrl || landingUrl ? `IMPORTANT: Include the URL "${input.ctaUrl || landingUrl}" naturally in at least 2 of the email messages as a CTA link. Each email step should give them a reason to click that link (e.g., "See a quick demo here: [URL]", "I put together something for you: [URL]").` : 'Include placeholder "[YOUR_LINK]" in email messages where a CTA link should go — the user will replace it with their actual URL.'}`
   );
 
   db.prepare(
