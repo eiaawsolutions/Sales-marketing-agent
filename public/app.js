@@ -383,7 +383,7 @@ async function loadDashboard() {
           <h3>Recent Activity</h3>
           ${data.recentActivities.length ? data.recentActivities.map(a => `
             <div style="padding:8px 0;border-bottom:1px solid rgba(71,85,105,0.3);font-size:13px">
-              <span class="badge badge-${a.type === 'ai_action' || a.type === 'contact_reveal' ? 'qualified' : 'contacted'}">${a.type.replace('_', ' ')}</span>
+              <span class="badge badge-${a.type === 'ai_action' ? 'qualified' : 'contacted'}">${a.type.replace('_', ' ')}</span>
               <span style="margin-left:8px">${esc(a.lead_name || '')} — ${esc(a.description.substring(0, 80))}</span>
               <div class="text-muted text-sm" style="margin-top:2px">${new Date(a.created_at).toLocaleString()}</div>
             </div>
