@@ -291,24 +291,39 @@ async function chat(userMessage, extraContext = '') {
   const client = getClient();
   const model = getModel();
 
-  const response = await client.messages.create({
-    model,
-    max_tokens: 4096,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userMessage }],
-  });
+  // Retry with exponential backoff for transient errors (overloaded, rate limit, 5xx)
+  const MAX_RETRIES = 2;
+  let lastError;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await client.messages.create({
+        model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }],
+      });
 
-  // Capture usage for cost tracking
-  _lastUsage = {
-    model: response.model || model,
-    inputTokens: response.usage?.input_tokens || 0,
-    outputTokens: response.usage?.output_tokens || 0,
-  };
+      // Capture usage for cost tracking
+      _lastUsage = {
+        model: response.model || model,
+        inputTokens: response.usage?.input_tokens || 0,
+        outputTokens: response.usage?.output_tokens || 0,
+      };
 
-  if (!response.content || !response.content[0] || !response.content[0].text) {
-    throw new Error('AI returned an empty response. Please try again.');
+      if (!response.content || !response.content[0] || !response.content[0].text) {
+        throw new Error('AI returned an empty response. Please try again.');
+      }
+      return response.content[0].text;
+    } catch (err) {
+      lastError = err;
+      const msg = err.message || String(err);
+      const isRetryable = msg.includes('overloaded') || msg.includes('529') || msg.includes('rate') || msg.includes('500') || msg.includes('503');
+      if (!isRetryable || attempt === MAX_RETRIES) throw err;
+      // Wait before retry: 2s, then 5s
+      await new Promise(r => setTimeout(r, (attempt + 1) * 2500));
+    }
   }
-  return response.content[0].text;
+  throw lastError;
 }
 
 async function chatJSON(userMessage, extraContext = '') {
