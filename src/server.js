@@ -46,7 +46,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '1mb' }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: 0, etag: true }));
 
 // Trust proxy for Railway/reverse proxy
 app.set('trust proxy', 1);
