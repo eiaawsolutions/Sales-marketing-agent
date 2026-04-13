@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
 import db from '../db/index.js';
-import { hashPassword, generateToken } from '../middleware/auth.js';
+import { hashPassword, generateToken, getPlanLimits, requireAuth } from '../middleware/auth.js';
 import { decrypt } from '../utils/crypto.js';
 
 const router = Router();
@@ -38,6 +38,103 @@ const PLANS = {
 // GET /api/billing/plans — public, returns plan info
 router.get('/plans', (req, res) => {
   res.json(PLANS);
+});
+
+// GET /api/billing/usage — current user's usage vs plan limits
+router.get('/usage', requireAuth, (req, res) => {
+  const userId = req.user.id;
+  const plan = req.user.plan || 'starter';
+  const limits = getPlanLimits(plan);
+
+  const leads = db.prepare('SELECT COUNT(*) as c FROM leads WHERE user_id = ?').get(userId).c;
+  const campaigns = db.prepare('SELECT COUNT(*) as c FROM campaigns WHERE user_id = ?').get(userId).c;
+  const aiActions = db.prepare(
+    "SELECT COUNT(*) as c FROM ai_cost_log WHERE user_id = ? AND created_at >= datetime('now', 'start of month')"
+  ).get(userId).c;
+  const contactReveals = db.prepare(
+    "SELECT COUNT(*) as c FROM activities WHERE user_id = ? AND description LIKE 'Contact revealed:%' AND created_at >= datetime('now', 'start of month')"
+  ).get(userId).c;
+
+  const trialEnd = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(`trial_end_${userId}`)?.value;
+  const isTrialing = trialEnd && new Date(trialEnd) > new Date();
+
+  res.json({
+    plan,
+    planName: PLANS[plan]?.name || plan,
+    price: PLANS[plan]?.price_myr || 0,
+    isTrialing,
+    trialEnd: trialEnd || null,
+    usage: { leads, campaigns, aiActions, contactReveals },
+    limits: {
+      leads: limits.leads,
+      campaigns: limits.campaigns,
+      aiActions: limits.ai_actions,
+      contactReveals: limits.contact_reveals,
+      autoOutreach: limits.auto_outreach,
+      autoLeads: limits.auto_leads,
+      chatbot: limits.chatbot,
+    },
+    allPlans: PLANS,
+  });
+});
+
+// POST /api/billing/upgrade — create Stripe checkout for plan upgrade (existing user)
+router.post('/upgrade', requireAuth, async (req, res) => {
+  try {
+    const { plan } = req.body;
+    if (!plan || !PLANS[plan]) return res.status(400).json({ error: 'Invalid plan.' });
+
+    const currentPlan = req.user.plan || 'starter';
+    const planOrder = { starter: 0, pro: 1, business: 2 };
+    if (planOrder[plan] <= planOrder[currentPlan]) {
+      return res.status(400).json({ error: 'You can only upgrade to a higher plan. Contact support to downgrade.' });
+    }
+
+    const stripe = getStripe();
+
+    // Get or create Stripe price for target plan
+    const row = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(`stripe_price_${plan}`);
+    let priceId = row?.value;
+
+    if (!priceId) {
+      const product = await stripe.products.create({
+        name: `EIAAW SalesAgent - ${PLANS[plan].name}`,
+        description: PLANS[plan].features,
+      });
+      const price = await stripe.prices.create({
+        product: product.id,
+        unit_amount: PLANS[plan].price_myr * 100,
+        currency: 'myr',
+        recurring: { interval: 'month' },
+      });
+      priceId = price.id;
+      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+        .run(`stripe_price_${plan}`, priceId);
+    }
+
+    const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+    const userId = req.user.id;
+
+    // Check if user has an existing Stripe customer
+    const customerId = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(`stripe_customer_${userId}`)?.value;
+
+    const sessionOpts = {
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${baseUrl}/app?upgraded=${plan}`,
+      cancel_url: `${baseUrl}/app?page=billing`,
+      metadata: { plan, userId: String(userId), upgrade: 'true' },
+    };
+
+    if (customerId) sessionOpts.customer = customerId;
+    else sessionOpts.customer_email = req.user.email;
+
+    const session = await stripe.checkout.sessions.create(sessionOpts);
+    res.json({ url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // POST /api/billing/checkout — create Stripe checkout session for signup
@@ -233,6 +330,25 @@ router.post('/webhook', async (req, res) => {
     }
 
     switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        // Handle upgrade checkout completion
+        if (session.metadata?.upgrade === 'true' && session.metadata?.userId) {
+          const plan = session.metadata.plan;
+          const userId = session.metadata.userId;
+          db.prepare('UPDATE users SET plan = ? WHERE id = ?').run(plan, userId);
+          // Update Stripe refs
+          if (session.customer) {
+            db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+              .run(`stripe_customer_${userId}`, session.customer);
+          }
+          if (session.subscription) {
+            db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+              .run(`stripe_subscription_${userId}`, session.subscription);
+          }
+        }
+        break;
+      }
       case 'customer.subscription.deleted': {
         const sub = event.data.object;
         // Find user by subscription ID and suspend

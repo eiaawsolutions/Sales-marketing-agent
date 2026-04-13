@@ -274,6 +274,7 @@ function renderSidebar() {
     { id: 'campaigns', icon: '&#9993;', label: 'Campaigns' },
     { id: 'content', icon: '&#9998;', label: 'AI Content' },
     { id: 'chat', icon: '&#10070;', label: 'AI Assistant' },
+    { id: 'billing', icon: '&#9733;', label: 'Plan & Billing' },
   ];
 
   if (isSuperadmin) {
@@ -296,7 +297,7 @@ function renderSidebar() {
       `).join('')}
       <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface)">
         <div class="text-sm" style="font-weight:600">${esc(currentUser?.displayName || currentUser?.username || '')}</div>
-        <div class="text-muted text-sm">${currentUser?.role === 'superadmin' ? 'Super Admin' : `${(currentUser?.plan||'starter').toUpperCase()} Plan`}</div>
+        <div class="text-muted text-sm" ${currentUser?.role !== 'superadmin' ? `style="cursor:pointer;text-decoration:underline" onclick="navigate('billing')"` : ''}>${currentUser?.role === 'superadmin' ? 'Super Admin' : `${(currentUser?.plan||'starter').toUpperCase()} Plan`}</div>
         <button class="btn btn-sm btn-outline" style="margin-top:8px;width:100%" onclick="doLogout()">Sign Out</button>
       </div>
     </div>
@@ -311,6 +312,7 @@ function renderPage() {
     case 'campaigns': return '<div id="page" class="loading">Loading campaigns...</div>';
     case 'content': return '<div id="page" class="loading">Loading content...</div>';
     case 'chat': return renderChatPage();
+    case 'billing': return '<div id="page" class="loading">Loading plan...</div>';
     case 'settings': return '<div id="page" class="loading">Loading settings...</div>';
     case 'accounts': return '<div id="page" class="loading">Loading accounts...</div>';
     case 'system-overview': return '<div id="page" class="loading">Loading overview...</div>';
@@ -326,6 +328,7 @@ async function afterRender() {
     case 'pipeline': return loadPipeline();
     case 'campaigns': return loadCampaigns();
     case 'content': return loadContent();
+    case 'billing': return loadBilling();
     case 'settings': return loadSettings();
     case 'accounts': return loadAccounts();
     case 'system-overview': return loadSystemOverview();
@@ -2405,9 +2408,109 @@ function showNotification(msg, type = 'info') {
   n.style.cssText = `position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;z-index:200;font-size:14px;max-width:400px;animation:slideIn 0.3s;${
     type === 'error' ? 'background:var(--danger);' : type === 'success' ? 'background:var(--success);' : 'background:var(--primary);'
   }color:white;`;
-  n.textContent = msg;
+  // Make limit errors clickable to navigate to billing
+  if (type === 'error' && (msg.includes('limit reached') || msg.includes('Upgrade'))) {
+    n.innerHTML = esc(msg) + ' <u style="cursor:pointer;margin-left:6px">View Plans</u>';
+    n.querySelector('u').onclick = () => { n.remove(); navigate('billing'); };
+    n.style.cursor = 'pointer';
+    setTimeout(() => n.remove(), 8000);
+  } else {
+    n.textContent = msg;
+    setTimeout(() => n.remove(), 4000);
+  }
   document.body.appendChild(n);
-  setTimeout(() => n.remove(), 4000);
+}
+
+// ========== Plan & Billing ==========
+async function loadBilling() {
+  try {
+    const data = await api.get('/billing/usage');
+    const u = data.usage;
+    const l = data.limits;
+    const plans = data.allPlans;
+    const planOrder = ['starter', 'pro', 'business'];
+
+    function usageBar(used, max, label) {
+      const pct = max >= 99999 ? 0 : Math.min((used / max) * 100, 100);
+      const isMax = max < 99999 && used >= max;
+      return `
+        <div style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span class="text-sm">${label}</span>
+            <span class="text-sm ${isMax ? 'text-danger' : ''}">${used} / ${max >= 99999 ? 'Unlimited' : max}${isMax ? ' — LIMIT REACHED' : ''}</span>
+          </div>
+          <div class="score-bar" style="width:100%;height:8px;border-radius:4px">
+            <div class="score-fill" style="width:${max >= 99999 ? 3 : pct}%;background:${isMax ? 'var(--danger)' : pct > 80 ? 'var(--warning)' : 'var(--primary)'};border-radius:4px;height:100%"></div>
+          </div>
+        </div>`;
+    }
+
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar"><h2>Plan & Billing</h2></div>
+
+      <!-- Current Plan -->
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div>
+            <h3 style="margin:0;text-transform:none;letter-spacing:0">${esc(data.planName)} Plan</h3>
+            <span class="text-muted">RM ${data.price}/month${data.isTrialing ? ` — <span style="color:var(--warning)">Trial until ${new Date(data.trialEnd).toLocaleDateString()}</span>` : ''}</span>
+          </div>
+          ${data.plan !== 'business' ? `<button class="btn btn-primary" onclick="document.getElementById('plan-cards').scrollIntoView({behavior:'smooth'})">Upgrade Plan</button>` : '<span class="badge badge-active">Top tier</span>'}
+        </div>
+
+        <h4 style="margin-bottom:12px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">This Month's Usage</h4>
+        ${usageBar(u.leads, l.leads, 'Leads')}
+        ${usageBar(u.campaigns, l.campaigns, 'Campaigns')}
+        ${usageBar(u.aiActions, l.aiActions, 'AI Actions')}
+        ${usageBar(u.contactReveals, l.contactReveals, 'Contact Reveals')}
+
+        <div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap">
+          <span class="text-sm">Auto-Outreach: ${l.autoOutreach ? '<span style="color:var(--success)">Enabled</span>' : '<span class="text-muted">Pro+</span>'}</span>
+          <span class="text-sm">Auto-Lead Gen: ${l.autoLeads ? '<span style="color:var(--success)">Enabled</span>' : '<span class="text-muted">Pro+</span>'}</span>
+          <span class="text-sm">AI Chatbot: ${l.chatbot ? '<span style="color:var(--success)">Enabled</span>' : '<span class="text-muted">Pro+</span>'}</span>
+        </div>
+      </div>
+
+      <!-- Plan Cards -->
+      <div id="plan-cards">
+        <h3 style="margin-bottom:12px;text-transform:none;letter-spacing:0">Choose a Plan</h3>
+        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+          ${planOrder.map(key => {
+            const p = plans[key];
+            const isCurrent = key === data.plan;
+            const isUpgrade = planOrder.indexOf(key) > planOrder.indexOf(data.plan);
+            return `
+            <div class="card" style="text-align:center;${isCurrent ? 'border:2px solid var(--primary)' : ''}">
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:4px">${esc(p.name)}</div>
+              <div style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:4px">RM ${p.price_myr}</div>
+              <div class="text-muted text-sm" style="margin-bottom:16px">/month</div>
+              <div class="text-sm" style="text-align:left;margin-bottom:16px;line-height:1.8">${p.features.split(', ').map(f => `<div>&#10003; ${esc(f)}</div>`).join('')}</div>
+              ${isCurrent ? '<button class="btn btn-outline" disabled style="width:100%">Current Plan</button>' :
+                isUpgrade ? `<button class="btn btn-primary" style="width:100%" onclick="upgradePlan('${key}')">Upgrade to ${esc(p.name)}</button>` :
+                '<button class="btn btn-outline" disabled style="width:100%">Downgrade N/A</button>'}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <p class="text-muted text-sm">Need to downgrade or cancel? Contact <strong>eiaawsolutions@gmail.com</strong> or manage your subscription in the <a href="https://billing.stripe.com" target="_blank" style="color:var(--primary)">Stripe customer portal</a>.</p>
+      </div>
+    `;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error loading billing: ${e.message}</div>`;
+  }
+}
+
+async function upgradePlan(plan) {
+  if (!confirm(`Upgrade to the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan? You'll be redirected to Stripe checkout.`)) return;
+  try {
+    showNotification('Redirecting to checkout...');
+    const result = await api.post('/billing/upgrade', { plan });
+    if (result.url) window.location.href = result.url;
+  } catch (e) {
+    showNotification(e.message, 'error');
+  }
 }
 
 // ========== Accounts (Superadmin) ==========
@@ -3671,8 +3774,15 @@ async function init() {
   if (params.get('welcome') === '1' && params.get('token')) {
     authToken = params.get('token');
     sessionStorage.setItem('auth_token', authToken);
-    // Clean URL
     window.history.replaceState({}, '', '/app');
+  }
+
+  // Handle post-upgrade redirect from Stripe
+  if (params.get('upgraded')) {
+    const upgradedPlan = params.get('upgraded');
+    window.history.replaceState({}, '', '/app');
+    currentPage = 'billing';
+    setTimeout(() => showNotification(`Upgraded to ${upgradedPlan.charAt(0).toUpperCase() + upgradedPlan.slice(1)}! Your new limits are now active.`, 'success'), 500);
   }
 
   if (authToken) {
