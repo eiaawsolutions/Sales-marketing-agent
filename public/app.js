@@ -2409,8 +2409,8 @@ function showNotification(msg, type = 'info') {
     type === 'error' ? 'background:var(--danger);' : type === 'success' ? 'background:var(--success);' : 'background:var(--primary);'
   }color:white;`;
   // Make limit errors clickable to navigate to billing
-  if (type === 'error' && (msg.includes('limit reached') || msg.includes('Upgrade'))) {
-    n.innerHTML = esc(msg) + ' <u style="cursor:pointer;margin-left:6px">View Plans</u>';
+  if (type === 'error' && (msg.includes('limit reached') || msg.includes('Add more credits') || msg.includes('Upgrade'))) {
+    n.innerHTML = esc(msg) + ' <u style="cursor:pointer;margin-left:6px">Plan & Billing</u>';
     n.querySelector('u').onclick = () => { n.remove(); navigate('billing'); };
     n.style.cursor = 'pointer';
     setTimeout(() => n.remove(), 8000);
@@ -2429,14 +2429,15 @@ async function loadBilling() {
     const l = data.limits;
     const plans = data.allPlans;
     const planOrder = ['starter', 'pro', 'business'];
+    const revealAddons = data.revealAddons || {};
 
-    function usageBar(used, max, label) {
+    function usageBar(used, max, label, extra) {
       const pct = max >= 99999 ? 0 : Math.min((used / max) * 100, 100);
       const isMax = max < 99999 && used >= max;
       return `
         <div style="margin-bottom:14px">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <span class="text-sm">${label}</span>
+            <span class="text-sm">${label}${extra || ''}</span>
             <span class="text-sm ${isMax ? 'text-danger' : ''}">${used} / ${max >= 99999 ? 'Unlimited' : max}${isMax ? ' — LIMIT REACHED' : ''}</span>
           </div>
           <div class="score-bar" style="width:100%;height:8px;border-radius:4px">
@@ -2445,24 +2446,26 @@ async function loadBilling() {
         </div>`;
     }
 
+    const revealExtra = l.contactRevealsAddon > 0 ? ` <span class="text-muted text-sm">(${l.contactReveals - l.contactRevealsAddon} plan + ${l.contactRevealsAddon} add-on)</span>` : '';
+
     document.getElementById('page').innerHTML = `
       <div class="toolbar"><h2>Plan & Billing</h2></div>
 
-      <!-- Current Plan -->
+      <!-- Current Plan & Usage -->
       <div class="card" style="margin-bottom:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
           <div>
             <h3 style="margin:0;text-transform:none;letter-spacing:0">${esc(data.planName)} Plan</h3>
             <span class="text-muted">RM ${data.price}/month${data.isTrialing ? ` — <span style="color:var(--warning)">Trial until ${new Date(data.trialEnd).toLocaleDateString()}</span>` : ''}</span>
           </div>
-          ${data.plan !== 'business' ? `<button class="btn btn-primary" onclick="document.getElementById('plan-cards').scrollIntoView({behavior:'smooth'})">Upgrade Plan</button>` : '<span class="badge badge-active">Top tier</span>'}
+          ${data.plan !== 'business' ? `<button class="btn btn-outline" onclick="document.getElementById('plan-cards').scrollIntoView({behavior:'smooth'})">View Plans</button>` : '<span class="badge badge-active">Top tier</span>'}
         </div>
 
         <h4 style="margin-bottom:12px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">This Month's Usage</h4>
         ${usageBar(u.leads, l.leads, 'Leads')}
         ${usageBar(u.campaigns, l.campaigns, 'Campaigns')}
         ${usageBar(u.aiActions, l.aiActions, 'AI Actions')}
-        ${usageBar(u.contactReveals, l.contactReveals, 'Contact Reveals')}
+        ${usageBar(u.contactReveals, l.contactRevealsTotal, 'Contact Reveals', revealExtra)}
 
         <div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap">
           <span class="text-sm">Auto-Outreach: ${l.autoOutreach ? '<span style="color:var(--success)">Enabled</span>' : '<span class="text-muted">Pro+</span>'}</span>
@@ -2471,9 +2474,25 @@ async function loadBilling() {
         </div>
       </div>
 
-      <!-- Plan Cards -->
+      <!-- Contact Reveal Add-ons -->
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin:0 0 4px 0;text-transform:none;letter-spacing:0">Need More Contact Reveals?</h3>
+        <p class="text-muted text-sm" style="margin-bottom:16px">Add extra reveal credits to your account. Credits carry over until used.</p>
+        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+          ${Object.entries(revealAddons).map(([key, addon]) => `
+            <div class="card" style="text-align:center">
+              <div style="font-size:22px;font-weight:800;color:var(--text)">${addon.credits}</div>
+              <div class="text-muted text-sm" style="margin-bottom:8px">extra reveals</div>
+              <div style="font-size:18px;font-weight:700;color:var(--primary);margin-bottom:12px">RM ${addon.price_myr}</div>
+              <button class="btn btn-primary btn-sm" style="width:100%" onclick="buyReveals('${key}')">Buy Now</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Plan Comparison -->
       <div id="plan-cards">
-        <h3 style="margin-bottom:12px;text-transform:none;letter-spacing:0">Choose a Plan</h3>
+        <h3 style="margin-bottom:12px;text-transform:none;letter-spacing:0">Subscription Plans</h3>
         <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
           ${planOrder.map(key => {
             const p = plans[key];
@@ -2487,14 +2506,10 @@ async function loadBilling() {
               <div class="text-sm" style="text-align:left;margin-bottom:16px;line-height:1.8">${p.features.split(', ').map(f => `<div>&#10003; ${esc(f)}</div>`).join('')}</div>
               ${isCurrent ? '<button class="btn btn-outline" disabled style="width:100%">Current Plan</button>' :
                 isUpgrade ? `<button class="btn btn-primary" style="width:100%" onclick="upgradePlan('${key}')">Upgrade to ${esc(p.name)}</button>` :
-                '<button class="btn btn-outline" disabled style="width:100%">Downgrade N/A</button>'}
+                ''}
             </div>`;
           }).join('')}
         </div>
-      </div>
-
-      <div class="card" style="margin-top:16px">
-        <p class="text-muted text-sm">Need to downgrade or cancel? Contact <strong>eiaawsolutions@gmail.com</strong> or manage your subscription in the <a href="https://billing.stripe.com" target="_blank" style="color:var(--primary)">Stripe customer portal</a>.</p>
       </div>
     `;
   } catch (e) {
@@ -2502,8 +2517,24 @@ async function loadBilling() {
   }
 }
 
+async function buyReveals(pack) {
+  if (!confirm('Purchase extra contact reveal credits?')) return;
+  try {
+    showNotification('Processing...');
+    const result = await api.post('/billing/buy-reveals', { pack });
+    if (result.url) {
+      window.location.href = result.url;
+    } else if (result.success) {
+      showNotification(result.message, 'success');
+      loadBilling();
+    }
+  } catch (e) {
+    showNotification(e.message, 'error');
+  }
+}
+
 async function upgradePlan(plan) {
-  if (!confirm(`Upgrade to the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan? You'll be redirected to Stripe checkout.`)) return;
+  if (!confirm(`Upgrade to the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan? You'll be redirected to complete payment.`)) return;
   try {
     showNotification('Redirecting to checkout...');
     const result = await api.post('/billing/upgrade', { plan });
@@ -3777,11 +3808,20 @@ async function init() {
     window.history.replaceState({}, '', '/app');
   }
 
-  // Handle post-upgrade redirect from Stripe
+  // Handle billing redirects
+  if (params.get('page') === 'billing') {
+    currentPage = 'billing';
+    window.history.replaceState({}, '', '/app');
+  }
+  if (params.get('addon') === 'success') {
+    currentPage = 'billing';
+    window.history.replaceState({}, '', '/app');
+    setTimeout(() => showNotification('Reveal credits added to your account!', 'success'), 500);
+  }
   if (params.get('upgraded')) {
     const upgradedPlan = params.get('upgraded');
-    window.history.replaceState({}, '', '/app');
     currentPage = 'billing';
+    window.history.replaceState({}, '', '/app');
     setTimeout(() => showNotification(`Upgraded to ${upgradedPlan.charAt(0).toUpperCase() + upgradedPlan.slice(1)}! Your new limits are now active.`, 'success'), 500);
   }
 

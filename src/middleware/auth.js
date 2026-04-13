@@ -158,8 +158,11 @@ export function checkPlanLimit(req, resource) {
       const count = db.prepare(
         "SELECT COUNT(*) as c FROM activities WHERE user_id = ? AND description LIKE 'Contact revealed:%' AND created_at >= datetime('now', 'start of month')"
       ).get(userId);
-      if (count.c >= limits.contact_reveals) {
-        throw new Error(`Contact reveal limit reached (${limits.contact_reveals}/month on ${req.user.plan} plan). Upgrade for more.`);
+      // Check plan limit + any add-on credits
+      const addonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`reveal_addon_${userId}`)?.value || '0');
+      const totalLimit = limits.contact_reveals + addonCredits;
+      if (count.c >= totalLimit) {
+        throw new Error(`Contact reveal limit reached (${totalLimit}/month on ${req.user.plan} plan). Add more credits from Plan & Billing.`);
       }
       return true;
     }

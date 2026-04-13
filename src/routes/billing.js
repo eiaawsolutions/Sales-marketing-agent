@@ -40,6 +40,13 @@ router.get('/plans', (req, res) => {
   res.json(PLANS);
 });
 
+// Contact reveal add-on packs
+const REVEAL_ADDONS = {
+  reveal_20:  { name: '20 Extra Reveals',  credits: 20,  price_myr: 19 },
+  reveal_50:  { name: '50 Extra Reveals',  credits: 50,  price_myr: 39 },
+  reveal_100: { name: '100 Extra Reveals', credits: 100, price_myr: 69 },
+};
+
 // GET /api/billing/usage — current user's usage vs plan limits
 router.get('/usage', requireAuth, (req, res) => {
   const userId = req.user.id;
@@ -54,6 +61,8 @@ router.get('/usage', requireAuth, (req, res) => {
   const contactReveals = db.prepare(
     "SELECT COUNT(*) as c FROM activities WHERE user_id = ? AND description LIKE 'Contact revealed:%' AND created_at >= datetime('now', 'start of month')"
   ).get(userId).c;
+
+  const addonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`reveal_addon_${userId}`)?.value || '0');
 
   const trialEnd = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(`trial_end_${userId}`)?.value;
   const isTrialing = trialEnd && new Date(trialEnd) > new Date();
@@ -70,15 +79,93 @@ router.get('/usage', requireAuth, (req, res) => {
       campaigns: limits.campaigns,
       aiActions: limits.ai_actions,
       contactReveals: limits.contact_reveals,
+      contactRevealsAddon: addonCredits,
+      contactRevealsTotal: limits.contact_reveals + addonCredits,
       autoOutreach: limits.auto_outreach,
       autoLeads: limits.auto_leads,
       chatbot: limits.chatbot,
     },
     allPlans: PLANS,
+    revealAddons: REVEAL_ADDONS,
   });
 });
 
-// POST /api/billing/upgrade — create Stripe checkout for plan upgrade (existing user)
+// POST /api/billing/buy-reveals — purchase extra contact reveal credits
+router.post('/buy-reveals', requireAuth, async (req, res) => {
+  try {
+    const { pack } = req.body;
+    if (!pack || !REVEAL_ADDONS[pack]) return res.status(400).json({ error: 'Invalid add-on pack.' });
+
+    const addon = REVEAL_ADDONS[pack];
+    const userId = req.user.id;
+
+    // Try Stripe checkout for the add-on
+    let checkoutUrl = null;
+    try {
+      const stripe = getStripe();
+      const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+      const customerId = db.prepare("SELECT value FROM settings WHERE key = ?").get(`stripe_customer_${userId}`)?.value;
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        payment_method_types: ['card'],
+        ...(customerId ? { customer: customerId } : { customer_email: req.user.email }),
+        line_items: [{
+          price_data: {
+            currency: 'myr',
+            product_data: { name: `EIAAW SalesAgent — ${addon.name}` },
+            unit_amount: addon.price_myr * 100,
+          },
+          quantity: 1,
+        }],
+        success_url: `${baseUrl}/api/billing/reveal-success?userId=${userId}&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/app?page=billing`,
+        metadata: { type: 'reveal_addon', pack, userId: String(userId), credits: String(addon.credits) },
+      });
+      checkoutUrl = session.url;
+    } catch (stripeErr) {
+      // Stripe not configured — grant credits directly (admin-managed billing)
+      const current = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`reveal_addon_${userId}`)?.value || '0');
+      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+        .run(`reveal_addon_${userId}`, String(current + addon.credits));
+      return res.json({ success: true, credits: current + addon.credits, message: `Added ${addon.credits} reveal credits.` });
+    }
+
+    res.json({ url: checkoutUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/billing/reveal-success — grant credits after Stripe payment
+router.get('/reveal-success', async (req, res) => {
+  try {
+    const { userId, pack, session_id } = req.query;
+    const addon = REVEAL_ADDONS[pack];
+    if (!addon || !userId) return res.redirect('/app?page=billing&error=invalid');
+
+    // Verify payment
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+    if (session.payment_status !== 'paid') return res.redirect('/app?page=billing&error=payment_failed');
+
+    // Grant credits (idempotent check via session metadata)
+    const granted = db.prepare("SELECT value FROM settings WHERE key = ?").get(`reveal_granted_${session_id}`);
+    if (!granted) {
+      const current = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`reveal_addon_${userId}`)?.value || '0');
+      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+        .run(`reveal_addon_${userId}`, String(current + addon.credits));
+      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+        .run(`reveal_granted_${session_id}`, 'true');
+    }
+
+    res.redirect('/app?page=billing&addon=success');
+  } catch (err) {
+    res.redirect('/app?page=billing&error=setup_failed');
+  }
+});
+
+// POST /api/billing/upgrade — upgrade plan via Stripe checkout
 router.post('/upgrade', requireAuth, async (req, res) => {
   try {
     const { plan } = req.body;
@@ -87,13 +174,14 @@ router.post('/upgrade', requireAuth, async (req, res) => {
     const currentPlan = req.user.plan || 'starter';
     const planOrder = { starter: 0, pro: 1, business: 2 };
     if (planOrder[plan] <= planOrder[currentPlan]) {
-      return res.status(400).json({ error: 'You can only upgrade to a higher plan. Contact support to downgrade.' });
+      return res.status(400).json({ error: 'You are already on this plan or higher.' });
     }
 
     const stripe = getStripe();
+    const userId = req.user.id;
 
     // Get or create Stripe price for target plan
-    const row = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(`stripe_price_${plan}`);
+    const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(`stripe_price_${plan}`);
     let priceId = row?.value;
 
     if (!priceId) {
@@ -113,24 +201,18 @@ router.post('/upgrade', requireAuth, async (req, res) => {
     }
 
     const baseUrl = req.headers.origin || `https://${req.headers.host}`;
-    const userId = req.user.id;
+    const customerId = db.prepare("SELECT value FROM settings WHERE key = ?").get(`stripe_customer_${userId}`)?.value;
 
-    // Check if user has an existing Stripe customer
-    const customerId = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(`stripe_customer_${userId}`)?.value;
-
-    const sessionOpts = {
+    const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
+      ...(customerId ? { customer: customerId } : { customer_email: req.user.email }),
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${baseUrl}/app?upgraded=${plan}`,
       cancel_url: `${baseUrl}/app?page=billing`,
       metadata: { plan, userId: String(userId), upgrade: 'true' },
-    };
+    });
 
-    if (customerId) sessionOpts.customer = customerId;
-    else sessionOpts.customer_email = req.user.email;
-
-    const session = await stripe.checkout.sessions.create(sessionOpts);
     res.json({ url: session.url });
   } catch (err) {
     res.status(500).json({ error: err.message });
