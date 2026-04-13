@@ -61,7 +61,7 @@ export function initializeDatabase(db) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       lead_id INTEGER,
       campaign_id INTEGER,
-      type TEXT NOT NULL CHECK(type IN ('email','call','meeting','note','task','ai_action')),
+      type TEXT NOT NULL CHECK(type IN ('email','call','meeting','note','task','ai_action','contact_reveal','voice_call')),
       description TEXT NOT NULL,
       outcome TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

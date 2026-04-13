@@ -78,7 +78,7 @@ router.post('/call', async (req, res) => {
 
     // Log the call
     db.prepare('INSERT INTO activities (user_id, lead_id, campaign_id, type, description, outcome) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(req.user.id, leadId, campaignId || null, 'voice_call',
+      .run(req.user.id, leadId, campaignId || null, 'ai_action',
         `AI voice call to ${lead.name} (${lead.phone})`,
         JSON.stringify(callResult));
 
@@ -108,7 +108,7 @@ router.post('/auto-call', async (req, res) => {
       try {
         // Queue the call (don't actually call in batch — use outreach_queue)
         db.prepare(`INSERT INTO outreach_queue (campaign_id, lead_id, step, channel, subject, message, goal, delay_days, status)
-          VALUES (?, ?, 1, 'voice_call', ?, ?, 'AI voice outreach', 0, 'pending')`)
+          VALUES (?, ?, 1, 'ai_action', ?, ?, 'AI voice outreach', 0, 'pending')`)
           .run(campaignId, lead.id, `Call to ${lead.name}`, `AI voice call to ${lead.name} at ${lead.company || 'their company'}`);
         results.push({ leadId: lead.id, name: lead.name, status: 'queued' });
       } catch (e) {

@@ -156,7 +156,7 @@ export function checkPlanLimit(req, resource) {
     }
     case 'contact_reveal': {
       const count = db.prepare(
-        "SELECT COUNT(*) as c FROM activities WHERE user_id = ? AND type = 'contact_reveal' AND created_at >= datetime('now', 'start of month')"
+        "SELECT COUNT(*) as c FROM activities WHERE user_id = ? AND description LIKE 'Contact revealed:%' AND created_at >= datetime('now', 'start of month')"
       ).get(userId);
       if (count.c >= limits.contact_reveals) {
         throw new Error(`Contact reveal limit reached (${limits.contact_reveals}/month on ${req.user.plan} plan). Upgrade for more.`);
