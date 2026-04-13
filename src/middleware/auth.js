@@ -137,8 +137,11 @@ export function checkPlanLimit(req, resource) {
       const count = db.prepare(
         "SELECT COUNT(*) as c FROM ai_cost_log WHERE user_id = ? AND created_at >= datetime('now', 'start of month')"
       ).get(userId);
-      if (count.c >= limits.ai_actions) {
-        throw new Error(`AI action limit reached (${limits.ai_actions}/month on ${req.user.plan} plan). Upgrade for more.`);
+      // Check plan limit + any purchased add-on credits
+      const aiAddonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`ai_addon_${userId}`)?.value || '0');
+      const totalAiLimit = limits.ai_actions + aiAddonCredits;
+      if (count.c >= totalAiLimit) {
+        throw new Error(`AI action limit reached (${totalAiLimit}/month on ${req.user.plan} plan${aiAddonCredits > 0 ? ` + ${aiAddonCredits} add-on` : ''}). ${aiAddonCredits > 0 ? 'Buy more credits or upgrade' : 'Add more credits or upgrade'} from Plan & Billing.`);
       }
       return true;
     }

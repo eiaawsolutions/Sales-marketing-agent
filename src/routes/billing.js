@@ -47,6 +47,13 @@ const REVEAL_ADDONS = {
   reveal_100: { name: '100 Extra Reveals', credits: 100, price_myr: 69 },
 };
 
+// AI credit add-on packs (extra AI actions on top of plan limit)
+const AI_CREDIT_ADDONS = {
+  ai_50:  { name: '50 Extra AI Actions',  credits: 50,  price_myr: 29 },
+  ai_100: { name: '100 Extra AI Actions', credits: 100, price_myr: 49 },
+  ai_500: { name: '500 Extra AI Actions', credits: 500, price_myr: 149 },
+};
+
 // GET /api/billing/usage — current user's usage vs plan limits
 router.get('/usage', requireAuth, (req, res) => {
   const userId = req.user.id;
@@ -63,6 +70,7 @@ router.get('/usage', requireAuth, (req, res) => {
   ).get(userId).c;
 
   const addonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`reveal_addon_${userId}`)?.value || '0');
+  const aiAddonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`ai_addon_${userId}`)?.value || '0');
 
   const trialEnd = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(`trial_end_${userId}`)?.value;
   const isTrialing = trialEnd && new Date(trialEnd) > new Date();
@@ -78,6 +86,8 @@ router.get('/usage', requireAuth, (req, res) => {
       leads: limits.leads,
       campaigns: limits.campaigns,
       aiActions: limits.ai_actions,
+      aiActionsAddon: aiAddonCredits,
+      aiActionsTotal: limits.ai_actions + aiAddonCredits,
       contactReveals: limits.contact_reveals,
       contactRevealsAddon: addonCredits,
       contactRevealsTotal: limits.contact_reveals + addonCredits,
@@ -87,6 +97,7 @@ router.get('/usage', requireAuth, (req, res) => {
     },
     allPlans: PLANS,
     revealAddons: REVEAL_ADDONS,
+    aiCreditAddons: AI_CREDIT_ADDONS,
     stripeConfigured: !!db.prepare("SELECT value FROM settings WHERE key = 'stripe_secret_key'").get()?.value,
   });
 });
@@ -150,6 +161,70 @@ router.get('/reveal-success', async (req, res) => {
     }
 
     res.redirect('/app?page=billing&addon=success');
+  } catch (err) {
+    res.redirect('/app?page=billing&error=setup_failed');
+  }
+});
+
+// POST /api/billing/buy-ai-credits — purchase extra AI action credits
+router.post('/buy-ai-credits', requireAuth, async (req, res) => {
+  try {
+    const { pack } = req.body;
+    if (!pack || !AI_CREDIT_ADDONS[pack]) return res.status(400).json({ error: 'Invalid AI credit pack.' });
+
+    const addon = AI_CREDIT_ADDONS[pack];
+    const userId = req.user.id;
+
+    const stripe = getStripe();
+    const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+    const customerId = db.prepare("SELECT value FROM settings WHERE key = ?").get(`stripe_customer_${userId}`)?.value;
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      ...(customerId ? { customer: customerId } : { customer_email: req.user.email }),
+      line_items: [{
+        price_data: {
+          currency: 'myr',
+          product_data: { name: `EIAAW SalesAgent — ${addon.name}` },
+          unit_amount: addon.price_myr * 100,
+        },
+        quantity: 1,
+      }],
+      success_url: `${baseUrl}/api/billing/ai-credit-success?userId=${userId}&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/app?page=billing`,
+      metadata: { type: 'ai_credit_addon', pack, userId: String(userId), credits: String(addon.credits) },
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/billing/ai-credit-success — grant AI credits after Stripe payment
+router.get('/ai-credit-success', async (req, res) => {
+  try {
+    const { userId, pack, session_id } = req.query;
+    const addon = AI_CREDIT_ADDONS[pack];
+    if (!addon || !userId) return res.redirect('/app?page=billing&error=invalid');
+
+    // Verify payment
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+    if (session.payment_status !== 'paid') return res.redirect('/app?page=billing&error=payment_failed');
+
+    // Grant credits (idempotent check via session metadata)
+    const granted = db.prepare("SELECT value FROM settings WHERE key = ?").get(`ai_credit_granted_${session_id}`);
+    if (!granted) {
+      const current = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`ai_addon_${userId}`)?.value || '0');
+      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+        .run(`ai_addon_${userId}`, String(current + addon.credits));
+      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+        .run(`ai_credit_granted_${session_id}`, 'true');
+    }
+
+    res.redirect('/app?page=billing&addon=ai_success');
   } catch (err) {
     res.redirect('/app?page=billing&error=setup_failed');
   }

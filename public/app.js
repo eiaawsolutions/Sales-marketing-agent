@@ -2617,6 +2617,7 @@ async function loadBilling() {
     const plans = data.allPlans;
     const planOrder = ['starter', 'pro', 'business'];
     const revealAddons = data.revealAddons || {};
+    const aiCreditAddons = data.aiCreditAddons || {};
     const stripeOk = data.stripeConfigured;
 
     function usageBar(used, max, label, extra) {
@@ -2635,6 +2636,7 @@ async function loadBilling() {
     }
 
     const revealExtra = l.contactRevealsAddon > 0 ? ` <span class="text-muted text-sm">(${l.contactReveals - l.contactRevealsAddon} plan + ${l.contactRevealsAddon} add-on)</span>` : '';
+    const aiExtra = l.aiActionsAddon > 0 ? ` <span class="text-muted text-sm">(${l.aiActions - l.aiActionsAddon} plan + ${l.aiActionsAddon} add-on)</span>` : '';
 
     document.getElementById('page').innerHTML = `
       <div class="toolbar"><h2>Plan & Billing</h2></div>
@@ -2652,7 +2654,7 @@ async function loadBilling() {
         <h4 style="margin-bottom:12px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">This Month's Usage</h4>
         ${usageBar(u.leads, l.leads, 'Leads')}
         ${usageBar(u.campaigns, l.campaigns, 'Campaigns')}
-        ${usageBar(u.aiActions, l.aiActions, 'AI Actions')}
+        ${usageBar(u.aiActions, l.aiActionsTotal, 'AI Actions', aiExtra)}
         ${usageBar(u.contactReveals, l.contactRevealsTotal, 'Contact Reveals', revealExtra)}
 
         <div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap">
@@ -2673,6 +2675,22 @@ async function loadBilling() {
               <div class="text-muted text-sm" style="margin-bottom:8px">extra reveals</div>
               <div style="font-size:18px;font-weight:700;color:var(--primary);margin-bottom:12px">RM ${addon.price_myr}</div>
               <button class="btn btn-primary btn-sm" style="width:100%${stripeOk ? '' : ';opacity:0.5'}" onclick="buyReveals('${key}')" ${stripeOk ? '' : 'disabled'}>Buy Now</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- AI Credit Add-ons -->
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin:0 0 4px 0;text-transform:none;letter-spacing:0">Need More AI Actions?</h3>
+        <p class="text-muted text-sm" style="margin-bottom:16px">Top up your AI action credits without upgrading your plan. Credits stack on top of your plan's monthly limit and carry over until used.</p>
+        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+          ${Object.entries(aiCreditAddons).map(([key, addon]) => `
+            <div class="card" style="text-align:center;border:1px solid rgba(124,58,237,0.15);background:linear-gradient(135deg,rgba(124,58,237,0.04),transparent)">
+              <div style="font-size:22px;font-weight:800;color:var(--text)">${addon.credits}</div>
+              <div class="text-muted text-sm" style="margin-bottom:8px">extra AI actions</div>
+              <div style="font-size:18px;font-weight:700;color:#a855f7;margin-bottom:12px">RM ${addon.price_myr}</div>
+              <button class="btn btn-sm" style="width:100%;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none${stripeOk ? '' : ';opacity:0.5'}" onclick="buyAiCredits('${key}')" ${stripeOk ? '' : 'disabled'}>Buy Now</button>
             </div>
           `).join('')}
         </div>
@@ -2716,6 +2734,20 @@ async function buyReveals(pack) {
   try {
     showNotification('Redirecting to checkout...');
     const result = await api.post('/billing/buy-reveals', { pack });
+    if (result.url) {
+      window.location.href = result.url;
+    }
+  } catch (e) {
+    const msg = e.message.includes('Stripe') ? 'Payment system is being set up. Please try again later or contact support.' : e.message;
+    showNotification(msg, 'error');
+  }
+}
+
+async function buyAiCredits(pack) {
+  if (!confirm('Purchase extra AI action credits? You will be redirected to complete payment.')) return;
+  try {
+    showNotification('Redirecting to checkout...');
+    const result = await api.post('/billing/buy-ai-credits', { pack });
     if (result.url) {
       window.location.href = result.url;
     }
@@ -4010,6 +4042,11 @@ async function init() {
     currentPage = 'billing';
     window.history.replaceState({}, '', '/app');
     setTimeout(() => showNotification('Reveal credits added to your account!', 'success'), 500);
+  }
+  if (params.get('addon') === 'ai_success') {
+    currentPage = 'billing';
+    window.history.replaceState({}, '', '/app');
+    setTimeout(() => showNotification('AI action credits added to your account!', 'success'), 500);
   }
   if (params.get('upgraded')) {
     const upgradedPlan = params.get('upgraded');
