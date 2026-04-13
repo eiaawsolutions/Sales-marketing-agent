@@ -177,6 +177,9 @@ export function initializeDatabase(db) {
     insert.run('from_email', '');
     insert.run('admin_password', 'admin123');
     insert.run('stripe_secret_key', '');
+    insert.run('voice_ai_provider', 'retell');
+    insert.run('voice_ai_api_key', '');
+    insert.run('voice_ai_agent_id', '');
     insert.run('stripe_publishable_key', '');
     insert.run('ai_credit_balance', '5.00');
   }

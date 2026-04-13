@@ -1,5 +1,42 @@
 import db from '../db/index.js';
 
+// Mask contact details for non-superadmin users
+function maskEmail(email) {
+  if (!email) return '';
+  const [local, domain] = email.split('@');
+  if (!domain) return '***@***.com';
+  return local.charAt(0) + '*'.repeat(Math.max(local.length - 2, 1)) + local.charAt(local.length - 1) + '@' + domain;
+}
+
+function maskPhone(phone) {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 6) return '***-****';
+  return phone.substring(0, 4) + '*'.repeat(phone.length - 6) + phone.substring(phone.length - 2);
+}
+
+function maskName(name) {
+  if (!name) return '';
+  const parts = name.split(' ');
+  if (parts.length === 1) return parts[0].charAt(0) + '.';
+  return parts[0] + ' ' + parts.slice(1).map(p => p.charAt(0) + '.').join(' ');
+}
+
+export function maskLead(lead) {
+  if (!lead) return lead;
+  return {
+    ...lead,
+    name: maskName(lead.name),
+    email: maskEmail(lead.email),
+    phone: maskPhone(lead.phone),
+    _masked: true,
+  };
+}
+
+export function maskLeads(leads) {
+  return leads.map(maskLead);
+}
+
 export const leadsService = {
   getAll(userId, filters = {}) {
     let query = `SELECT l.*,

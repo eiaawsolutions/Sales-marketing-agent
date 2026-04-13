@@ -18,6 +18,7 @@ import pipelineRouter from './routes/pipeline.js';
 import agentRouter from './routes/agent.js';
 import settingsRouter from './routes/settings.js';
 import systemLogicRouter from './routes/system-logic.js';
+import voiceRouter from './routes/voice.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -179,6 +180,28 @@ app.get('/api/admin/ai-usage', requireAuth, (req, res) => {
   res.json({ total, thisMonth, lastMonth, daily, byModel, byType });
 });
 
+// Public chatbot endpoint (for landing page visitor conversion)
+app.post('/api/chatbot', rateLimit({ windowMs: 60000, max: 5, message: { error: 'Chat limit reached. Try again in a minute.' }, validate: false }), async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message || message.length > 500) return res.status(400).json({ error: 'Message required (max 500 chars).' });
+
+    const { freeformChat } = await import('./services/ai-agent.js');
+    const response = await freeformChat(null, `You are a sales assistant on the EIAAW SalesAgent website. A visitor is asking about the product. Be helpful, concise, and guide them toward signing up for the 14-day free trial at /app.
+
+Plans: Starter RM99/mo (100 leads, 3 campaigns), Pro RM199/mo (500 leads, auto-outreach), Business RM399/mo (unlimited).
+
+Visitor says: "${message.replace(/"/g, '\\"')}"`);
+
+    // Log chatbot cost
+    db.prepare("INSERT INTO ai_cost_log (campaign_id, task_type, input_tokens, output_tokens, total_tokens, cost_usd, model, user_id) VALUES (NULL, 'chatbot', 0, 0, 0, 0.005, 'chatbot', 1)").run();
+
+    res.json({ response });
+  } catch (err) {
+    res.json({ response: "I'm having trouble connecting right now. Please email us at eiaawsolutions@gmail.com or try the free trial at sa.eiaawsolutions.com/app" });
+  }
+});
+
 // Public routes (no auth)
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);
@@ -191,6 +214,7 @@ app.use('/api/pipeline', requireAuth, pipelineRouter);
 app.use('/api/agent', requireAuth, agentRouter);
 app.use('/api/settings', requireAuth, settingsRouter);
 app.use('/api/system-logic', requireAuth, systemLogicRouter);
+app.use('/api/voice', voiceRouter);
 
 // Dashboard overview endpoint
 app.get('/api/dashboard', requireAuth, (req, res) => {

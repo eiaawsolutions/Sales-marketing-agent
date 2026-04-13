@@ -425,9 +425,12 @@ async function loadLeads() {
           <tr><th>Name</th><th>Email</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Performance</th><th>Actions</th></tr>
           ${leads.map(l => `
             <tr>
-              <td><strong>${l.name}</strong></td>
-              <td>${l.email}</td>
-              <td>${l.company || '-'}</td>
+              <td><strong>${esc(l.name)}</strong></td>
+              <td>
+                <span id="lead-email-${l.id}">${l._masked ? `<span class="text-muted">${esc(l.email)}</span>` : esc(l.email)}</span>
+                ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" onclick="revealContact(${l.id})">Reveal</button>` : ''}
+              </td>
+              <td>${esc(l.company || '-')}</td>
               <td>${l.source}</td>
               <td>
                 <div style="display:flex;align-items:center;gap:8px">
@@ -445,8 +448,8 @@ async function loadLeads() {
                   <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id})">AI Score</button>
                   <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id})">Qualify</button>
                   <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id})">Outreach</button>
-                  <button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>
-                  <button class="btn btn-sm btn-danger" onclick="deleteLead(${l.id})">X</button>
+                  ${currentUser?.role === 'superadmin' ? `<button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteLead(${l.id})">X</button>` : ''}
                 </div>
               </td>
             </tr>
@@ -507,6 +510,17 @@ async function deleteLead(id) {
   if (!confirm('Delete this lead?')) return;
   await api.del(`/leads/${id}`);
   loadLeads();
+}
+
+async function revealContact(leadId) {
+  if (!confirm('Reveal this contact? This uses 1 of your monthly contact reveal credits.')) return;
+  try {
+    const result = await api.post(`/leads/${leadId}/reveal`);
+    showNotification(`Contact revealed: ${result.email}`, 'success');
+    loadLeads(); // Refresh to show full data
+  } catch (e) {
+    showNotification(e.message, 'error');
+  }
 }
 
 async function aiScoreLead(id) {
@@ -3276,6 +3290,32 @@ async function loadSettings() {
       </div>
 
       <div class="card">
+        <h3>Voice AI (Auto-Call)</h3>
+        <p class="text-muted text-sm mb-4">Configure AI voice calling for automated lead outreach. Supports <a href="https://www.retellai.com" target="_blank" style="color:var(--primary)">Retell AI</a> and <a href="https://vapi.ai" target="_blank" style="color:var(--primary)">Vapi</a>.</p>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Voice AI Provider</label>
+            <select id="s-voice-provider">
+              <option value="retell" ${(settings.voice_ai_provider||'retell') === 'retell' ? 'selected' : ''}>Retell AI</option>
+              <option value="vapi" ${settings.voice_ai_provider === 'vapi' ? 'selected' : ''}>Vapi</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Agent ID</label>
+            <input id="s-voice-agent" value="${settings.voice_ai_agent_id || ''}" placeholder="Your voice agent/assistant ID">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Voice AI API Key</label>
+          <div class="flex gap-2">
+            <input id="s-voice-key" type="password" value="${settings.voice_ai_api_key || ''}" placeholder="Your Retell/Vapi API key">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('s-voice-key').type = document.getElementById('s-voice-key').type === 'password' ? 'text' : 'password'">Show</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:12px">Save Settings</button>
+      </div>
+
+      <div class="card">
         <h3>Stripe / Billing</h3>
         <p class="text-muted text-sm mb-4">Connect your Stripe account for subscription billing. Get keys from <a href="https://dashboard.stripe.com/apikeys" target="_blank" style="color:var(--primary)">dashboard.stripe.com</a></p>
         <div class="form-group">
@@ -3324,6 +3364,9 @@ async function saveSettings() {
     stripe_secret_key: document.getElementById('s-stripe-secret')?.value || '',
     stripe_publishable_key: gv('s-stripe-pub'),
     ai_credit_balance: gv('s-ai-balance') || '5.00',
+    voice_ai_provider: gv('s-voice-provider') || 'retell',
+    voice_ai_api_key: document.getElementById('s-voice-key')?.value || '',
+    voice_ai_agent_id: gv('s-voice-agent') || '',
   };
 
   try {

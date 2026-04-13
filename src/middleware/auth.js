@@ -94,9 +94,16 @@ export function requireSuperadmin(req, res, next) {
 
 // Plan limits
 const PLAN_LIMITS = {
-  starter: { leads: 100, campaigns: 3, ai_actions: 50, model: 'claude-haiku-4-5-20251001', users: 1, auto_outreach: false, auto_leads: false },
-  pro:     { leads: 500, campaigns: 10, ai_actions: 200, model: 'claude-sonnet-4-20250514', users: 3, auto_outreach: true, auto_leads: true },
-  business:{ leads: 99999, campaigns: 99999, ai_actions: 1000, model: 'claude-sonnet-4-20250514', users: 10, auto_outreach: true, auto_leads: true },
+  starter: { leads: 100, campaigns: 3, ai_actions: 50, contact_reveals: 10, model: 'claude-haiku-4-5-20251001', users: 1, auto_outreach: false, auto_leads: false, voice_calls: 0, chatbot: false },
+  pro:     { leads: 500, campaigns: 10, ai_actions: 200, contact_reveals: 50, model: 'claude-sonnet-4-20250514', users: 3, auto_outreach: true, auto_leads: true, voice_calls: 0, chatbot: true },
+  business:{ leads: 99999, campaigns: 99999, ai_actions: 1000, contact_reveals: 200, model: 'claude-sonnet-4-20250514', users: 10, auto_outreach: true, auto_leads: true, voice_calls: 0, chatbot: true },
+};
+
+// Voice AI add-on pricing
+export const VOICE_ADDONS = {
+  voice_starter: { name: 'Voice Starter', calls: 50, price_myr: 49, per_min: 0.50 },
+  voice_pro: { name: 'Voice Pro', calls: 200, price_myr: 149, per_min: 0.40 },
+  voice_unlimited: { name: 'Voice Unlimited', calls: 1000, price_myr: 399, per_min: 0.30 },
 };
 
 export function getPlanLimits(plan) {
@@ -144,6 +151,21 @@ export function checkPlanLimit(req, resource) {
     case 'auto_leads': {
       if (!limits.auto_leads) {
         throw new Error('Auto-lead generation is available on Pro and Business plans. Upgrade to unlock.');
+      }
+      return true;
+    }
+    case 'contact_reveal': {
+      const count = db.prepare(
+        "SELECT COUNT(*) as c FROM activities WHERE user_id = ? AND type = 'contact_reveal' AND created_at >= datetime('now', 'start of month')"
+      ).get(userId);
+      if (count.c >= limits.contact_reveals) {
+        throw new Error(`Contact reveal limit reached (${limits.contact_reveals}/month on ${req.user.plan} plan). Upgrade for more.`);
+      }
+      return true;
+    }
+    case 'voice_call': {
+      if (!limits.voice_calls) {
+        throw new Error('Voice AI calls require a Voice add-on. Add it from your plan settings.');
       }
       return true;
     }

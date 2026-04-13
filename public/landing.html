@@ -495,6 +495,30 @@
   </div>
 </footer>
 
+<!-- AI Chatbot Widget -->
+<div id="chatbot-toggle" onclick="toggleChatbot()" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:300;box-shadow:0 4px 20px rgba(46,196,182,0.4);transition:transform 0.2s">
+  <span style="font-size:24px;color:#fff" id="chatbot-icon">&#128172;</span>
+</div>
+
+<div id="chatbot-panel" style="display:none;position:fixed;bottom:90px;right:24px;width:380px;max-height:500px;background:var(--bg);border:1px solid var(--border);border-radius:16px;z-index:300;box-shadow:0 8px 40px rgba(0,0,0,0.4);overflow:hidden;flex-direction:column">
+  <div style="background:var(--gradient);padding:16px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-weight:700;color:#fff;font-size:14px">EIAAW Sales Assistant</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.7)">Ask me anything about our AI sales tool</div>
+    </div>
+    <button onclick="toggleChatbot()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer">&times;</button>
+  </div>
+  <div id="chatbot-messages" style="flex:1;overflow-y:auto;padding:12px;max-height:340px;min-height:200px">
+    <div style="background:var(--surface);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);margin-bottom:8px;max-width:85%">
+      Hi! I'm the EIAAW Sales Assistant. Ask me about our AI sales tool, pricing, or how we can help you close more deals!
+    </div>
+  </div>
+  <div style="padding:10px;border-top:1px solid var(--border);display:flex;gap:8px">
+    <input id="chatbot-input" placeholder="Ask me anything..." style="flex:1;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px" onkeydown="if(event.key==='Enter')sendChatbotMsg()">
+    <button onclick="sendChatbotMsg()" class="btn btn-primary" style="padding:8px 14px;font-size:13px">Send</button>
+  </div>
+</div>
+
 <!-- Contact Modal -->
 <div id="contact-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center">
   <div style="background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:32px;width:90%;max-width:480px;position:relative">
@@ -716,6 +740,46 @@ async function submitContact() {
     btn.disabled = false;
     btn.textContent = 'Send Enquiry';
   }
+}
+
+// Chatbot
+function toggleChatbot() {
+  const panel = document.getElementById('chatbot-panel');
+  const icon = document.getElementById('chatbot-icon');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'flex';
+    icon.innerHTML = '&#10005;';
+    document.getElementById('chatbot-input')?.focus();
+  } else {
+    panel.style.display = 'none';
+    icon.innerHTML = '&#128172;';
+  }
+}
+
+async function sendChatbotMsg() {
+  const input = document.getElementById('chatbot-input');
+  const msg = input?.value?.trim();
+  if (!msg) return;
+  input.value = '';
+
+  const messages = document.getElementById('chatbot-messages');
+  messages.innerHTML += `<div style="background:var(--primary);color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:8px;margin-left:auto;max-width:85%;text-align:right">${msg}</div>`;
+  messages.innerHTML += `<div id="chatbot-typing" style="color:var(--text-muted);font-size:12px;padding:4px 14px;animation:pulse 1s infinite">Typing...</div>`;
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const res = await fetch('/api/chatbot', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+    }).then(r => r.json());
+
+    document.getElementById('chatbot-typing')?.remove();
+    messages.innerHTML += `<div style="background:var(--surface);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);margin-bottom:8px;max-width:85%;white-space:pre-wrap;line-height:1.5">${res.response || res.error}</div>`;
+  } catch (e) {
+    document.getElementById('chatbot-typing')?.remove();
+    messages.innerHTML += `<div style="background:var(--surface);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--danger);margin-bottom:8px">Something went wrong. Email us at eiaawsolutions@gmail.com</div>`;
+  }
+  messages.scrollTop = messages.scrollHeight;
 }
 
 // Handle welcome redirect from successful signup

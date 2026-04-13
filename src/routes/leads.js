@@ -1,13 +1,15 @@
 import { Router } from 'express';
-import { leadsService } from '../services/leads.js';
+import { leadsService, maskLeads, maskLead } from '../services/leads.js';
 import { runAgent } from '../services/ai-agent.js';
 import { checkPlanLimit } from '../middleware/auth.js';
+import db from '../db/index.js';
 
 const router = Router();
 
 router.get('/', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;
-  res.json(leadsService.getAll(userId, req.query));
+  const leads = leadsService.getAll(userId, req.query);
+  res.json(req.user.role === 'superadmin' ? leads : maskLeads(leads));
 });
 
 router.get('/stats', (req, res) => {
@@ -19,7 +21,7 @@ router.get('/:id', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;
   const lead = leadsService.getById(userId, req.params.id);
   if (!lead) return res.status(404).json({ error: 'Lead not found' });
-  res.json(lead);
+  res.json(req.user.role === 'superadmin' ? lead : maskLead(lead));
 });
 
 router.post('/', (req, res) => {
@@ -85,6 +87,23 @@ router.post('/:id/outreach', async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/leads/:id/reveal — reveal masked contact (costs 1 credit)
+router.post('/:id/reveal', (req, res) => {
+  try {
+    checkPlanLimit(req, 'contact_reveal');
+    const userId = req.user.role === 'superadmin' ? null : req.user.id;
+    const lead = leadsService.getById(userId, req.params.id);
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+    db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+      .run(req.user.id, lead.id, 'contact_reveal', `Revealed contact: ${lead.name}`);
+
+    res.json({ email: lead.email, phone: lead.phone, name: lead.name, company: lead.company });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
