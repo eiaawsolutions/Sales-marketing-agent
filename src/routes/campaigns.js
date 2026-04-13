@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { campaignsService } from '../services/campaigns.js';
 import { runAgent, getAICostStats, getAICostByCampaign, getAICostLog, getOutreachQueue } from '../services/ai-agent.js';
 import { checkPlanLimit } from '../middleware/auth.js';
+import { maskLeads, maskLead } from '../services/leads.js';
 
 const router = Router();
 
@@ -27,6 +28,9 @@ router.get('/:id', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;
   const campaign = campaignsService.getById(userId, req.params.id);
   if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+  if (req.user.role !== 'superadmin' && campaign.leads) {
+    campaign.leads = maskLeads(campaign.leads);
+  }
   res.json(campaign);
 });
 
@@ -56,6 +60,9 @@ router.delete('/:id', (req, res) => {
 router.post('/:id/leads', (req, res) => {
   try {
     const campaign = campaignsService.addLeads(req.params.id, req.body.leadIds);
+    if (req.user.role !== 'superadmin' && campaign.leads) {
+      campaign.leads = maskLeads(campaign.leads);
+    }
     res.json(campaign);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -94,7 +101,14 @@ router.post('/:id/auto-outreach', async (req, res) => {
 });
 
 router.get('/:id/outreach-queue', (req, res) => {
-  res.json(getOutreachQueue(parseInt(req.params.id)));
+  let queue = getOutreachQueue(parseInt(req.params.id));
+  if (req.user.role !== 'superadmin') {
+    queue = queue.map(item => {
+      const masked = maskLead({ name: item.lead_name, email: item.lead_email, phone: '', company: item.lead_company });
+      return { ...item, lead_name: masked.name, lead_email: masked.email, lead_company: item.lead_company };
+    });
+  }
+  res.json(queue);
 });
 
 router.post('/:id/send', async (req, res) => {

@@ -1,13 +1,32 @@
 import db from '../db/index.js';
 import nodemailer from 'nodemailer';
-import { config } from '../config/index.js';
+import { decrypt } from '../utils/crypto.js';
 
-const transporter = nodemailer.createTransport({
-  host: config.smtp.host,
-  port: config.smtp.port,
-  secure: config.smtp.port === 465,
-  auth: { user: config.smtp.user, pass: config.smtp.pass },
-});
+// Read SMTP settings from DB (consistent with auth, billing, contact form)
+function getSmtpConfig() {
+  const get = (key) => db.prepare("SELECT value FROM settings WHERE key = ?").get(key)?.value || '';
+  const host = get('smtp_host') || process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseInt(get('smtp_port') || process.env.SMTP_PORT || '587');
+  const user = get('smtp_user') || process.env.SMTP_USER || '';
+  const rawPass = get('smtp_pass');
+  const pass = (rawPass ? decrypt(rawPass) : null) || process.env.SMTP_PASS || '';
+  const from = get('from_email') || process.env.FROM_EMAIL || '';
+  return { host, port, user, pass, from };
+}
+
+function createTransporter() {
+  const smtp = getSmtpConfig();
+  if (!smtp.user) return null;
+  return nodemailer.createTransport({
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.port === 465,
+    auth: { user: smtp.user, pass: smtp.pass },
+    connectionTimeout: 10000, // 10s connection timeout
+    greetingTimeout: 10000,
+    socketTimeout: 15000,     // 15s socket timeout
+  });
+}
 
 export const campaignsService = {
   getAll(userId, filters = {}) {
@@ -94,15 +113,18 @@ export const campaignsService = {
     if (campaign.type !== 'email') throw new Error('Only email campaigns can be sent');
     if (!campaign.leads?.length) throw new Error('No leads assigned to campaign');
 
+    const smtp = getSmtpConfig();
+    const mailer = createTransporter();
+
     let sentCount = 0;
     const results = [];
 
     for (const lead of campaign.leads) {
       if (lead.campaign_status !== 'pending') continue;
       try {
-        if (config.smtp.user) {
-          await transporter.sendMail({
-            from: config.smtp.from, to: lead.email,
+        if (mailer) {
+          await mailer.sendMail({
+            from: smtp.from || smtp.user, to: lead.email,
             subject: campaign.subject, html: campaign.body,
           });
         }

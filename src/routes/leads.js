@@ -99,7 +99,7 @@ router.post('/:id/reveal', (req, res) => {
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
     db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
-      .run(req.user.id, lead.id, 'ai_action', `Contact revealed: ${lead.name} (${lead.email})`);
+      .run(req.user.id, lead.id, 'contact_reveal', `Contact revealed: ${lead.name} (${lead.email}${lead.phone ? ', ' + lead.phone : ''})`);
 
     res.json({ email: lead.email, phone: lead.phone, name: lead.name, company: lead.company });
   } catch (err) {

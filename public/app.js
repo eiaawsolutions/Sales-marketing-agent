@@ -365,8 +365,8 @@ async function loadDashboard() {
             <tr><th>Name</th><th>Company</th><th>Score</th><th>Status</th></tr>
             ${data.topLeads.map(l => `
               <tr>
-                <td>${l.name}</td>
-                <td>${l.company || '-'}</td>
+                <td>${esc(l.name)}</td>
+                <td>${esc(l.company || '-')}</td>
                 <td>
                   <div style="display:flex;align-items:center;gap:8px">
                     <div class="score-bar" style="width:60px"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
@@ -383,8 +383,8 @@ async function loadDashboard() {
           <h3>Recent Activity</h3>
           ${data.recentActivities.length ? data.recentActivities.map(a => `
             <div style="padding:8px 0;border-bottom:1px solid rgba(71,85,105,0.3);font-size:13px">
-              <span class="badge badge-${a.type === 'ai_action' ? 'qualified' : 'contacted'}">${a.type}</span>
-              <span style="margin-left:8px">${a.lead_name || ''} — ${a.description.substring(0, 80)}</span>
+              <span class="badge badge-${a.type === 'ai_action' || a.type === 'contact_reveal' ? 'qualified' : 'contacted'}">${a.type.replace('_', ' ')}</span>
+              <span style="margin-left:8px">${esc(a.lead_name || '')} — ${esc(a.description.substring(0, 80))}</span>
               <div class="text-muted text-sm" style="margin-top:2px">${new Date(a.created_at).toLocaleString()}</div>
             </div>
           `).join('') : '<div class="empty">No activities yet</div>'}
@@ -422,14 +422,15 @@ async function loadLeads() {
       </div>
       <div class="card">
         <table>
-          <tr><th>Name</th><th>Email</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Performance</th><th>Actions</th></tr>
+          <tr><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Performance</th><th>Actions</th></tr>
           ${leads.map(l => `
             <tr>
-              <td><strong>${esc(l.name)}</strong></td>
+              <td><strong><span id="lead-name-${l.id}">${esc(l.name)}</span></strong></td>
               <td>
                 <span id="lead-email-${l.id}">${l._masked ? `<span class="text-muted">${esc(l.email)}</span>` : esc(l.email)}</span>
-                ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" onclick="revealContact(${l.id})">Reveal</button>` : ''}
+                ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" id="reveal-btn-${l.id}" onclick="revealContact(${l.id})">Reveal</button>` : ''}
               </td>
+              <td><span id="lead-phone-${l.id}">${l._masked ? `<span class="text-muted">${l.phone ? esc(l.phone) : '-'}</span>` : esc(l.phone || '-')}</span></td>
               <td>${esc(l.company || '-')}</td>
               <td>${l.source}</td>
               <td>
@@ -453,7 +454,7 @@ async function loadLeads() {
                 </div>
               </td>
             </tr>
-          `).join('') || '<tr><td colspan="8" class="empty">No leads yet. Add your first lead!</td></tr>'}
+          `).join('') || '<tr><td colspan="9" class="empty">No leads yet. Add your first lead!</td></tr>'}
         </table>
       </div>
     `;
@@ -516,8 +517,19 @@ async function revealContact(leadId) {
   if (!confirm('Reveal this contact? This uses 1 of your monthly contact reveal credits.')) return;
   try {
     const result = await api.post(`/leads/${leadId}/reveal`);
-    showNotification(`Contact revealed: ${result.email}`, 'success');
-    loadLeads(); // Refresh to show full data
+    const parts = [result.email, result.phone].filter(Boolean);
+    showNotification(`Contact revealed: ${parts.join(' | ')}`, 'success');
+
+    // Update DOM inline so revealed data stays visible (reloading would re-mask)
+    const emailEl = document.getElementById(`lead-email-${leadId}`);
+    if (emailEl) emailEl.innerHTML = esc(result.email);
+    const phoneEl = document.getElementById(`lead-phone-${leadId}`);
+    if (phoneEl) phoneEl.innerHTML = esc(result.phone || '-');
+    const nameEl = document.getElementById(`lead-name-${leadId}`);
+    if (nameEl) nameEl.textContent = result.name;
+    // Remove the reveal button
+    const revealBtn = document.getElementById(`reveal-btn-${leadId}`);
+    if (revealBtn) revealBtn.remove();
   } catch (e) {
     showNotification(e.message, 'error');
   }
@@ -653,7 +665,7 @@ async function showDealModal(id) {
     title: id ? 'Edit Deal' : 'New Deal',
     body: `
       <div class="form-group"><label>Lead</label>
-        <select id="f-lead">${leads.map(l => `<option value="${l.id}" ${deal.lead_id == l.id ? 'selected' : ''}>${l.name} (${l.company || l.email})</option>`).join('')}</select>
+        <select id="f-lead">${leads.map(l => `<option value="${l.id}" ${deal.lead_id == l.id ? 'selected' : ''}>${esc(l.name)} (${esc(l.company || l.email)})</option>`).join('')}</select>
       </div>
       <div class="form-group"><label>Stage</label>
         <select id="f-stage">${['prospecting','qualification','proposal','negotiation','closed_won','closed_lost'].map(s => `<option value="${s}" ${deal.stage === s ? 'selected' : ''}>${s.replace('_',' ')}</option>`).join('')}</select>
@@ -879,9 +891,9 @@ async function toggleCampaignLeads(id) {
                 const clicked = ['clicked','replied'].includes(cs) ? 1 : 0;
                 return `
                 <tr>
-                  <td><strong>${l.name}</strong></td>
-                  <td>${l.email}</td>
-                  <td>${l.company || '-'}</td>
+                  <td><strong>${esc(l.name)}</strong></td>
+                  <td>${esc(l.email)}</td>
+                  <td>${esc(l.company || '-')}</td>
                   <td>${l.source === 'ai_generated' ? '<span class="badge badge-new">AI Found</span>' : l.source}</td>
                   <td>
                     <div style="display:flex;align-items:center;gap:6px">
@@ -995,7 +1007,7 @@ async function showOutreachQueue(campaignId) {
 
     const body = Object.values(byLead).map(lead => `
       <div class="content-card" style="margin-bottom:12px">
-        <div class="type" style="margin-bottom:8px">${lead.name} — ${lead.company || lead.email}</div>
+        <div class="type" style="margin-bottom:8px">${esc(lead.name)} — ${esc(lead.company || lead.email)}</div>
         ${lead.steps.map(s => `
           <div class="outreach-step ${s.status}">
             <div class="outreach-step-header">
@@ -1254,10 +1266,10 @@ async function loadWizardLeads() {
             <input type="checkbox" ${wizardState.selectedLeads.includes(l.id) ? 'checked' : ''}
               onchange="wizardToggleLead(${l.id}, this.checked)">
             <div class="wizard-lead-info">
-              <strong>${l.name}</strong>
-              <span class="text-muted">${l.email}</span>
+              <strong>${esc(l.name)}</strong>
+              <span class="text-muted">${esc(l.email)}</span>
             </div>
-            <div class="text-sm text-muted">${l.company || ''}</div>
+            <div class="text-sm text-muted">${esc(l.company || '')}</div>
             <div>
               <span class="badge badge-${l.status}">${l.status}</span>
             </div>
@@ -1460,7 +1472,10 @@ async function wizardSave(action) {
     return;
   }
 
-  showNotification('Saving campaign...');
+  // Disable buttons to prevent double-clicks and show loading state
+  const btns = document.querySelectorAll('.wizard-nav button');
+  btns.forEach(b => { b.disabled = true; b.style.opacity = '0.6'; });
+  showNotification(action === 'send' ? 'Saving & sending campaign...' : 'Saving campaign...');
 
   try {
     let campaign;
@@ -1474,6 +1489,11 @@ async function wizardSave(action) {
       campaign = await api.put(`/campaigns/${wizardState.editId}`, payload);
     } else {
       campaign = await api.post('/campaigns', payload);
+    }
+
+    // Track that campaign was created so we don't re-create on retry
+    if (!wizardState.editId && campaign.id) {
+      wizardState.editId = campaign.id;
     }
 
     // Assign leads if any selected
@@ -1493,6 +1513,9 @@ async function wizardSave(action) {
     loadCampaigns();
   } catch (e) {
     showNotification('Error saving: ' + e.message, 'error');
+    // Re-enable buttons so user can retry
+    const btns2 = document.querySelectorAll('.wizard-nav button');
+    btns2.forEach(b => { b.disabled = false; b.style.opacity = '1'; });
   }
 }
 

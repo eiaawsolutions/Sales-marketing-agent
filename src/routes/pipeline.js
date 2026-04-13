@@ -1,12 +1,20 @@
 import { Router } from 'express';
 import { pipelineService } from '../services/pipeline.js';
 import { runAgent } from '../services/ai-agent.js';
+import { maskLead } from '../services/leads.js';
 
 const router = Router();
 
 router.get('/', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;
-  res.json(pipelineService.getAll(userId, req.query));
+  let deals = pipelineService.getAll(userId, req.query);
+  if (req.user.role !== 'superadmin') {
+    deals = deals.map(d => {
+      const masked = maskLead({ name: d.name, email: d.email, phone: '', company: d.company });
+      return { ...d, name: masked.name, email: masked.email, company: d.company };
+    });
+  }
+  res.json(deals);
 });
 
 router.get('/stats', (req, res) => {
@@ -18,6 +26,11 @@ router.get('/:id', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;
   const deal = pipelineService.getById(userId, req.params.id);
   if (!deal) return res.status(404).json({ error: 'Deal not found' });
+  if (req.user.role !== 'superadmin') {
+    const masked = maskLead({ name: deal.name, email: deal.email, phone: '', company: deal.company });
+    deal.name = masked.name;
+    deal.email = masked.email;
+  }
   res.json(deal);
 });
 

@@ -19,6 +19,7 @@ import agentRouter from './routes/agent.js';
 import settingsRouter from './routes/settings.js';
 import systemLogicRouter from './routes/system-logic.js';
 import voiceRouter from './routes/voice.js';
+import { maskLeads, maskLead } from './services/leads.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -242,9 +243,21 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
     `SELECT a.*, l.name as lead_name FROM activities a LEFT JOIN leads l ON a.lead_id = l.id WHERE 1=1${uf.replace('user_id', 'a.user_id')} ORDER BY a.created_at DESC LIMIT 10`
   ).all(...p);
 
-  const topLeads = db.prepare(`SELECT * FROM leads${uw} ORDER BY score DESC LIMIT 5`).all(...p);
+  let topLeads = db.prepare(`SELECT * FROM leads${uw} ORDER BY score DESC LIMIT 5`).all(...p);
 
   const aiCost = db.prepare(`SELECT COALESCE(SUM(cost_usd),0) as total FROM ai_cost_log${uw}`).get(...p);
+
+  // Apply masking for non-superadmin users
+  if (!isSuperadmin) {
+    topLeads = maskLeads(topLeads);
+    for (const a of recentActivities) {
+      if (a.lead_name) a.lead_name = maskLead({ name: a.lead_name, email: '', phone: '' }).name;
+      // Mask emails/phones embedded in activity descriptions
+      a.description = a.description
+        .replace(/[\w.-]+@[\w.-]+\.\w+/g, (email) => maskLead({ name: '', email, phone: '' }).email)
+        .replace(/(\+?\d[\d\s-]{7,}\d)/g, (phone) => maskLead({ name: '', email: '', phone }).phone);
+    }
+  }
 
   res.json({
     leads: { total: leads.count, new: newLeads.count, qualified: qualifiedLeads.count },
