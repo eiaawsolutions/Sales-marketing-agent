@@ -99,39 +99,28 @@ router.post('/buy-reveals', requireAuth, async (req, res) => {
     const addon = REVEAL_ADDONS[pack];
     const userId = req.user.id;
 
-    // Try Stripe checkout for the add-on
-    let checkoutUrl = null;
-    try {
-      const stripe = getStripe();
-      const baseUrl = req.headers.origin || `https://${req.headers.host}`;
-      const customerId = db.prepare("SELECT value FROM settings WHERE key = ?").get(`stripe_customer_${userId}`)?.value;
+    const stripe = getStripe();
+    const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+    const customerId = db.prepare("SELECT value FROM settings WHERE key = ?").get(`stripe_customer_${userId}`)?.value;
 
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        payment_method_types: ['card'],
-        ...(customerId ? { customer: customerId } : { customer_email: req.user.email }),
-        line_items: [{
-          price_data: {
-            currency: 'myr',
-            product_data: { name: `EIAAW SalesAgent — ${addon.name}` },
-            unit_amount: addon.price_myr * 100,
-          },
-          quantity: 1,
-        }],
-        success_url: `${baseUrl}/api/billing/reveal-success?userId=${userId}&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}/app?page=billing`,
-        metadata: { type: 'reveal_addon', pack, userId: String(userId), credits: String(addon.credits) },
-      });
-      checkoutUrl = session.url;
-    } catch (stripeErr) {
-      // Stripe not configured — grant credits directly (admin-managed billing)
-      const current = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`reveal_addon_${userId}`)?.value || '0');
-      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
-        .run(`reveal_addon_${userId}`, String(current + addon.credits));
-      return res.json({ success: true, credits: current + addon.credits, message: `Added ${addon.credits} reveal credits.` });
-    }
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      ...(customerId ? { customer: customerId } : { customer_email: req.user.email }),
+      line_items: [{
+        price_data: {
+          currency: 'myr',
+          product_data: { name: `EIAAW SalesAgent — ${addon.name}` },
+          unit_amount: addon.price_myr * 100,
+        },
+        quantity: 1,
+      }],
+      success_url: `${baseUrl}/api/billing/reveal-success?userId=${userId}&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/app?page=billing`,
+      metadata: { type: 'reveal_addon', pack, userId: String(userId), credits: String(addon.credits) },
+    });
 
-    res.json({ url: checkoutUrl });
+    res.json({ url: session.url });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
