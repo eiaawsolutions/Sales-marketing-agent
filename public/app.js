@@ -2430,6 +2430,7 @@ async function loadBilling() {
     const plans = data.allPlans;
     const planOrder = ['starter', 'pro', 'business'];
     const revealAddons = data.revealAddons || {};
+    const stripeOk = data.stripeConfigured;
 
     function usageBar(used, max, label, extra) {
       const pct = max >= 99999 ? 0 : Math.min((used / max) * 100, 100);
@@ -2484,11 +2485,17 @@ async function loadBilling() {
               <div style="font-size:22px;font-weight:800;color:var(--text)">${addon.credits}</div>
               <div class="text-muted text-sm" style="margin-bottom:8px">extra reveals</div>
               <div style="font-size:18px;font-weight:700;color:var(--primary);margin-bottom:12px">RM ${addon.price_myr}</div>
-              <button class="btn btn-primary btn-sm" style="width:100%" onclick="buyReveals('${key}')">Buy Now</button>
+              <button class="btn btn-primary btn-sm" style="width:100%${stripeOk ? '' : ';opacity:0.5'}" onclick="buyReveals('${key}')" ${stripeOk ? '' : 'disabled'}>Buy Now</button>
             </div>
           `).join('')}
         </div>
       </div>
+
+      ${!stripeOk && currentUser?.role === 'superadmin' ? `
+        <div class="card" style="margin-bottom:16px;border:1px solid var(--warning);background:rgba(234,179,8,0.08)">
+          <p style="color:var(--warning);margin:0"><strong>Stripe not configured.</strong> Add your Stripe secret key in <a style="color:var(--primary);cursor:pointer" onclick="navigate('settings')">Settings</a> to enable payments for add-ons and plan upgrades.</p>
+        </div>
+      ` : ''}
 
       <!-- Plan Comparison -->
       <div id="plan-cards">
@@ -2505,7 +2512,7 @@ async function loadBilling() {
               <div class="text-muted text-sm" style="margin-bottom:16px">/month</div>
               <div class="text-sm" style="text-align:left;margin-bottom:16px;line-height:1.8">${p.features.split(', ').map(f => `<div>&#10003; ${esc(f)}</div>`).join('')}</div>
               ${isCurrent ? '<button class="btn btn-outline" disabled style="width:100%">Current Plan</button>' :
-                isUpgrade ? `<button class="btn btn-primary" style="width:100%" onclick="upgradePlan('${key}')">Upgrade to ${esc(p.name)}</button>` :
+                isUpgrade ? `<button class="btn btn-primary" style="width:100%${stripeOk ? '' : ';opacity:0.5'}" onclick="upgradePlan('${key}')" ${stripeOk ? '' : 'disabled'}>Upgrade to ${esc(p.name)}</button>` :
                 ''}
             </div>`;
           }).join('')}
@@ -2518,29 +2525,28 @@ async function loadBilling() {
 }
 
 async function buyReveals(pack) {
-  if (!confirm('Purchase extra contact reveal credits?')) return;
+  if (!confirm('Purchase extra contact reveal credits? You will be redirected to complete payment.')) return;
   try {
-    showNotification('Processing...');
+    showNotification('Redirecting to checkout...');
     const result = await api.post('/billing/buy-reveals', { pack });
     if (result.url) {
       window.location.href = result.url;
-    } else if (result.success) {
-      showNotification(result.message, 'success');
-      loadBilling();
     }
   } catch (e) {
-    showNotification(e.message, 'error');
+    const msg = e.message.includes('Stripe') ? 'Payment system is being set up. Please try again later or contact support.' : e.message;
+    showNotification(msg, 'error');
   }
 }
 
 async function upgradePlan(plan) {
-  if (!confirm(`Upgrade to the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan? You'll be redirected to complete payment.`)) return;
+  if (!confirm(`Upgrade to the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan? You will be redirected to complete payment.`)) return;
   try {
     showNotification('Redirecting to checkout...');
     const result = await api.post('/billing/upgrade', { plan });
     if (result.url) window.location.href = result.url;
   } catch (e) {
-    showNotification(e.message, 'error');
+    const msg = e.message.includes('Stripe') ? 'Payment system is being set up. Please try again later or contact support.' : e.message;
+    showNotification(msg, 'error');
   }
 }
 

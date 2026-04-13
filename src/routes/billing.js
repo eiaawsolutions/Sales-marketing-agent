@@ -87,6 +87,7 @@ router.get('/usage', requireAuth, (req, res) => {
     },
     allPlans: PLANS,
     revealAddons: REVEAL_ADDONS,
+    stripeConfigured: !!db.prepare("SELECT value FROM settings WHERE key = 'stripe_secret_key'").get()?.value,
   });
 });
 
