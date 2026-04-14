@@ -3828,12 +3828,12 @@ async function loadSettings() {
           </div>
         </div>
         <div class="form-group">
-          <label>Voice AI API Key</label>
+          <label>Voice AI API Key ${settings._voice_key_set ? '<span style="color:var(--success)">&#10003; set</span>' : ''}</label>
           <div class="flex gap-2">
-            <input id="s-voice-key" type="password" value="${settings.voice_ai_api_key || ''}" placeholder="Your Retell/Vapi API key">
+            <input id="s-voice-key" type="password" value="" placeholder="${settings._voice_key_set ? 'Key is saved — enter new key to change' : 'Paste your Retell API key here'}">
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('s-voice-key').type = document.getElementById('s-voice-key').type === 'password' ? 'text' : 'password'">Show</button>
           </div>
-          <small class="text-muted">Get your API key from <a href="https://dashboard.retellai.com" target="_blank" style="color:var(--primary)">Retell Dashboard</a> &gt; API Keys</small>
+          <small class="text-muted">Get your API key from <a href="https://dashboard.retellai.com" target="_blank" style="color:var(--primary)">Retell Dashboard</a> &gt; API Keys${settings._voice_key_set ? '. Leave empty to keep current key.' : ''}</small>
         </div>
         <div style="margin-top:8px;padding:14px;background:rgba(34,197,94,0.06);border-radius:var(--radius);border:1px solid rgba(34,197,94,0.15)">
           <div style="font-weight:700;font-size:13px;color:#22c55e;margin-bottom:4px">&#9889; Web Calls (No Phone Number Needed)</div>
@@ -3954,12 +3954,14 @@ async function setupVoiceAgent() {
 
   try {
     // Save settings first WITHOUT re-rendering the page
+    const voiceKey = document.getElementById('s-voice-key')?.value || '';
     const data = {
       voice_ai_provider: gv('s-voice-provider') || 'retell',
-      voice_ai_api_key: document.getElementById('s-voice-key')?.value || '',
       voice_ai_agent_id: gv('s-voice-agent') || '',
       voice_phone_number: gv('s-voice-phone') || '',
     };
+    // Only send API key if user entered a new one (not empty placeholder)
+    if (voiceKey && !voiceKey.includes('•')) data.voice_ai_api_key = voiceKey;
     await api.put('/settings', data);
 
     // Now create the agent

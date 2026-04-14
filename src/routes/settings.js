@@ -27,6 +27,8 @@ router.get('/', (req, res) => {
       settings[row.key] = rawValue.length > 12
         ? rawValue.substring(0, 8) + '...' + rawValue.substring(rawValue.length - 4)
         : rawValue ? '••••••••' : '';
+    } else if (row.key === 'voice_ai_api_key' && rawValue) {
+      settings[row.key] = rawValue ? '••••••••' : '';
     } else {
       settings[row.key] = row.value; // Non-sensitive: return as-is
     }
@@ -34,6 +36,11 @@ router.get('/', (req, res) => {
   const apiKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'api_key'").get();
   const decryptedKey = apiKeyRow?.value ? decrypt(apiKeyRow.value) : '';
   settings._api_key_set = !!(decryptedKey && decryptedKey.length > 5);
+
+  const voiceKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'voice_ai_api_key'").get();
+  const decryptedVoiceKey = voiceKeyRow?.value ? decrypt(voiceKeyRow.value) : '';
+  settings._voice_key_set = !!(decryptedVoiceKey && decryptedVoiceKey.length > 5 && !decryptedVoiceKey.startsWith('enc:'));
+
   res.json(settings);
 });
 
@@ -48,7 +55,7 @@ router.put('/', (req, res) => {
   for (const [key, value] of Object.entries(req.body)) {
     if (!allowedKeys.includes(key)) continue;
     // Don't overwrite with masked values
-    if (['api_key', 'smtp_pass', 'admin_password', 'stripe_secret_key'].includes(key) && (value.includes('•') || value.includes('...'))) continue;
+    if (['api_key', 'smtp_pass', 'admin_password', 'stripe_secret_key', 'voice_ai_api_key'].includes(key) && (value.includes('•') || value.includes('...'))) continue;
     // Encrypt sensitive values before storing
     const storeValue = isSensitive(key) ? encrypt(value) : value;
     upsert.run(key, storeValue, storeValue);
