@@ -635,41 +635,44 @@ let callSeconds = 0;
 let _lastCallLink = {};
 
 async function shareCallLink(leadId) {
-  showNotification('Sending call link...');
+  // Show immediate feedback
+  showNotification('Generating call link...');
+
   try {
     const result = await api.post('/voice/generate-link', { leadId, sendEmail: true });
     _lastCallLink = { url: result.callUrl, message: result.shareMessage, phone: result.leadPhone };
 
-    // Immediately open WhatsApp with pre-filled message (one tap to send)
-    // If lead has phone, send directly to their number
+    // Show modal with all share options (window.open from async gets blocked by popup blockers)
+    const emailNote = result.emailSent
+      ? `<div style="background:rgba(34,197,94,0.1);border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:#22c55e;text-align:center">&#10003; Email auto-sent to ${esc(result.leadEmail || 'lead')}</div>`
+      : '';
+
     const phone = (result.leadPhone || '').replace(/[\s\-()]/g, '').replace(/^\+/, '');
     const waUrl = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(result.shareMessage)}`
       : `https://wa.me/?text=${encodeURIComponent(result.shareMessage)}`;
-    window.open(waUrl, '_blank');
 
-    // Show quick confirmation toast with extra share options
-    const emailNote = result.emailSent ? `Email sent to ${result.leadEmail}` : 'No email (SMTP not configured)';
-    showNotification(`Link sent! ${emailNote}. WhatsApp opened — just tap Send.`, 'success');
-
-    // Show a small non-blocking banner with copy/LinkedIn fallback
-    const banner = document.createElement('div');
-    banner.id = 'call-link-banner';
-    banner.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.3);display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:90vw;animation:slideUp 0.3s ease';
-    banner.innerHTML = `
-      <span style="font-size:12px;color:var(--text-muted)">Link for ${esc(result.leadName || 'lead')}:</span>
-      <button class="btn btn-sm btn-primary" onclick="callLinkCopy()" style="font-size:11px;padding:4px 10px">Copy Link</button>
-      <button class="btn btn-sm" style="background:#0077B5;color:#fff;border:none;font-size:11px;padding:4px 10px" onclick="callLinkLinkedIn()">LinkedIn</button>
-      <button class="btn btn-sm btn-outline" onclick="callLinkCopyMsg()" style="font-size:11px;padding:4px 10px">Copy Msg</button>
-      <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0 4px">&times;</button>
-    `;
-    document.getElementById('call-link-banner')?.remove();
-    document.body.appendChild(banner);
-    // Auto-remove after 15 seconds
-    setTimeout(() => banner.remove(), 15000);
-
+    showResultModal('Call Link Ready', `
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:28px;margin-bottom:8px">&#128279;</div>
+        <p class="text-muted text-sm">Send this link to <strong>${esc(result.leadName || 'the lead')}</strong>. When they click it, they'll talk to your AI sales agent.</p>
+      </div>
+      ${emailNote}
+      <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:16px;word-break:break-all;text-align:center">
+        <code style="font-size:12px;color:var(--primary)">${esc(result.callUrl)}</code>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:280px;margin:0 auto">
+        <a href="${waUrl}" target="_blank" rel="noopener" class="btn btn-sm" style="background:#25D366;color:#fff;border:none;text-align:center;text-decoration:none;padding:12px;font-size:14px;font-weight:700;border-radius:10px;display:block">Send via WhatsApp</a>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="callLinkCopy()" style="flex:1">Copy Link</button>
+          <a href="https://www.linkedin.com/messaging/compose/?body=${encodeURIComponent(result.shareMessage)}" target="_blank" rel="noopener" class="btn btn-sm" style="background:#0077B5;color:#fff;border:none;flex:1;text-align:center;text-decoration:none">LinkedIn</a>
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="callLinkCopyMsg()" style="width:100%">Copy Full Message</button>
+      </div>
+      <div class="text-muted text-sm" style="text-align:center;margin-top:12px">Link expires in 24 hours</div>
+    `);
   } catch (e) {
-    showNotification('Error: ' + e.message, 'error');
+    showNotification('Call link error: ' + e.message, 'error');
   }
 }
 
