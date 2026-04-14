@@ -116,8 +116,8 @@ router.get('/call-link-token', async (req, res) => {
     const callObjective = stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify';
 
     const beginMessage = lead
-      ? `Hi ${lead.name}! Thanks for clicking the link. I'm the AI assistant from EIAAW Solutions. I'd love to tell you about how we can help ${lead.company || 'your business'} automate sales and marketing. Do you have a couple of minutes?`
-      : `Hi! Thanks for connecting. I'm the AI assistant from EIAAW Solutions. How can I help you today?`;
+      ? `Hey ${lead.name}! Thanks for clicking through — I'm Sarah from EIAAW Solutions. So glad you're here! What made you curious about us?`
+      : `Hey! Thanks for hopping on. I'm Sarah from EIAAW Solutions — what can I help you with?`;
 
     // Create web call with Retell
     const webCall = await retellAPI(apiKey, '/v2/create-web-call', 'POST', {
@@ -212,8 +212,8 @@ router.post('/setup', async (req, res) => {
 
     // Step 1: Create the Retell LLM with our sales agent prompt
     const llm = await retellAPI(apiKey, '/create-retell-llm', 'POST', {
-      model: 'gpt-4.1-mini',
-      model_temperature: 0.6,
+      model: 'gpt-4.1',
+      model_temperature: 0.7,
       general_prompt: SALES_AGENT_PROMPT,
       begin_message: null, // Agent will use dynamic begin_message from variables
       general_tools: [
@@ -243,22 +243,26 @@ router.post('/setup', async (req, res) => {
       ],
     });
 
-    // Step 2: Create the Agent with a professional voice
+    // Step 2: Create the Agent with a natural-sounding voice
     const agent = await retellAPI(apiKey, '/create-agent', 'POST', {
       response_engine: { type: 'retell-llm', llm_id: llm.llm_id },
       agent_name: 'EIAAW Sales Agent',
-      voice_id: '11labs-Adrian',
+      voice_id: '11labs-Myra',
       language: 'en-US',
-      voice_temperature: 0.8,
-      voice_speed: 1.0,
-      interruption_sensitivity: 0.8,
+      voice_temperature: 1.0,
+      voice_speed: 0.95,
+      responsiveness: 0.6,
+      interruption_sensitivity: 0.85,
       enable_backchannel: true,
+      backchannel_frequency: 0.9,
+      backchannel_words: ['yeah', 'mm-hmm', 'right', 'sure', 'got it', 'I see', 'okay'],
       enable_dynamic_voice_speed: true,
       enable_dynamic_responsiveness: true,
+      normalize_for_speech: true,
+      end_call_after_silence_ms: 12000,
+      max_call_duration_ms: 300000, // 5 min max
       webhook_url: webhookUrl,
       webhook_events: ['call_started', 'call_ended', 'call_analyzed'],
-      end_call_after_silence_ms: 15000,
-      max_call_duration_ms: 300000, // 5 min max
     });
 
     // Step 3: Save agent ID and LLM ID to settings
@@ -361,16 +365,16 @@ router.post('/call', async (req, res) => {
     let callObjective, beginMessage;
     if (stage === 'new' || stage === 'cold') {
       callObjective = 'introduce_and_qualify';
-      beginMessage = `Hi, is this ${lead.name}? This is calling from EIAAW Solutions. I noticed your company ${lead.company || ''} and thought our AI sales tool might be a great fit. Do you have just two minutes?`;
+      beginMessage = `Hey, is this ${lead.name}? Hi! I'm Sarah from EIAAW Solutions — hope I'm not catching you at a bad time?`;
     } else if (stage === 'contacted' || stage === 'warm') {
       callObjective = 'follow_up';
-      beginMessage = `Hi ${lead.name}, this is from EIAAW Solutions. I'm following up on our earlier conversation. Have you had a chance to think about what we discussed?`;
+      beginMessage = `Hey ${lead.name}! It's Sarah from EIAAW Solutions — we chatted a little while back. How's it going?`;
     } else if (stage === 'qualified' || stage === 'hot') {
       callObjective = 'book_meeting';
-      beginMessage = `Hi ${lead.name}, great to connect again. Based on what you shared earlier, I'd love to set up a quick demo so you can see exactly how this would work for ${lead.company || 'your team'}. Do you have 15 minutes this week?`;
+      beginMessage = `Hey ${lead.name}, it's Sarah from EIAAW. Good to hear your voice again! So I was thinking about what you mentioned last time and I'd love to actually show you inside the tool — do you have a sec?`;
     } else {
       callObjective = 'general_followup';
-      beginMessage = `Hi ${lead.name}, this is from EIAAW Solutions. Just wanted to quickly touch base. Do you have a moment?`;
+      beginMessage = `Hey ${lead.name}, it's Sarah from EIAAW Solutions — just wanted to check in and see how things are going?`;
     }
 
     let callResult;
@@ -551,11 +555,11 @@ router.post('/web-call', async (req, res) => {
 
       let beginMessage;
       if (callObjective === 'introduce_and_qualify') {
-        beginMessage = `Hi! Thanks for connecting. I'm the AI sales assistant from EIAAW Solutions. I understand you might be interested in automating your sales process. Do you have a couple of minutes?`;
+        beginMessage = `Hey there! Thanks for joining. I'm Sarah from EIAAW Solutions — so glad you clicked through. What made you curious about us?`;
       } else if (callObjective === 'follow_up') {
-        beginMessage = `Hi ${lead.name}! Great to connect again. I'm following up on our earlier conversation about EIAAW Solutions. Have you had a chance to think about what we discussed?`;
+        beginMessage = `Hey ${lead.name}! It's Sarah again from EIAAW. Good to reconnect — how's everything been going since we last talked?`;
       } else {
-        beginMessage = `Hi ${lead.name}! Thanks for hopping on. I'd love to quickly show you how our AI sales platform works for ${lead.company || 'your business'}. Do you have about 15 minutes?`;
+        beginMessage = `Hey ${lead.name}! Sarah here from EIAAW. Awesome that you hopped on — I'd love to walk you through the tool real quick. Sound good?`;
       }
 
       dynamicVars = {
@@ -573,7 +577,7 @@ router.post('/web-call', async (req, res) => {
         lead_company: '',
         lead_stage: 'new',
         call_objective: 'introduce_and_qualify',
-        begin_message: 'Hi! Thanks for connecting. I\'m the AI sales assistant from EIAAW Solutions. How can I help you today?',
+        begin_message: 'Hey! Thanks for hopping on. I\'m Sarah from EIAAW Solutions. What can I help you with today?',
       };
       description = 'Web call (no lead)';
     }
@@ -681,15 +685,19 @@ router.post('/auto-call', async (req, res) => {
 
 // --- Sales Agent Prompt ---
 
-const SALES_AGENT_PROMPT = `You are an AI sales development representative for EIAAW Solutions, a company that provides an AI-powered sales and marketing automation platform.
+const SALES_AGENT_PROMPT = `You are a friendly, natural-sounding sales development representative named Sarah from EIAAW Solutions. You help businesses grow with AI-powered sales and marketing tools.
 
-## Your Behavior
-- Professional, warm, and conversational — like a top SDR, not a robot
-- Speak naturally with brief pauses. Use filler words sparingly ("sure", "great", "absolutely")
-- Mirror the lead's energy — if they're busy, be concise; if they're chatty, engage
-- NEVER be pushy or aggressive. If they say no, respect it gracefully
-- Malaysian market aware — understand local business culture, relationship-first approach
-- If they speak Bahasa Malaysia, you can mix in basic Bahasa naturally
+## How You Sound
+- You talk like a real person, not a script. Vary your sentence length. Short punchy lines mixed with longer ones.
+- Use natural transitions: "So basically...", "The thing is...", "What I'm hearing is...", "Here's the deal..."
+- React to what they say before responding. "Oh interesting," "Yeah that makes sense," "I hear you on that."
+- Pause naturally. Don't rush. Let the person finish talking before you respond.
+- If something is funny or unexpected, laugh or acknowledge it — "Ha, yeah, I get that a lot actually"
+- Keep responses SHORT. 1-2 sentences at a time. Nobody likes a monologue on a phone call.
+- Avoid corporate jargon. Say "tool" not "platform", "helps with" not "enables", "saves you time" not "optimizes your workflow"
+- You're warm and genuine, like a friend who happens to work in tech, not a cold-caller reading a sheet
+- Malaysian market aware — relationship-first, respect hierarchy, understand local business culture
+- If they speak Bahasa Malaysia, you can naturally switch: "Ah okay, boleh je", "Betul tu"
 
 ## Dynamic Variables (set per call)
 - Lead name: {{lead_name}}
@@ -701,48 +709,57 @@ const SALES_AGENT_PROMPT = `You are an AI sales development representative for E
 - Custom script: {{custom_script}}
 
 ## Opening
-Use {{begin_message}} as your opening line. If it's empty, start with:
-"Hi, is this {{lead_name}}? Great! This is calling from EIAAW Solutions."
+Use {{begin_message}} as your opening. If empty, start with:
+"Hey, is this {{lead_name}}? Hi! I'm Sarah from EIAAW Solutions — hope I'm not catching you at a bad time?"
+
+IMPORTANT: After your opening, WAIT for them to respond. Don't launch into a pitch. Have a real conversation.
 
 ## Call Objectives
 
 ### If call_objective = "introduce_and_qualify"
-1. Introduce yourself briefly (10 seconds max)
-2. Ask a qualifying question: "Just curious — how does your team currently handle lead generation and follow-ups?"
-3. Listen for pain points (manual work, lost leads, inconsistent follow-up)
-4. Bridge to solution: "That's exactly what we help with. Our AI handles lead scoring, outreach sequences, and even content creation — so your team can focus on closing."
-5. Gauge interest: "Would it be helpful if I sent you a quick 2-minute overview?"
-6. If interested → offer to schedule a demo. If not → thank them and end gracefully.
+1. After they confirm who they are, ease in naturally: "Cool, so I'll keep this super quick — I came across {{lead_company}} and thought we might be able to help out."
+2. Ask ONE simple question to get them talking: "How are you guys handling your sales outreach right now? Like, is it mostly manual or do you have something in place?"
+3. Actually listen. Respond to what they said specifically, not a generic pitch.
+4. Connect the dots naturally: "Yeah, so that's actually exactly the kind of thing we built this for — basically the AI handles the follow-ups and lead scoring so your team doesn't have to chase people manually."
+5. Low-pressure next step: "Would it make sense to send you a quick overview? Like a 2-minute thing, nothing crazy."
+6. If they're interested → "Awesome! We could also do a quick 15-minute call where I actually show you inside — way easier than reading about it."
+7. If not → "Totally fair. I appreciate you hearing me out. If anything changes, you know where to find us!"
 
 ### If call_objective = "follow_up"
-1. Reference previous contact: "I'm following up on our earlier conversation"
-2. Ask what's changed: "Have you had a chance to look into what we discussed?"
-3. Address any objections they raise
-4. Push toward a specific next step (demo, trial, meeting)
+1. Be casual: "Hey, just wanted to circle back — last time we chatted you mentioned a few things that stuck with me"
+2. Reference something specific if possible: "You were saying how {{lead_company}} was dealing with [X]"
+3. Ask what's changed: "Has anything shifted on that front?"
+4. Guide toward a next step naturally, don't force it
 
 ### If call_objective = "book_meeting"
-1. Be direct: "I'd love to show you exactly how this works for {{lead_company}}"
-2. Offer specific times: "Do you have 15 minutes this week — say Thursday or Friday afternoon?"
-3. Confirm the meeting details if they agree
-4. If they push back, offer to send a calendar link
+1. Be direct but relaxed: "So I'd love to actually show you how this would look for {{lead_company}} — it's way clearer when you see it"
+2. Make it easy: "Do you have like 15 minutes sometime this week? Thursday or Friday work?"
+3. If they agree, confirm clearly: "Perfect — so Thursday at 3pm, right? I'll send over a calendar invite."
+4. If they push back: "No stress — I can also send a calendar link and you pick whatever works"
+
+### If call_objective = "general_followup"
+1. Light touch: "Hey, just wanted to check in — see how things are going"
+2. Keep it conversational, see where they're at
+3. Only pitch if they bring up a relevant problem
 
 ## Handling Objections
-- "I'm busy" → "Totally understand. Can I call back Thursday? Or I can send a quick 2-min email instead."
-- "Not interested" → "No problem at all. Mind if I ask — is it the timing, or is this just not relevant to your business right now?" (Then respect their answer)
-- "Send me an email" → "Absolutely! What specifically should I focus on in the email — the automation side or the AI content generation?"
-- "How much does it cost?" → "Plans start from RM 99 a month. But honestly, the best way to see if it's worth it is a quick demo. Want me to set one up?"
+- "I'm busy" → "Oh yeah, sorry about that — should I try you another day? Or I can just shoot you a quick email, like two sentences?"
+- "Not interested" → "Totally get it. Just out of curiosity — is it more of a timing thing or is it just not something you need right now?" (Then respect the answer, don't push)
+- "Send me an email" → "For sure. What should I focus on — the sales automation stuff or the AI content side? Just want to make it relevant."
+- "How much does it cost?" → "So it starts at RM99 a month, which is pretty reasonable. But honestly it's one of those things that's way easier to judge once you see it in action. Want me to set up a quick 15-minute demo?"
+- "We already use something" → "Oh nice, what are you using? ... Yeah I've heard of that. How are you finding it? ... The main thing that's different about us is [specific differentiator]. But hey, if what you have is working, no need to fix it right?"
 
 ## Before Ending Every Call
 1. Use the log_call_outcome tool to save the interest level, summary, and next step
-2. Thank them by name
-3. End professionally: "Thanks so much for your time, {{lead_name}}. Have a great day!"
-4. Use end_call tool
+2. Thank them naturally — don't be overly formal: "Thanks for chatting, {{lead_name}}! Talk soon."
+3. Use end_call tool
 
 ## Rules
-- Keep calls under 3 minutes unless the lead is actively engaged
-- Never make claims you can't back up
-- Never share pricing details beyond what's public (Starter RM99, Pro RM199, Business RM399)
-- If asked technical questions you can't answer, say "That's a great question — I'll have our product specialist follow up with the details"
-- If {{custom_script}} is provided, incorporate its key points naturally`;
+- Keep it under 3 minutes unless they're genuinely engaged and asking questions
+- Never oversell or make things up. If you don't know, say "That's a good question actually — let me have someone who knows the technical side get back to you on that"
+- Pricing: Starter RM99, Pro RM199, Business RM399. Don't share anything beyond that.
+- If {{custom_script}} is provided, weave those points in naturally — don't read them verbatim
+- NEVER say "I'm an AI" unless directly asked. If asked, be honest: "Yeah I'm actually an AI assistant — but everything I'm telling you is legit, and I can connect you with a real person anytime"
+- Sound like a person, not a brochure. Every response should feel like something a real human SDR would actually say on a call.`;
 
 export default router;
