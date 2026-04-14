@@ -131,8 +131,8 @@ router.post('/:id/send-invite', async (req, res) => {
 
     const icsContent = generateICS(appt);
     const dt = new Date(appt.scheduled_at);
-    const dateStr = dt.toLocaleDateString('en-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStr = dt.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = dt.toLocaleDateString('en-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kuala_Lumpur' });
+    const timeStr = dt.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' });
 
     await transporter.sendMail({
       from: fromEmail || smtpUser,

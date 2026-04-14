@@ -179,8 +179,8 @@ async function handleScheduleMeeting(args, callId, leadId, userId, res) {
     );
   }
 
-  const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', month: 'long', day: 'numeric' });
-  const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
+  const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Kuala_Lumpur' });
+  const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' });
   res.json({ result: `Perfect, I've booked that for ${dateStr} at ${timeStr}. ${lead?.email ? "I'm sending a calendar invite to their email now." : 'All set!'}` });
 }
 
@@ -244,7 +244,7 @@ async function sendCalendarInvite(apptId, lead, scheduled, title, duration) {
   ].join('\r\n');
 
   const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
+  const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' });
 
   const nodemailer = (await import('nodemailer')).default;
   const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value;
@@ -355,51 +355,72 @@ async function sendDemoLinkEmail(lead, token, baseUrl) {
 }
 
 // --- Date parser for meeting times from voice ---
+// All times are interpreted as Malaysian time (UTC+8) since leads and users are in Malaysia.
+// We store as ISO string with the correct UTC offset applied.
+const MYT_OFFSET_MS = 8 * 60 * 60 * 1000; // UTC+8
+
+function nowInMYT() {
+  const utc = new Date();
+  return new Date(utc.getTime() + MYT_OFFSET_MS);
+}
+
 function parseMeetingTime(text) {
   if (!text) return null;
-  // Try direct ISO parse first
+
+  // Try direct ISO parse first (already has timezone info)
   const direct = new Date(text);
   if (!isNaN(direct.getTime()) && direct > new Date()) return direct;
 
-  const now = new Date();
+  // Work in Malaysian time
+  const myt = nowInMYT();
   const lower = text.toLowerCase();
 
   // "Thursday at 3pm", "Friday 2:30pm", etc.
   const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const dayMatch = dayNames.findIndex(d => lower.includes(d));
 
-  let targetDate = null;
+  // Start with today in MYT
+  let targetYear = myt.getUTCFullYear();
+  let targetMonth = myt.getUTCMonth();
+  let targetDay = myt.getUTCDate();
+  let found = false;
+
   if (lower.includes('tomorrow')) {
-    targetDate = new Date(now); targetDate.setDate(now.getDate() + 1);
+    targetDay += 1;
+    found = true;
   } else if (lower.includes('today')) {
-    targetDate = new Date(now);
+    found = true;
   } else if (dayMatch >= 0) {
-    targetDate = new Date(now);
-    let daysAhead = dayMatch - now.getDay();
+    let daysAhead = dayMatch - myt.getUTCDay();
     if (daysAhead <= 0) daysAhead += 7;
-    targetDate.setDate(now.getDate() + daysAhead);
+    targetDay += daysAhead;
+    found = true;
   } else if (lower.includes('next week')) {
-    targetDate = new Date(now);
-    targetDate.setDate(now.getDate() + (8 - now.getDay())); // Next Monday
+    let daysAhead = 8 - myt.getUTCDay(); // Next Monday
+    targetDay += daysAhead;
+    found = true;
   }
 
-  if (!targetDate) return null;
+  if (!found) return null;
 
-  // Extract time: "3pm", "2:30 pm", "15:00", "10am"
+  // Extract time: "4pm", "2:30 pm", "15:00", "10am"
+  let hour = 10, min = 0; // Default 10am MYT
   const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
   if (timeMatch) {
-    let hour = parseInt(timeMatch[1]);
-    const min = parseInt(timeMatch[2] || '0');
+    hour = parseInt(timeMatch[1]);
+    min = parseInt(timeMatch[2] || '0');
     const ampm = timeMatch[3];
     if (ampm === 'pm' && hour < 12) hour += 12;
     if (ampm === 'am' && hour === 12) hour = 0;
     if (!ampm && hour < 8) hour += 12; // Assume PM for business hours
-    targetDate.setHours(hour, min, 0, 0);
-  } else {
-    targetDate.setHours(10, 0, 0, 0); // Default 10am
   }
 
-  return targetDate > now ? targetDate : null;
+  // Build the date in MYT then convert to UTC for storage
+  // We construct the MYT time, then subtract 8 hours to get UTC
+  const mytDate = new Date(Date.UTC(targetYear, targetMonth, targetDay, hour, min, 0, 0));
+  const utcDate = new Date(mytDate.getTime() - MYT_OFFSET_MS);
+
+  return utcDate > new Date() ? utcDate : null;
 }
 
 // GET /api/voice/call-link-token — public endpoint: exchange a call link token for a Retell access token
