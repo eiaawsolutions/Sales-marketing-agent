@@ -336,12 +336,14 @@ function renderSidebar() {
         <h1>EIAAW SalesAgent</h1>
         <small>AI-Human Sales Partnerships</small>
       </div>
+      <div class="sidebar-nav-items" style="flex:1;overflow-y:auto">
       ${items.map(i => `
         <div class="nav-item ${currentPage === i.id ? 'active' : ''}" onclick="closeMobileMenu(); navigate('${i.id}')">
           <span>${i.icon}</span> ${i.label}
         </div>
       `).join('')}
-      <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface)">
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0">
         <div class="text-sm" style="font-weight:600">${esc(currentUser?.displayName || currentUser?.username || '')}</div>
         <div class="text-muted text-sm" ${currentUser?.role !== 'superadmin' ? `style="cursor:pointer;text-decoration:underline" onclick="navigate('billing')"` : ''}>${currentUser?.role === 'superadmin' ? 'Super Admin' : `${(currentUser?.plan||'starter').toUpperCase()} Plan`}</div>
         <button class="btn btn-sm btn-outline" style="margin-top:8px;width:100%" onclick="doLogout()">Sign Out</button>
@@ -498,7 +500,7 @@ async function loadLeads() {
                   <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id})">AI Score</button>
                   <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id})">Qualify</button>
                   <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id})">Outreach</button>
-                  <button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="aiVoiceCall(${l.id})">&#9742; Call</button>
+                  <button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="shareCallLink(${l.id})">&#128279; Call Link</button>
                   ${currentUser?.role === 'superadmin' ? `<button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>
                   <button class="btn btn-sm btn-danger" onclick="deleteLead(${l.id})">X</button>` : ''}
                 </div>
@@ -628,6 +630,34 @@ async function aiQualifyLead(id) {
 let activeCall = null;
 let callTimer = null;
 let callSeconds = 0;
+
+async function shareCallLink(leadId) {
+  showNotification('Generating call link...');
+  try {
+    const result = await api.post('/voice/generate-link', { leadId });
+    const url = result.callUrl;
+    const msg = result.shareMessage;
+
+    showResultModal('Call Link Generated', `
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:28px;margin-bottom:8px">&#128279;</div>
+        <p class="text-muted text-sm">Send this link to <strong>${result.leadName || 'the lead'}</strong>. When they click it, they'll talk to your AI sales agent directly in their browser.</p>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:16px;word-break:break-all">
+        <code style="font-size:13px;color:var(--primary)">${url}</code>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+        <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${url}');showNotification('Link copied!','success')">Copy Link</button>
+        <button class="btn btn-sm" style="background:#25D366;color:#fff;border:none" onclick="window.open('https://wa.me/?text=${encodeURIComponent(msg)}','_blank')">WhatsApp</button>
+        <button class="btn btn-sm" style="background:#0077B5;color:#fff;border:none" onclick="window.open('https://www.linkedin.com/messaging/compose/?body=${encodeURIComponent(msg)}','_blank')">LinkedIn</button>
+        <button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(\`${msg.replace(/`/g, "'")}\`);showNotification('Message copied!','success')">Copy Message</button>
+      </div>
+      <div class="text-muted text-sm" style="text-align:center;margin-top:12px">Link expires in 24 hours</div>
+    `);
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+  }
+}
 
 async function aiVoiceCall(leadId) {
   if (activeCall) {

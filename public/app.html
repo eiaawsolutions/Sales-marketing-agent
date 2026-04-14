@@ -46,6 +46,8 @@
       position: fixed;
       height: 100vh;
       overflow-y: auto;
+      display: flex;
+      flex-direction: column;
     }
 
     .sidebar-logo {
@@ -960,8 +962,12 @@
     .sidebar-overlay.open { display: block; }
     .sidebar.mobile-open {
       display: flex !important;
+      flex-direction: column;
       position: fixed; top: 0; left: 0; bottom: 0; z-index: 1003;
       width: 260px;
+      height: 100vh; height: 100dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       animation: slideRight 0.2s ease;
     }
     @keyframes slideRight { from { transform: translateX(-260px); } to { transform: translateX(0); } }
@@ -985,7 +991,7 @@
     @media (max-width: 768px) {
       .mobile-header { display: flex; }
       .mobile-bottom-nav { display: flex; }
-      .sidebar { display: none; }
+      .sidebar { display: none !important; }
       .main { margin-left: 0; margin-top: 52px; margin-bottom: 56px; padding: 12px; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
       .grid-2 { grid-template-columns: 1fr; }
@@ -1015,6 +1021,6 @@
     import { RetellWebClient } from 'https://esm.sh/retell-client-js-sdk@2.0.7';
     window.RetellWebClient = RetellWebClient;
   </script>
-  <script src="/app.js?v=20260414k"></script>
+  <script src="/app.js?v=20260414m"></script>
 </body>
 </html>
