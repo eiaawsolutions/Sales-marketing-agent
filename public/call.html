@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EIAAW Solutions — Voice Call</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0b1929;
+      color: #e8f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .call-container {
+      width: 100%;
+      max-width: 420px;
+      padding: 24px;
+      text-align: center;
+    }
+    .brand {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #2ec4b6;
+      margin-bottom: 32px;
+    }
+    .avatar {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #2ec4b6, #0e8b7d);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 32px;
+      box-shadow: 0 0 30px rgba(46,196,182,0.3);
+    }
+    .avatar.active {
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 30px rgba(46,196,182,0.3); }
+      50% { box-shadow: 0 0 50px rgba(46,196,182,0.5); }
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #7fb5c9;
+      font-size: 14px;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+    .status {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .status.waiting { color: #f59e0b; }
+    .status.connecting { color: #f59e0b; }
+    .status.active { color: #22c55e; }
+    .status.ended { color: #94a3b8; }
+    .status.error { color: #ef4444; }
+
+    .timer {
+      font-size: 48px;
+      font-weight: 300;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 24px;
+      display: none;
+    }
+    .timer.visible { display: block; }
+
+    .wave {
+      display: none;
+      align-items: center; justify-content: center;
+      gap: 4px; height: 32px; margin-bottom: 24px;
+    }
+    .wave.visible { display: flex; }
+    .wave span {
+      width: 4px; border-radius: 2px;
+      background: #2ec4b6;
+      animation: wave 1.2s ease-in-out infinite;
+    }
+    .wave span:nth-child(2) { animation-delay: 0.1s; }
+    .wave span:nth-child(3) { animation-delay: 0.2s; }
+    .wave span:nth-child(4) { animation-delay: 0.3s; }
+    .wave span:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes wave { 0%,100% { height: 6px; } 50% { height: 28px; } }
+
+    .transcript {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+      max-height: 120px;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #94a3b8;
+      text-align: left;
+      display: none;
+    }
+    .transcript.visible { display: block; }
+    .transcript b { color: #e8f4f8; }
+
+    .btn-start {
+      width: 100%;
+      padding: 16px 32px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-start.green {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(34,197,94,0.3);
+    }
+    .btn-start.green:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(34,197,94,0.4); }
+    .btn-start.red {
+      background: #ef4444;
+      color: #fff;
+    }
+    .btn-start.red:hover { background: #dc2626; }
+    .btn-start:disabled {
+      opacity: 0.5; cursor: not-allowed; transform: none !important;
+    }
+
+    .permissions-note {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #7fb5c9;
+    }
+
+    .error-msg {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #ef4444;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    .powered-by {
+      margin-top: 40px;
+      font-size: 11px;
+      color: #4a6b7f;
+    }
+    .powered-by a { color: #2ec4b6; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="call-container">
+    <div class="brand">EIAAW Solutions</div>
+    <div class="avatar" id="avatar">&#129302;</div>
+    <h1 id="heading">AI Sales Assistant</h1>
+    <p class="subtitle" id="subtitle">Hi! I'm ready to tell you about how we can help automate your sales and marketing. Click below to start a voice conversation.</p>
+
+    <div class="status waiting" id="status">Ready to connect</div>
+    <div class="timer" id="timer">00:00</div>
+    <div class="wave" id="wave">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="transcript" id="transcript"></div>
+    <div class="error-msg" id="error"></div>
+
+    <button class="btn-start green" id="call-btn" onclick="startCall()">
+      Start Voice Call
+    </button>
+
+    <p class="permissions-note" id="permissions-note">Your browser will ask for microphone access. This is required for the voice call.</p>
+
+    <div class="powered-by">Powered by <a href="https://eiaawsolutions.com">EIAAW Solutions</a></div>
+  </div>
+
+  <script type="module">
+    import { RetellWebClient } from 'https://esm.sh/retell-client-js-sdk@2.0.7';
+    window.RetellWebClient = RetellWebClient;
+  </script>
+  <script>
+    let callActive = false;
+    let timerInterval = null;
+    let seconds = 0;
+
+    // Get the call token from URL
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('t');
+
+    if (!token) {
+      document.getElementById('subtitle').textContent = 'This call link is invalid or has expired. Please request a new one.';
+      document.getElementById('call-btn').style.display = 'none';
+      document.getElementById('status').textContent = 'Invalid link';
+      document.getElementById('status').className = 'status error';
+      document.getElementById('permissions-note').style.display = 'none';
+    }
+
+    async function startCall() {
+      if (callActive) return endCall();
+
+      const btn = document.getElementById('call-btn');
+      const status = document.getElementById('status');
+      const errorEl = document.getElementById('error');
+      errorEl.className = 'error-msg';
+
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+      status.textContent = 'Connecting';
+      status.className = 'status connecting';
+
+      try {
+        // Request the access token from the server
+        const res = await fetch(`/api/voice/call-link-token?t=${token}`);
+        const data = await res.json();
+        if (!res.ok || !data.accessToken) throw new Error(data.error || 'Failed to connect. This link may have expired.');
+
+        // Update heading with lead context if available
+        if (data.leadName) {
+          document.getElementById('heading').textContent = `Hi ${data.leadName}!`;
+          document.getElementById('subtitle').textContent = data.greeting || 'Thanks for connecting. Let me tell you about how we can help.';
+        }
+
+        // Start the Retell web call
+        if (!window.RetellWebClient) {
+          // Wait a moment for SDK to load
+          await new Promise(r => setTimeout(r, 1500));
+          if (!window.RetellWebClient) throw new Error('Voice system loading. Please refresh and try again.');
+        }
+
+        const client = new window.RetellWebClient();
+
+        client.on('call_started', () => {
+          callActive = true;
+          status.textContent = 'Connected';
+          status.className = 'status active';
+          document.getElementById('avatar').classList.add('active');
+          document.getElementById('timer').classList.add('visible');
+          document.getElementById('permissions-note').style.display = 'none';
+          btn.disabled = false;
+          btn.textContent = 'End Call';
+          btn.className = 'btn-start red';
+
+          timerInterval = setInterval(() => {
+            seconds++;
+            const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+            const s = String(seconds % 60).padStart(2, '0');
+            document.getElementById('timer').textContent = `${m}:${s}`;
+          }, 1000);
+        });
+
+        client.on('call_ended', () => {
+          endCallUI('Call ended. Thank you!');
+        });
+
+        client.on('agent_start_talking', () => {
+          document.getElementById('wave').classList.add('visible');
+        });
+
+        client.on('agent_stop_talking', () => {
+          document.getElementById('wave').classList.remove('visible');
+        });
+
+        client.on('update', (update) => {
+          if (update.transcript) {
+            const el = document.getElementById('transcript');
+            el.classList.add('visible');
+            const lines = update.transcript.map(t =>
+              `<b>${t.role === 'agent' ? 'AI' : 'You'}:</b> ${t.content}`
+            );
+            el.innerHTML = lines.slice(-4).join('<br>');
+            el.scrollTop = el.scrollHeight;
+          }
+        });
+
+        client.on('error', (err) => {
+          errorEl.textContent = 'Connection error: ' + (err.message || 'Please try again.');
+          errorEl.className = 'error-msg visible';
+          endCallUI('Connection lost');
+        });
+
+        window._retellClient = client;
+        await client.startCall({ accessToken: data.accessToken });
+
+      } catch (e) {
+        errorEl.textContent = e.message;
+        errorEl.className = 'error-msg visible';
+        btn.disabled = false;
+        btn.textContent = 'Try Again';
+        btn.className = 'btn-start green';
+        status.textContent = 'Failed to connect';
+        status.className = 'status error';
+      }
+    }
+
+    function endCall() {
+      if (window._retellClient) window._retellClient.stopCall();
+      endCallUI('Call ended');
+    }
+
+    function endCallUI(msg) {
+      callActive = false;
+      if (timerInterval) clearInterval(timerInterval);
+      document.getElementById('status').textContent = msg;
+      document.getElementById('status').className = 'status ended';
+      document.getElementById('avatar').classList.remove('active');
+      document.getElementById('wave').classList.remove('visible');
+      const btn = document.getElementById('call-btn');
+      btn.textContent = 'Call Again';
+      btn.className = 'btn-start green';
+      btn.disabled = false;
+      btn.onclick = () => { seconds = 0; startCall(); };
+    }
+
+    // Expose for button onclick
+    window.startCall = startCall;
+  </script>
+</body>
+</html>

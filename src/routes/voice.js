@@ -89,6 +89,73 @@ router.post('/tool-callback', async (req, res) => {
   }
 });
 
+// GET /api/voice/call-link-token — public endpoint: exchange a call link token for a Retell access token
+router.get('/call-link-token', async (req, res) => {
+  try {
+    const { t } = req.query;
+    if (!t) return res.status(400).json({ error: 'Missing token' });
+
+    // Look up the call link token
+    const linkData = db.prepare("SELECT value FROM settings WHERE key = ?").get(`call_link_${t}`);
+    if (!linkData?.value) return res.status(404).json({ error: 'This call link has expired or is invalid. Please request a new one.' });
+
+    const data = JSON.parse(linkData.value);
+
+    // Check expiry (24 hours)
+    if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
+      db.prepare("DELETE FROM settings WHERE key = ?").run(`call_link_${t}`);
+      return res.status(410).json({ error: 'This call link has expired. Please request a new one.' });
+    }
+
+    const { apiKey, agentId } = getVoiceConfig();
+    if (!apiKey || !agentId) return res.status(500).json({ error: 'Voice system not configured.' });
+
+    // Determine dynamic variables from lead data
+    const lead = data.leadId ? db.prepare('SELECT * FROM leads WHERE id = ?').get(data.leadId) : null;
+    const stage = lead?.status || 'new';
+    const callObjective = stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify';
+
+    const beginMessage = lead
+      ? `Hi ${lead.name}! Thanks for clicking the link. I'm the AI assistant from EIAAW Solutions. I'd love to tell you about how we can help ${lead.company || 'your business'} automate sales and marketing. Do you have a couple of minutes?`
+      : `Hi! Thanks for connecting. I'm the AI assistant from EIAAW Solutions. How can I help you today?`;
+
+    // Create web call with Retell
+    const webCall = await retellAPI(apiKey, '/v2/create-web-call', 'POST', {
+      agent_id: agentId,
+      retell_llm_dynamic_variables: {
+        lead_name: lead?.name || 'there',
+        lead_company: lead?.company || '',
+        lead_title: lead?.title || '',
+        lead_stage: stage,
+        call_objective: callObjective,
+        begin_message: beginMessage,
+      },
+      metadata: {
+        lead_id: data.leadId ? String(data.leadId) : '',
+        source: 'call_link',
+        token: t,
+      },
+    });
+
+    // Log the call activity
+    if (data.leadId) {
+      db.prepare('INSERT INTO activities (user_id, lead_id, type, description, outcome) VALUES (?, ?, ?, ?, ?)')
+        .run(data.userId || 1, data.leadId, 'voice_call',
+          `Lead opened call link and started web call`,
+          JSON.stringify(webCall));
+    }
+
+    res.json({
+      accessToken: webCall.access_token,
+      callId: webCall.call_id,
+      leadName: lead?.name || null,
+      greeting: beginMessage,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Authenticated routes ---
 router.use(requireAuth);
 
@@ -358,6 +425,49 @@ router.post('/call', async (req, res) => {
       status: callResult?.call_status || 'initiated',
       objective: callObjective,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/voice/generate-link — create a shareable call link for a lead
+router.post('/generate-link', (req, res) => {
+  try {
+    const { leadId } = req.body;
+
+    const { agentId } = getVoiceConfig();
+    if (!agentId) return res.status(400).json({ error: 'Voice agent not set up. Run Auto-Setup in Settings first.' });
+
+    // Generate a unique token
+    const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+    // Store with 24h expiry
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const linkData = { leadId: leadId || null, userId: req.user.id, expiresAt };
+    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+      .run(`call_link_${token}`, JSON.stringify(linkData));
+
+    const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+    const callUrl = `${baseUrl}/call.html?t=${token}`;
+
+    // Get lead info for share message
+    let leadName = '';
+    let shareMessage = `Hi! I'd like to have a quick chat about how we can help your business. Click here to talk to our AI assistant: ${callUrl}`;
+    if (leadId) {
+      const lead = db.prepare('SELECT name, company FROM leads WHERE id = ?').get(leadId);
+      if (lead) {
+        leadName = lead.name;
+        shareMessage = `Hi ${lead.name}! I'd love to show you how EIAAW Solutions can help ${lead.company || 'your business'}. Click here for a quick voice chat with our AI assistant: ${callUrl}`;
+      }
+    }
+
+    // Log activity
+    if (leadId) {
+      db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+        .run(req.user.id, leadId, 'ai_action', `Generated call link for ${leadName || 'lead'}`);
+    }
+
+    res.json({ callUrl, token, expiresAt, shareMessage, leadName });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
