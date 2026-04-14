@@ -3523,8 +3523,9 @@ async function loadAppointments() {
     ]);
 
     const now = new Date();
-    const past = all.filter(a => new Date(a.scheduled_at) < now || a.status === 'completed' || a.status === 'cancelled' || a.status === 'no_show');
-    const upcomingList = all.filter(a => new Date(a.scheduled_at) >= now && a.status !== 'cancelled' && a.status !== 'completed' && a.status !== 'no_show');
+    const parseDt = s => { let d = s || ''; if (d && !d.endsWith('Z') && !d.includes('+')) d += 'Z'; return new Date(d); };
+    const past = all.filter(a => parseDt(a.scheduled_at) < now || a.status === 'completed' || a.status === 'cancelled' || a.status === 'no_show');
+    const upcomingList = all.filter(a => parseDt(a.scheduled_at) >= now && a.status !== 'cancelled' && a.status !== 'completed' && a.status !== 'no_show');
 
     page.innerHTML = `
       <div class="toolbar">
@@ -3557,9 +3558,12 @@ async function loadAppointments() {
 }
 
 function renderAppointmentCard(a, isUpcoming) {
-  const dt = new Date(a.scheduled_at);
+  // Ensure scheduled_at is parsed correctly — add Z if missing (stored as UTC)
+  let rawDt = a.scheduled_at || '';
+  if (rawDt && !rawDt.endsWith('Z') && !rawDt.includes('+')) rawDt += 'Z';
+  const dt = new Date(rawDt);
   const dateStr = dt.toLocaleDateString('en-MY', { weekday: 'short', month: 'short', day: 'numeric' });
-  const timeStr = dt.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
+  const timeStr = dt.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: true });
   const statusColors = { scheduled: '#f59e0b', confirmed: '#2ec4b6', completed: '#10b981', cancelled: '#6b7280', no_show: '#ef4444' };
   const statusColor = statusColors[a.status] || '#6b7280';
   const typeLabels = { demo: 'Demo', call: 'Call', meeting: 'Meeting', follow_up: 'Follow-up' };
@@ -3567,7 +3571,7 @@ function renderAppointmentCard(a, isUpcoming) {
   return `
     <div style="display:flex;align-items:flex-start;gap:12px;padding:12px;border-bottom:1px solid var(--border);${!isUpcoming ? 'opacity:0.7' : ''}">
       <div style="min-width:56px;text-align:center;background:var(--surface2);border-radius:8px;padding:6px 8px">
-        <div style="font-size:11px;color:var(--text-muted)">${dt.toLocaleDateString('en-MY', { month: 'short' })}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${dt.toLocaleDateString('en-MY', { month: 'short', year: 'numeric' })}</div>
         <div style="font-size:20px;font-weight:700">${dt.getDate()}</div>
         <div style="font-size:10px;color:var(--text-muted)">${timeStr}</div>
       </div>
@@ -3624,7 +3628,14 @@ async function showNewAppointmentModal(editId) {
     if (editId) existing = await api.get(`/appointments/${editId}`);
   } catch (e) { /* ignore */ }
 
-  const dtVal = existing ? existing.scheduled_at.replace('Z', '').substring(0, 16) : '';
+  // Convert UTC stored time to local datetime-local format for input
+  let dtVal = '';
+  if (existing?.scheduled_at) {
+    let raw = existing.scheduled_at;
+    if (!raw.endsWith('Z') && !raw.includes('+')) raw += 'Z';
+    const local = new Date(raw);
+    dtVal = local.getFullYear() + '-' + String(local.getMonth() + 1).padStart(2, '0') + '-' + String(local.getDate()).padStart(2, '0') + 'T' + String(local.getHours()).padStart(2, '0') + ':' + String(local.getMinutes()).padStart(2, '0');
+  }
 
   modal = {
     title: existing ? 'Edit Appointment' : 'New Appointment',
