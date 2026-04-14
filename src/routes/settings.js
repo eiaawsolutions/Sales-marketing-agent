@@ -29,6 +29,8 @@ router.get('/', (req, res) => {
         : rawValue ? '••••••••' : '';
     } else if (row.key === 'voice_ai_api_key' && rawValue) {
       settings[row.key] = rawValue ? '••••••••' : '';
+    } else if (row.key === 'resend_api_key' && rawValue) {
+      settings[row.key] = rawValue ? '••••••••' : '';
     } else {
       settings[row.key] = row.value; // Non-sensitive: return as-is
     }
@@ -41,12 +43,16 @@ router.get('/', (req, res) => {
   const decryptedVoiceKey = voiceKeyRow?.value ? decrypt(voiceKeyRow.value) : '';
   settings._voice_key_set = !!(decryptedVoiceKey && decryptedVoiceKey.length > 5 && !decryptedVoiceKey.startsWith('enc:'));
 
+  const resendKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'resend_api_key'").get();
+  const decryptedResendKey = resendKeyRow?.value ? decrypt(resendKeyRow.value) : '';
+  settings._resend_key_set = !!(decryptedResendKey && decryptedResendKey.length > 5 && !decryptedResendKey.startsWith('enc:'));
+
   res.json(settings);
 });
 
 // PUT /api/settings — update settings
 router.put('/', (req, res) => {
-  const allowedKeys = ['ai_provider', 'ai_model', 'api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'from_email', 'admin_password', 'stripe_secret_key', 'stripe_publishable_key', 'ai_credit_balance', 'voice_ai_provider', 'voice_ai_api_key', 'voice_ai_agent_id', 'voice_phone_number', 'landing_url'];
+  const allowedKeys = ['ai_provider', 'ai_model', 'api_key', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'from_email', 'admin_password', 'stripe_secret_key', 'stripe_publishable_key', 'ai_credit_balance', 'voice_ai_provider', 'voice_ai_api_key', 'voice_ai_agent_id', 'voice_phone_number', 'landing_url', 'resend_api_key'];
   const upsert = db.prepare(
     'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP'
   );
@@ -55,7 +61,7 @@ router.put('/', (req, res) => {
   for (const [key, value] of Object.entries(req.body)) {
     if (!allowedKeys.includes(key)) continue;
     // Don't overwrite with masked values
-    if (['api_key', 'smtp_pass', 'admin_password', 'stripe_secret_key', 'voice_ai_api_key'].includes(key) && (value.includes('•') || value.includes('...'))) continue;
+    if (['api_key', 'smtp_pass', 'admin_password', 'stripe_secret_key', 'voice_ai_api_key', 'resend_api_key'].includes(key) && (value.includes('•') || value.includes('...'))) continue;
     // Encrypt sensitive values before storing
     const storeValue = isSensitive(key) ? encrypt(value) : value;
     upsert.run(key, storeValue, storeValue);

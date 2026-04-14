@@ -3,6 +3,7 @@ import db from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { checkPlanLimit, VOICE_ADDONS } from '../middleware/auth.js';
 import { decrypt } from '../utils/crypto.js';
+import { sendEmail } from '../utils/email.js';
 
 const router = Router();
 
@@ -69,6 +70,22 @@ router.post('/webhook', async (req, res) => {
         if (sentiment === 'Positive' || callSummary.toLowerCase().includes('interested')) {
           db.prepare('UPDATE leads SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status IN (?, ?)').run('qualified', leadId, 'new', 'contacted');
         }
+
+        // Check if a meeting was booked during the call (from call summary)
+        if (callSummary && (callSummary.toLowerCase().includes('meeting booked') || callSummary.toLowerCase().includes('demo scheduled') || callSummary.toLowerCase().includes('agreed to meet'))) {
+          const existingAppt = db.prepare('SELECT id FROM appointments WHERE call_id = ?').get(callId);
+          if (!existingAppt) {
+            // Create a placeholder appointment — the tool-callback may have already created one
+            const userId = metadata.user_id ? parseInt(metadata.user_id) : 1;
+            const lead = db.prepare('SELECT name FROM leads WHERE id = ?').get(leadId);
+            db.prepare(
+              `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, call_id, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).run(leadId, userId, `Follow-up with ${lead?.name || 'Lead'}`,
+              new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // Default 3 days out
+              15, 'demo', `Auto-created from voice call. Summary: ${callSummary}`, callId, 'scheduled');
+          }
+        }
       }
     }
 
@@ -79,15 +96,311 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
-// POST /api/voice/tool-callback — Retell tool callback for log_call_outcome
+// POST /api/voice/tool-callback — Retell tool callback dispatcher
 router.post('/tool-callback', async (req, res) => {
   try {
-    const args = req.body.args || req.body;
-    res.json({ result: `Got it, I've noted: ${args.interest_level} interest. ${args.summary || ''}` });
+    const toolName = req.body.name || req.body.tool_name || '';
+    const args = req.body.args || req.body.arguments || req.body;
+    const callId = req.body.call_id || req.body.call?.call_id || '';
+    const metadata = req.body.metadata || req.body.call?.metadata || {};
+    const leadId = metadata.lead_id ? parseInt(metadata.lead_id) : null;
+    const userId = metadata.user_id ? parseInt(metadata.user_id) : 1;
+
+    if (toolName === 'schedule_meeting') {
+      return handleScheduleMeeting(args, callId, leadId, userId, res);
+    }
+    if (toolName === 'send_overview') {
+      return handleSendOverview(args, callId, leadId, userId, res);
+    }
+    if (toolName === 'send_demo_link') {
+      return handleSendDemoLink(args, callId, leadId, userId, res);
+    }
+
+    // Default: log_call_outcome
+    let apptMsg = '';
+    if (args.meeting_requested && leadId) {
+      const meetingTime = args.meeting_time || args.next_step || '';
+      const scheduled = parseMeetingTime(meetingTime);
+      if (scheduled) {
+        const lead = db.prepare('SELECT name, company FROM leads WHERE id = ?').get(leadId);
+        db.prepare(
+          `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, call_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(leadId, userId, `Demo with ${lead?.name || 'Lead'}`, scheduled.toISOString(), 15, 'demo',
+          args.summary || '', callId);
+        db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+          .run(userId, leadId, 'meeting', `Meeting booked via voice call: ${meetingTime}`);
+        apptMsg = ' Meeting has been scheduled.';
+      }
+    }
+
+    // Update lead status based on interest
+    if (leadId && args.interest_level) {
+      if (args.interest_level === 'hot') {
+        db.prepare('UPDATE leads SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status IN (?, ?, ?)').run('qualified', leadId, 'new', 'contacted', 'cold');
+      } else if (args.interest_level === 'warm') {
+        db.prepare('UPDATE leads SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status IN (?, ?)').run('contacted', leadId, 'new', 'cold');
+      }
+    }
+
+    res.json({ result: `Got it, I've noted: ${args.interest_level} interest. ${args.summary || ''}${apptMsg}` });
   } catch (err) {
+    console.error('Tool callback error:', err);
     res.json({ result: 'Noted, thank you.' });
   }
 });
+
+// --- Tool handlers ---
+
+async function handleScheduleMeeting(args, callId, leadId, userId, res) {
+  const { date_time, duration, meeting_type, notes } = args;
+  const scheduled = parseMeetingTime(date_time);
+  if (!scheduled) {
+    return res.json({ result: "I wasn't able to parse that time. Could you confirm the date and time again?" });
+  }
+
+  const lead = leadId ? db.prepare('SELECT name, company, email FROM leads WHERE id = ?').get(leadId) : null;
+  const title = `${meeting_type === 'demo' ? 'Demo' : 'Meeting'} with ${lead?.name || 'Lead'}`;
+
+  const result = db.prepare(
+    `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, call_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(leadId, userId, title, scheduled.toISOString(), parseInt(duration) || 15, meeting_type || 'demo', notes || '', callId);
+
+  if (leadId) {
+    db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+      .run(userId, leadId, 'meeting', `Meeting booked via voice call: ${title}`);
+  }
+
+  // Fire-and-forget: send calendar invite if lead has email
+  if (lead?.email) {
+    sendCalendarInvite(result.lastInsertRowid, lead, scheduled, title, parseInt(duration) || 15).catch(err =>
+      console.error('Calendar invite send error:', err.message)
+    );
+  }
+
+  const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', month: 'long', day: 'numeric' });
+  const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
+  res.json({ result: `Perfect, I've booked that for ${dateStr} at ${timeStr}. ${lead?.email ? "I'm sending a calendar invite to their email now." : 'All set!'}` });
+}
+
+async function handleSendOverview(args, callId, leadId, userId, res) {
+  const lead = leadId ? db.prepare('SELECT name, email, company FROM leads WHERE id = ?').get(leadId) : null;
+  if (!lead?.email) {
+    return res.json({ result: "I don't have their email on file. Could you ask for their email address so I can send it?" });
+  }
+
+  // Fire-and-forget
+  sendProductOverviewEmail(lead).catch(err => console.error('Overview email error:', err.message));
+
+  if (leadId) {
+    db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+      .run(userId, leadId, 'email', `Sent product overview email to ${lead.email}`);
+  }
+
+  res.json({ result: `Done! I've just sent a quick overview to ${lead.email}. They should see it in their inbox shortly.` });
+}
+
+async function handleSendDemoLink(args, callId, leadId, userId, res) {
+  const lead = leadId ? db.prepare('SELECT name, email, company FROM leads WHERE id = ?').get(leadId) : null;
+  if (!lead?.email) {
+    return res.json({ result: "I don't have their email. Ask for their email so I can send the demo link." });
+  }
+
+  const baseUrl = db.prepare("SELECT value FROM settings WHERE key = 'app_base_url'").get()?.value || '';
+  const demoToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+  db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+    .run(`demo_link_${demoToken}`, JSON.stringify({ leadId, userId, expiresAt }));
+
+  // Fire-and-forget
+  sendDemoLinkEmail(lead, demoToken, baseUrl).catch(err => console.error('Demo link email error:', err.message));
+
+  if (leadId) {
+    db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+      .run(userId, leadId, 'email', `Sent interactive demo link to ${lead.email}`);
+  }
+
+  res.json({ result: `I've sent an interactive demo link to ${lead.email}. It's a self-guided walkthrough they can explore at their own pace.` });
+}
+
+// --- Email helpers ---
+
+async function sendCalendarInvite(apptId, lead, scheduled, title, duration) {
+  const end = new Date(scheduled.getTime() + duration * 60000);
+  const now = new Date();
+  const fmt = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+  const icsContent = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//EIAAW Solutions//SalesAgent//EN',
+    'CALSCALE:GREGORIAN', 'METHOD:REQUEST', 'BEGIN:VEVENT',
+    `UID:appt-${apptId}@eiaaw.com`, `DTSTAMP:${fmt(now)}`,
+    `DTSTART:${fmt(scheduled)}`, `DTEND:${fmt(end)}`,
+    `SUMMARY:${title}`, `ATTENDEE;CN=${lead.name}:mailto:${lead.email}`,
+    'ORGANIZER;CN=EIAAW Solutions:mailto:noreply@eiaaw.com',
+    'STATUS:CONFIRMED',
+    'BEGIN:VALARM', 'TRIGGER:-PT15M', 'ACTION:DISPLAY', 'DESCRIPTION:Meeting in 15 minutes', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+
+  const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
+
+  const nodemailer = (await import('nodemailer')).default;
+  const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value;
+  const smtpPort = parseInt(db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || '587');
+  const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value;
+  const smtpPass = decrypt(db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value) || '';
+  const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value;
+  if (!smtpUser) return;
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost, port: smtpPort, secure: smtpPort === 465,
+    auth: { user: smtpUser, pass: smtpPass },
+    connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000,
+  });
+
+  await transporter.sendMail({
+    from: fromEmail || smtpUser, to: lead.email,
+    subject: `Meeting Confirmed: ${title} — ${dateStr}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px">
+        <h2 style="color:#2ec4b6">You're Booked!</h2>
+        <p>Hi ${lead.name},</p>
+        <p>Your meeting with EIAAW Solutions is confirmed:</p>
+        <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin:16px 0">
+          <p style="margin:4px 0"><strong>Date:</strong> ${dateStr}</p>
+          <p style="margin:4px 0"><strong>Time:</strong> ${timeStr}</p>
+          <p style="margin:4px 0"><strong>Duration:</strong> ${duration} minutes</p>
+        </div>
+        <p style="font-size:14px;color:#666">A calendar invite is attached — add it to your calendar!</p>
+        <hr style="margin:24px 0;border:none;border-top:1px solid #eee">
+        <p style="font-size:12px;color:#999;text-align:center">EIAAW Solutions — AI-Human Sales Partnerships</p>
+      </div>`,
+    icalEvent: { filename: 'invite.ics', method: 'REQUEST', content: icsContent },
+  });
+}
+
+async function sendProductOverviewEmail(lead) {
+  await sendEmail({
+    to: lead.email,
+    subject: `${lead.name}, here's the quick overview I mentioned`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px">
+        <h2 style="color:#2ec4b6;margin-bottom:4px">EIAAW SalesAgent</h2>
+        <p style="color:#999;margin-top:0;font-size:13px">AI-Powered Sales & Marketing Automation</p>
+
+        <p>Hi ${lead.name},</p>
+        <p>Thanks for chatting! As promised, here's a quick rundown of what EIAAW SalesAgent does:</p>
+
+        <div style="margin:20px 0">
+          <div style="padding:12px 0;border-bottom:1px solid #eee">
+            <strong style="color:#2ec4b6">1. AI Lead Scoring & Qualification</strong>
+            <p style="margin:4px 0;font-size:14px;color:#555">Every lead gets scored 0-100 automatically. Our AI uses the BANT framework to tell you who's ready to buy.</p>
+          </div>
+          <div style="padding:12px 0;border-bottom:1px solid #eee">
+            <strong style="color:#2ec4b6">2. Smart Outreach Sequences</strong>
+            <p style="margin:4px 0;font-size:14px;color:#555">AI writes personalized email sequences, follow-ups, and outreach plans — multi-step, multi-channel.</p>
+          </div>
+          <div style="padding:12px 0;border-bottom:1px solid #eee">
+            <strong style="color:#2ec4b6">3. AI Content Creation</strong>
+            <p style="margin:4px 0;font-size:14px;color:#555">Generate social posts, ad copy, email campaigns, blog outlines, and SEO keywords — all from a single prompt.</p>
+          </div>
+          <div style="padding:12px 0;border-bottom:1px solid #eee">
+            <strong style="color:#2ec4b6">4. Visual Sales Pipeline</strong>
+            <p style="margin:4px 0;font-size:14px;color:#555">Drag-and-drop pipeline board. AI analyzes deal health, forecasts revenue, and flags at-risk deals.</p>
+          </div>
+          <div style="padding:12px 0;border-bottom:1px solid #eee">
+            <strong style="color:#2ec4b6">5. AI Voice Calling</strong>
+            <p style="margin:4px 0;font-size:14px;color:#555">AI makes calls on your behalf — introduces, qualifies, follows up, and books meetings. You get the transcript and next steps.</p>
+          </div>
+          <div style="padding:12px 0">
+            <strong style="color:#2ec4b6">6. Campaign Management</strong>
+            <p style="margin:4px 0;font-size:14px;color:#555">Run email and social campaigns with open/click tracking. AI optimizes messaging per lead.</p>
+          </div>
+        </div>
+
+        <div style="background:linear-gradient(135deg,#0a1628,#1a2a45);border-radius:12px;padding:20px;text-align:center;margin:20px 0">
+          <p style="color:#fff;margin:0 0 4px;font-size:15px">Plans start from <strong style="color:#2ec4b6">RM 99/month</strong></p>
+          <p style="color:#aaa;margin:0;font-size:13px">Starter • Pro (RM199) • Business (RM399)</p>
+        </div>
+
+        <p style="font-size:14px;color:#555">Want to see it in action? Just reply to this email and we'll set up a quick 15-minute demo.</p>
+
+        <hr style="margin:24px 0;border:none;border-top:1px solid #eee">
+        <p style="font-size:12px;color:#999;text-align:center">EIAAW Solutions — AI-Human Sales Partnerships</p>
+      </div>`,
+  });
+}
+
+async function sendDemoLinkEmail(lead, token, baseUrl) {
+  const demoUrl = baseUrl ? `${baseUrl}/demo.html?t=${token}` : `https://eiaawsolutions.com/demo?t=${token}`;
+  await sendEmail({
+    to: lead.email,
+    subject: `${lead.name}, explore EIAAW SalesAgent at your own pace`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px">
+        <h2 style="color:#2ec4b6;margin-bottom:16px">Your Interactive Demo</h2>
+        <p>Hi ${lead.name},</p>
+        <p>Here's your personal demo link — take a self-guided tour of everything EIAAW SalesAgent can do for ${lead.company || 'your business'}.</p>
+        <div style="text-align:center;margin:24px 0">
+          <a href="${demoUrl}" style="display:inline-block;padding:14px 32px;background:#2ec4b6;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:16px">Start Interactive Demo</a>
+        </div>
+        <p style="font-size:14px;color:#666">This link is valid for 7 days. No signup needed — just click and explore.</p>
+        <p style="font-size:14px;color:#666">After exploring, if you want a live walkthrough with a real person, just reply to this email!</p>
+        <hr style="margin:24px 0;border:none;border-top:1px solid #eee">
+        <p style="font-size:12px;color:#999;text-align:center">EIAAW Solutions — AI-Human Sales Partnerships</p>
+      </div>`,
+  });
+}
+
+// --- Date parser for meeting times from voice ---
+function parseMeetingTime(text) {
+  if (!text) return null;
+  // Try direct ISO parse first
+  const direct = new Date(text);
+  if (!isNaN(direct.getTime()) && direct > new Date()) return direct;
+
+  const now = new Date();
+  const lower = text.toLowerCase();
+
+  // "Thursday at 3pm", "Friday 2:30pm", etc.
+  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const dayMatch = dayNames.findIndex(d => lower.includes(d));
+
+  let targetDate = null;
+  if (lower.includes('tomorrow')) {
+    targetDate = new Date(now); targetDate.setDate(now.getDate() + 1);
+  } else if (lower.includes('today')) {
+    targetDate = new Date(now);
+  } else if (dayMatch >= 0) {
+    targetDate = new Date(now);
+    let daysAhead = dayMatch - now.getDay();
+    if (daysAhead <= 0) daysAhead += 7;
+    targetDate.setDate(now.getDate() + daysAhead);
+  } else if (lower.includes('next week')) {
+    targetDate = new Date(now);
+    targetDate.setDate(now.getDate() + (8 - now.getDay())); // Next Monday
+  }
+
+  if (!targetDate) return null;
+
+  // Extract time: "3pm", "2:30 pm", "15:00", "10am"
+  const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+  if (timeMatch) {
+    let hour = parseInt(timeMatch[1]);
+    const min = parseInt(timeMatch[2] || '0');
+    const ampm = timeMatch[3];
+    if (ampm === 'pm' && hour < 12) hour += 12;
+    if (ampm === 'am' && hour === 12) hour = 0;
+    if (!ampm && hour < 8) hour += 12; // Assume PM for business hours
+    targetDate.setHours(hour, min, 0, 0);
+  } else {
+    targetDate.setHours(10, 0, 0, 0); // Default 10am
+  }
+
+  return targetDate > now ? targetDate : null;
+}
 
 // GET /api/voice/call-link-token — public endpoint: exchange a call link token for a Retell access token
 router.get('/call-link-token', async (req, res) => {
@@ -437,7 +750,7 @@ router.post('/call', async (req, res) => {
 // POST /api/voice/generate-link — create a shareable call link for a lead
 router.post('/generate-link', async (req, res) => {
   try {
-    const { leadId, sendEmail } = req.body;
+    const { leadId, sendEmail: sendEmailFlag } = req.body;
 
     const { agentId } = getVoiceConfig();
     if (!agentId) return res.status(400).json({ error: 'Voice agent not set up. Run Auto-Setup in Settings first.' });
@@ -479,53 +792,34 @@ router.post('/generate-link', async (req, res) => {
     res.json({ callUrl, token, expiresAt, shareMessage, leadName, leadEmail, leadPhone, emailSent: false });
 
     // Fire-and-forget: send email in background (don't block response)
-    if (sendEmail && leadEmail) {
-      (async () => {
-        try {
-          const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value;
-          const smtpPort = db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || '587';
-          const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value;
-          const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value;
-          const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value;
-
-          if (smtpUser && smtpHost) {
-            const nodemailer = (await import('nodemailer')).default;
-            const transporter = nodemailer.createTransport({
-              host: smtpHost, port: parseInt(smtpPort), secure: parseInt(smtpPort) === 465,
-              auth: { user: smtpUser, pass: smtpPass },
-              connectionTimeout: 10000,
-              greetingTimeout: 10000,
-              socketTimeout: 15000,
-            });
-
-            await transporter.sendMail({
-              from: fromEmail || smtpUser,
-              to: leadEmail,
-              subject: `${leadName ? leadName + ', ' : ''}Quick voice chat with EIAAW Solutions`,
-              html: `
-                <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px">
-                  <h2 style="color:#2ec4b6;margin-bottom:16px">Let's Have a Quick Chat!</h2>
-                  <p style="font-size:15px;line-height:1.6;color:#333">Hi ${leadName || 'there'},</p>
-                  <p style="font-size:15px;line-height:1.6;color:#333">I'd love to show you how EIAAW Solutions can help automate your sales and marketing. Instead of reading a long email, how about a quick voice chat?</p>
-                  <p style="font-size:15px;line-height:1.6;color:#333">Click the button below to talk to our AI assistant — it takes just 2 minutes, right from your browser. No app download needed.</p>
-                  <div style="text-align:center;margin:24px 0">
-                    <a href="${callUrl}" style="display:inline-block;padding:14px 32px;background:#2ec4b6;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:16px">Start Voice Chat</a>
-                  </div>
-                  <p style="font-size:13px;color:#999;text-align:center">This link expires in 24 hours. Your browser will ask for microphone access.</p>
-                  <hr style="margin:24px 0;border:none;border-top:1px solid #eee">
-                  <p style="font-size:12px;color:#999;text-align:center">EIAAW Solutions — AI-Human Sales Partnerships<br><a href="https://eiaawsolutions.com" style="color:#2ec4b6">eiaawsolutions.com</a></p>
-                </div>
-              `,
-            });
-            if (leadId) {
-              db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
-                .run(req.user.id, leadId, 'email', `Sent call link email to ${leadEmail}`);
-            }
-          }
-        } catch (emailErr) {
-          console.error('Call link email failed:', emailErr.message);
+    if (sendEmailFlag && leadEmail) {
+      const userId = req.user.id;
+      sendEmail({
+        to: leadEmail,
+        subject: `${leadName ? leadName + ', ' : ''}Quick voice chat with EIAAW Solutions`,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px">
+            <h2 style="color:#2ec4b6;margin-bottom:16px">Let's Have a Quick Chat!</h2>
+            <p style="font-size:15px;line-height:1.6;color:#333">Hi ${leadName || 'there'},</p>
+            <p style="font-size:15px;line-height:1.6;color:#333">I'd love to show you how EIAAW Solutions can help automate your sales and marketing. Instead of reading a long email, how about a quick voice chat?</p>
+            <p style="font-size:15px;line-height:1.6;color:#333">Click the button below to talk to our AI assistant — it takes just 2 minutes, right from your browser. No app download needed.</p>
+            <div style="text-align:center;margin:24px 0">
+              <a href="${callUrl}" style="display:inline-block;padding:14px 32px;background:#2ec4b6;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:16px">Start Voice Chat</a>
+            </div>
+            <p style="font-size:13px;color:#999;text-align:center">This link expires in 24 hours. Your browser will ask for microphone access.</p>
+            <hr style="margin:24px 0;border:none;border-top:1px solid #eee">
+            <p style="font-size:12px;color:#999;text-align:center">EIAAW Solutions — AI-Human Sales Partnerships<br><a href="https://eiaawsolutions.com" style="color:#2ec4b6">eiaawsolutions.com</a></p>
+          </div>
+        `,
+      }).then(() => {
+        if (leadId) {
+          db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+            .run(userId, leadId, 'email', `Sent call link email to ${leadEmail}`);
         }
-      })();
+        console.log(`Call link email sent to ${leadEmail}`);
+      }).catch(err => {
+        console.error('Call link email failed:', err.message);
+      });
     }
   } catch (err) {
     res.status(500).json({ error: err.message });

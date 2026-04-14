@@ -19,6 +19,7 @@ import agentRouter from './routes/agent.js';
 import settingsRouter from './routes/settings.js';
 import systemLogicRouter from './routes/system-logic.js';
 import voiceRouter from './routes/voice.js';
+import appointmentsRouter from './routes/appointments.js';
 import { maskLeads, maskLead } from './services/leads.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -218,6 +219,7 @@ app.use('/api/agent', requireAuth, agentRouter);
 app.use('/api/settings', requireAuth, settingsRouter);
 app.use('/api/system-logic', requireAuth, systemLogicRouter);
 app.use('/api/voice', voiceRouter);
+app.use('/api/appointments', appointmentsRouter);
 
 // Dashboard overview endpoint
 app.get('/api/dashboard', requireAuth, (req, res) => {

@@ -80,6 +80,24 @@ export function initializeDatabase(db) {
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
     );
 
+    CREATE TABLE IF NOT EXISTS appointments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER,
+      user_id INTEGER DEFAULT 1,
+      title TEXT NOT NULL,
+      scheduled_at DATETIME NOT NULL,
+      duration_minutes INTEGER DEFAULT 15,
+      status TEXT DEFAULT 'scheduled' CHECK(status IN ('scheduled','confirmed','completed','cancelled','no_show')),
+      type TEXT DEFAULT 'demo' CHECK(type IN ('demo','call','meeting','follow_up')),
+      notes TEXT,
+      call_id TEXT,
+      location TEXT,
+      reminder_sent INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (lead_id) REFERENCES leads(id)
+    );
+
     CREATE TABLE IF NOT EXISTS agent_tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,

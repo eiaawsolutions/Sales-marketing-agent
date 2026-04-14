@@ -3919,6 +3919,11 @@ async function loadSettings() {
           <label>From Email</label>
           <input id="s-from-email" value="${settings.from_email || ''}" placeholder="your-email@gmail.com">
         </div>
+        <div style="margin-top:12px;padding:12px;background:rgba(46,196,182,0.06);border-radius:var(--radius);border:1px solid rgba(46,196,182,0.15)">
+          <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:6px">Resend API (Recommended for Railway)</div>
+          <small class="text-muted" style="display:block;margin-bottom:8px">Gmail SMTP gets blocked on Railway. <a href="https://resend.com" target="_blank" style="color:var(--primary)">Resend</a> is free (100 emails/day) and works everywhere. Sign up &rarr; get API key &rarr; paste below.</small>
+          <input id="s-resend-key" type="password" value="" placeholder="${settings._resend_key_set ? 'Resend key saved — enter new to change' : 'Paste Resend API key (re_xxxxxx)'}">
+        </div>
         <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:12px">Save Settings</button>
       </div>
 
@@ -4014,6 +4019,7 @@ async function saveSettings() {
     smtp_user: gv('s-smtp-user'),
     smtp_pass: document.getElementById('s-smtp-pass')?.value || '',
     from_email: gv('s-from-email'),
+    resend_api_key: document.getElementById('s-resend-key')?.value || '',
     admin_password: document.getElementById('s-admin-pass')?.value || '',
     stripe_secret_key: document.getElementById('s-stripe-secret')?.value || '',
     stripe_publishable_key: gv('s-stripe-pub'),
