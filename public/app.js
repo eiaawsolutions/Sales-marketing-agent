@@ -3518,8 +3518,8 @@ async function loadAppointments() {
   const page = document.getElementById('page');
   try {
     const [upcoming, all] = await Promise.all([
-      api('/api/appointments?upcoming=1'),
-      api('/api/appointments'),
+      api.get('/appointments?upcoming=1'),
+      api.get('/appointments'),
     ]);
 
     const now = new Date();
@@ -3593,7 +3593,7 @@ function renderAppointmentCard(a, isUpcoming) {
 
 async function sendAppointmentInvite(id) {
   try {
-    const res = await api(`/api/appointments/${id}/send-invite`, { method: 'POST' });
+    const res = await api.post(`/appointments/${id}/send-invite`, {});
     notify(res.message || 'Calendar invite sent!', 'success');
     loadAppointments();
   } catch (err) {
@@ -3604,7 +3604,7 @@ async function sendAppointmentInvite(id) {
 async function cancelAppointment(id) {
   if (!confirm('Cancel this appointment?')) return;
   try {
-    await api(`/api/appointments/${id}`, { method: 'DELETE' });
+    await api.del(`/appointments/${id}`);
     notify('Appointment cancelled', 'success');
     loadAppointments();
   } catch (err) {
@@ -3620,8 +3620,8 @@ async function showNewAppointmentModal(editId) {
   let existing = null;
   let leads = [];
   try {
-    leads = await api('/api/leads');
-    if (editId) existing = await api(`/api/appointments/${editId}`);
+    leads = await api.get('/leads');
+    if (editId) existing = await api.get(`/appointments/${editId}`);
   } catch (e) { /* ignore */ }
 
   const dtVal = existing ? existing.scheduled_at.replace('Z', '').substring(0, 16) : '';
@@ -3712,10 +3712,10 @@ async function saveAppointment(editId) {
 
   try {
     if (editId) {
-      await api(`/api/appointments/${editId}`, { method: 'PUT', body: JSON.stringify(body) });
+      await api.put(`/appointments/${editId}`, body);
       notify('Appointment updated', 'success');
     } else {
-      await api('/api/appointments', { method: 'POST', body: JSON.stringify(body) });
+      await api.post('/appointments', body);
       notify('Appointment created', 'success');
     }
     modal = null;
