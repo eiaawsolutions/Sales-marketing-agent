@@ -283,13 +283,15 @@ async function executeTask(taskType, input) {
   return handler(input);
 }
 
-async function chat(userMessage, extraContext = '') {
+async function chat(userMessage, extraContext = '', options = {}) {
   const systemPrompt = extraContext
     ? `${SYSTEM_PROMPT}\n\nAdditional context:\n${extraContext}`
     : SYSTEM_PROMPT;
 
   const client = getClient();
   const model = getModel();
+  // Dynamic max_tokens: default 4096, but allow callers to request more for long-form output
+  const maxTokens = options.maxTokens || 4096;
 
   // Retry with exponential backoff for transient errors (overloaded, rate limit, 5xx)
   const MAX_RETRIES = 2;
@@ -298,7 +300,7 @@ async function chat(userMessage, extraContext = '') {
     try {
       const response = await client.messages.create({
         model,
-        max_tokens: 4096,
+        max_tokens: maxTokens,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
       });
@@ -317,19 +319,24 @@ async function chat(userMessage, extraContext = '') {
     } catch (err) {
       lastError = err;
       const msg = err.message || String(err);
+      // Token/context length errors are NOT retryable — fail fast with a clear message
+      if (msg.includes('context_length') || msg.includes('too many tokens') || msg.includes('maximum context') || msg.includes('input_tokens')) {
+        throw new Error('The request was too large for the AI model. Try with fewer leads, shorter descriptions, or a simpler prompt.');
+      }
       const isRetryable = msg.includes('overloaded') || msg.includes('529') || msg.includes('rate') || msg.includes('500') || msg.includes('503');
       if (!isRetryable || attempt === MAX_RETRIES) throw err;
-      // Wait before retry: 2s, then 5s
+      // Wait before retry: 2.5s, then 5s
       await new Promise(r => setTimeout(r, (attempt + 1) * 2500));
     }
   }
   throw lastError;
 }
 
-async function chatJSON(userMessage, extraContext = '') {
+async function chatJSON(userMessage, extraContext = '', options = {}) {
   const raw = await chat(
     userMessage + '\n\nRespond ONLY with valid JSON, no markdown fences.',
-    extraContext
+    extraContext,
+    options
   );
   const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
   try {
@@ -663,7 +670,9 @@ ${input.valueProposition ? `- Our value proposition: ${input.valueProposition}` 
 ${input.ctaUrl || landingUrl ? `- CTA/Landing page URL: ${input.ctaUrl || landingUrl}` : ''}
 
 Create a 4-5 step sequence that feels personal, not automated.
-${input.ctaUrl || landingUrl ? `IMPORTANT: Include the URL "${input.ctaUrl || landingUrl}" naturally in at least 2 of the email messages as a CTA link. Each email step should give them a reason to click that link (e.g., "See a quick demo here: [URL]", "I put together something for you: [URL]").` : 'Include placeholder "[YOUR_LINK]" in email messages where a CTA link should go — the user will replace it with their actual URL.'}`
+${input.ctaUrl || landingUrl ? `IMPORTANT: Include the URL "${input.ctaUrl || landingUrl}" naturally in at least 2 of the email messages as a CTA link. Each email step should give them a reason to click that link (e.g., "See a quick demo here: [URL]", "I put together something for you: [URL]").` : 'Include placeholder "[YOUR_LINK]" in email messages where a CTA link should go — the user will replace it with their actual URL.'}`,
+    '',
+    { maxTokens: 6000 }
   );
 
   db.prepare(
@@ -788,7 +797,9 @@ ${leadsInfo}
 
 Return JSON: { "sequences": [ { "lead_name": "exact name", "steps": [ { "step": 1, "channel": "email", "delay_days": 0, "subject": "...", "message": "short personalized msg", "goal": "..." } ] } ] }
 
-Rules: Step 1 = email, delay_days=0. Then steps 2-3 on days 3, 7. Keep messages SHORT (2-3 sentences). 3 steps per lead.`
+Rules: Step 1 = email, delay_days=0. Then steps 2-3 on days 3, 7. Keep messages SHORT (2-3 sentences). 3 steps per lead.`,
+      '',
+      { maxTokens: 6000 }
     );
 
     const sequences = result.sequences || [];
@@ -858,12 +869,16 @@ export async function freeformChat(userId, message) {
     const uf = userId ? ' AND user_id = ?' : '';
     const p = userId ? [userId] : [];
 
-    // Gather full CRM data for context
-    const allLeads = db.prepare(`SELECT id, name, email, company, title, source, score, status, notes FROM leads${uw} ORDER BY score DESC`).all(...p);
-    const allCampaigns = db.prepare(`SELECT * FROM campaigns${uw} ORDER BY created_at DESC`).all(...p);
+    // Gather CRM data for context — capped to prevent token overflow
+    const MAX_LEADS = 50;
+    const MAX_DEALS = 20;
+    const MAX_CAMPAIGNS = 15;
+    const totalLeadCount = db.prepare(`SELECT COUNT(*) as c FROM leads${uw}`).get(...p).c;
+    const allLeads = db.prepare(`SELECT id, name, email, company, title, source, score, status, notes FROM leads${uw} ORDER BY score DESC LIMIT ${MAX_LEADS}`).all(...p);
+    const allCampaigns = db.prepare(`SELECT * FROM campaigns${uw} ORDER BY created_at DESC LIMIT ${MAX_CAMPAIGNS}`).all(...p);
     const allDeals = db.prepare(`
       SELECT p.*, l.name, l.company, l.email FROM pipeline p
-      JOIN leads l ON p.lead_id = l.id WHERE 1=1${uf.replace('user_id', 'p.user_id')} ORDER BY p.deal_value DESC
+      JOIN leads l ON p.lead_id = l.id WHERE 1=1${uf.replace('user_id', 'p.user_id')} ORDER BY p.deal_value DESC LIMIT ${MAX_DEALS}
     `).all(...p);
     const recentActivities = db.prepare(
       `SELECT a.*, l.name as lead_name FROM activities a LEFT JOIN leads l ON a.lead_id = l.id WHERE 1=1${uf.replace('user_id', 'a.user_id')} ORDER BY a.created_at DESC LIMIT 20`
@@ -904,11 +919,12 @@ export async function freeformChat(userId, message) {
   Leads (${leads.length}): ${leads.length > 0 ? leads.map(l => `${l.name} (${l.company || 'N/A'}, score:${l.score}, ${l.delivery_status})`).join('; ') : 'None assigned'}\n`;
     }
 
-    // All leads
-    context += `\n=== ALL LEADS (${allLeads.length}) ===\n`;
+    // All leads (capped)
+    context += `\n=== LEADS (top ${allLeads.length} of ${totalLeadCount} by score) ===\n`;
     for (const l of allLeads) {
-      context += `- ${l.name} | ${l.email} | ${l.company || 'N/A'} | ${l.title || 'N/A'} | Source: ${l.source} | Score: ${l.score} | Status: ${l.status}${l.notes ? ' | Notes: ' + l.notes.substring(0, 80) : ''}\n`;
+      context += `- ${l.name} | ${l.email} | ${l.company || 'N/A'} | ${l.title || 'N/A'} | Source: ${l.source} | Score: ${l.score} | Status: ${l.status}${l.notes ? ' | Notes: ' + l.notes.substring(0, 60) : ''}\n`;
     }
+    if (totalLeadCount > MAX_LEADS) context += `... and ${totalLeadCount - MAX_LEADS} more leads not shown (use filters or ask about specific leads by name)\n`;
 
     // Pipeline
     context += `\n=== PIPELINE DEALS (${allDeals.length}) ===\n`;
