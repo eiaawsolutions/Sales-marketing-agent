@@ -212,8 +212,10 @@ export function initializeDatabase(db) {
   // Migrate activities table to add voice_call to CHECK constraint
   // SQLite doesn't support ALTER CHECK — must recreate the table
   try {
-    const hasVoiceCall = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'activities'").get();
-    if (hasVoiceCall?.sql && !hasVoiceCall.sql.includes('voice_call')) {
+    const actTableDef = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'activities'").get();
+    if (actTableDef?.sql && !actTableDef.sql.includes('voice_call')) {
+      // Get actual column names from the existing table
+      const cols = db.prepare("PRAGMA table_info(activities)").all().map(c => c.name);
       db.exec(`
         CREATE TABLE activities_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -227,12 +229,16 @@ export function initializeDatabase(db) {
           FOREIGN KEY (lead_id) REFERENCES leads(id),
           FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
         );
-        INSERT INTO activities_new SELECT id, lead_id, campaign_id, type, description, outcome, created_at, user_id FROM activities;
-        DROP TABLE activities;
-        ALTER TABLE activities_new RENAME TO activities;
       `);
+      // Build safe column list — only copy columns that exist in both tables
+      const targetCols = ['id', 'lead_id', 'campaign_id', 'type', 'description', 'outcome', 'created_at', 'user_id'];
+      const safeCols = targetCols.filter(c => cols.includes(c));
+      db.exec(`INSERT INTO activities_new (${safeCols.join(',')}) SELECT ${safeCols.join(',')} FROM activities;`);
+      db.exec(`DROP TABLE activities;`);
+      db.exec(`ALTER TABLE activities_new RENAME TO activities;`);
+      console.log('Activities table migrated: voice_call CHECK constraint added');
     }
-  } catch (e) { console.error('Activities migration:', e.message); }
+  } catch (e) { console.error('Activities migration error:', e.message); }
 
   // Seed default superadmin
   const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
