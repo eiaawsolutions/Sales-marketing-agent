@@ -456,8 +456,8 @@ router.get('/call-link-token', async (req, res) => {
     const callObjective = stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify';
 
     const beginMessage = lead
-      ? `Hey ${lead.name}! Thanks for clicking through — I'm Sarah from E-I-A-A-W Solutions. So glad you're here! What made you curious about us?`
-      : `Hey! Thanks for hopping on. I'm Sarah from E-I-A-A-W Solutions — what can I help you with?`;
+      ? `Hey ${lead.name}! Thanks for clicking through — I'm Sarah from E-I-A-A-W A.I. Sales Agent. So glad you're here! What made you curious about us?`
+      : `Hey! Thanks for hopping on. I'm Sarah from E-I-A-A-W A.I. Sales Agent — what can I help you with?`;
 
     // Create web call with Retell
     const webCall = await retellAPI(apiKey, '/v2/create-web-call', 'POST', {
@@ -752,16 +752,16 @@ router.post('/call', async (req, res) => {
     let callObjective, beginMessage;
     if (stage === 'new' || stage === 'cold') {
       callObjective = 'introduce_and_qualify';
-      beginMessage = `Hey, is this ${lead.name}? Hi! I'm Sarah from E-I-A-A-W Solutions — hope I'm not catching you at a bad time?`;
+      beginMessage = `Hey, is this ${lead.name}? Hi! I'm Sarah from E-I-A-A-W A.I. Sales Agent — hope I'm not catching you at a bad time?`;
     } else if (stage === 'contacted' || stage === 'warm') {
       callObjective = 'follow_up';
-      beginMessage = `Hey ${lead.name}! It's Sarah from E-I-A-A-W Solutions — we chatted a little while back. How's it going?`;
+      beginMessage = `Hey ${lead.name}! It's Sarah from E-I-A-A-W A.I. Sales Agent — we chatted a little while back. How's it going?`;
     } else if (stage === 'qualified' || stage === 'hot') {
       callObjective = 'book_meeting';
       beginMessage = `Hey ${lead.name}, it's Sarah from E-I-A-A-W. Good to hear your voice again! So I was thinking about what you mentioned last time and I'd love to actually show you inside the tool — do you have a sec?`;
     } else {
       callObjective = 'general_followup';
-      beginMessage = `Hey ${lead.name}, it's Sarah from E-I-A-A-W Solutions — just wanted to check in and see how things are going?`;
+      beginMessage = `Hey ${lead.name}, it's Sarah from E-I-A-A-W A.I. Sales Agent — just wanted to check in and see how things are going?`;
     }
 
     let callResult;
@@ -923,7 +923,7 @@ router.post('/web-call', async (req, res) => {
 
       let beginMessage;
       if (callObjective === 'introduce_and_qualify') {
-        beginMessage = `Hey there! Thanks for joining. I'm Sarah from E-I-A-A-W Solutions — so glad you clicked through. What made you curious about us?`;
+        beginMessage = `Hey there! Thanks for joining. I'm Sarah from E-I-A-A-W A.I. Sales Agent — so glad you clicked through. What made you curious about us?`;
       } else if (callObjective === 'follow_up') {
         beginMessage = `Hey ${lead.name}! It's Sarah again from E-I-A-A-W. Good to reconnect — how's everything been going since we last talked?`;
       } else {
@@ -945,7 +945,7 @@ router.post('/web-call', async (req, res) => {
         lead_company: '',
         lead_stage: 'new',
         call_objective: 'introduce_and_qualify',
-        begin_message: 'Hey! Thanks for hopping on. I\'m Sarah from E-I-A-A-W Solutions. What can I help you with today?',
+        begin_message: 'Hey! Thanks for hopping on. I\'m Sarah from E-I-A-A-W A.I. Sales Agent. What can I help you with today?',
       };
       description = 'Web call (no lead)';
     }
@@ -1017,7 +1017,7 @@ router.post('/auto-call', async (req, res) => {
             lead_company: lead.company || 'their company',
             lead_stage: stage,
             call_objective: stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify',
-            begin_message: `Hi, is this ${lead.name}? This is Sarah calling from E-I-A-A-W Solutions.`,
+            begin_message: `Hi, is this ${lead.name}? This is Sarah calling from E-I-A-A-W A.I. Sales Agent.`,
           },
           metadata: { lead_id: String(lead.id), user_id: String(req.user.id), campaign_id: String(campaignId) },
         };
@@ -1053,10 +1053,10 @@ router.post('/auto-call', async (req, res) => {
 
 // --- Sales Agent Prompt ---
 
-const SALES_AGENT_PROMPT = `You are a friendly, natural-sounding sales development representative named Sarah from E-I-A-A-W Solutions. You help businesses grow with AI-powered sales and marketing tools.
+const SALES_AGENT_PROMPT = `You are a friendly, natural-sounding sales development representative named Sarah from E-I-A-A-W A.I. Sales Agent. You help businesses grow with AI-powered sales and marketing tools.
 
 ## Pronunciation
-IMPORTANT: The company name "EIAAW" is an acronym. Always pronounce it as individual letters: "E, I, A, A, W". Never say it as one word. Say "E-I-A-A-W Solutions" every time.
+IMPORTANT: The product name "EIAAW" is an acronym. Always pronounce it as individual letters: "E, I, A, A, W". Never say it as one word. Always refer to the product as "E-I-A-A-W A.I. Sales Agent" — not "EIAAW Solutions".
 
 ## How You Sound
 - You talk like a real person, not a script. Vary your sentence length. Short punchy lines mixed with longer ones.
@@ -1081,7 +1081,7 @@ IMPORTANT: The company name "EIAAW" is an acronym. Always pronounce it as indivi
 
 ## Opening
 Use {{begin_message}} as your opening. If empty, start with:
-"Hey, is this {{lead_name}}? Hi! I'm Sarah from E-I-A-A-W Solutions — hope I'm not catching you at a bad time?"
+"Hey, is this {{lead_name}}? Hi! I'm Sarah from E-I-A-A-W A.I. Sales Agent — hope I'm not catching you at a bad time?"
 
 IMPORTANT: After your opening, WAIT for them to respond. Don't launch into a pitch. Have a real conversation.
 
