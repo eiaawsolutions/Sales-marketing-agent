@@ -3727,9 +3727,27 @@ async function loadSettings() {
           <small class="text-muted">Get your API key from <a href="https://dashboard.retellai.com" target="_blank" style="color:var(--primary)">Retell Dashboard</a> &gt; API Keys</small>
         </div>
         <div class="form-group">
-          <label>From Phone Number (E.164 format)</label>
-          <input id="s-voice-phone" value="${settings.voice_phone_number || ''}" placeholder="+14157774444 — buy a number in Retell Dashboard first">
-          <small class="text-muted">The phone number calls will come from. Buy one in your <a href="https://dashboard.retellai.com" target="_blank" style="color:var(--primary)">Retell Dashboard</a> &gt; Phone Numbers.</small>
+          <label>From Phone Number (E.164 format) ${settings.voice_phone_number ? '<span style="color:var(--success)">&#10003;</span>' : ''}</label>
+          <input id="s-voice-phone" value="${settings.voice_phone_number || ''}" placeholder="+60123456789 — Malaysian number via Twilio import">
+          <small class="text-muted">For Malaysian numbers: buy a +60 number from <a href="https://www.twilio.com/console/phone-numbers" target="_blank" style="color:var(--primary)">Twilio</a>, then import it below.</small>
+        </div>
+        <div style="margin-top:8px;padding:14px;background:rgba(245,158,11,0.06);border-radius:var(--radius);border:1px solid rgba(245,158,11,0.15)">
+          <div style="font-weight:700;font-size:13px;color:var(--warning);margin-bottom:8px">Import Malaysian Number from Twilio</div>
+          <small class="text-muted" style="display:block;margin-bottom:10px">
+            Retell only has US numbers built-in. For Malaysian (+60) numbers:<br>
+            1. Buy a number in <a href="https://www.twilio.com/console/phone-numbers" target="_blank" style="color:var(--primary)">Twilio Console</a><br>
+            2. Create an <a href="https://www.twilio.com/console/elastic-sip-trunking/trunks" target="_blank" style="color:var(--primary)">Elastic SIP Trunk</a> &rarr; set Origination URI to <code>sip:sip.retellai.com</code><br>
+            3. Under Termination, whitelist IP <code>18.98.16.120/30</code> or add credentials<br>
+            4. Copy the Termination URI and paste below, then click Import
+          </small>
+          <div class="grid-2" style="gap:8px">
+            <input id="s-twilio-uri" placeholder="e.g., mytrunk.pstn.twilio.com" style="font-size:13px">
+            <input id="s-twilio-user" placeholder="SIP username (optional)" style="font-size:13px">
+          </div>
+          <div style="margin-top:8px">
+            <button class="btn btn-sm" style="background:var(--warning);color:#000;border:none" onclick="importTwilioNumber()">Import Number to Retell</button>
+            <span id="import-number-status" class="text-sm" style="margin-left:8px"></span>
+          </div>
         </div>
         <div class="flex gap-2" style="margin-top:12px">
           <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
@@ -3807,6 +3825,29 @@ async function saveSettings() {
     loadSettings();
   } catch (e) {
     showNotification('Error saving: ' + e.message, 'error');
+  }
+}
+
+async function importTwilioNumber() {
+  const phoneNumber = gv('s-voice-phone');
+  const terminationUri = gv('s-twilio-uri');
+  const sipUsername = gv('s-twilio-user');
+  const statusEl = document.getElementById('import-number-status');
+
+  if (!phoneNumber || !terminationUri) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">Enter phone number and Twilio termination URI first.</span>';
+    return;
+  }
+
+  if (statusEl) statusEl.innerHTML = '<span class="text-muted">Importing...</span>';
+  try {
+    // Save settings first so API key is stored
+    await saveSettings();
+    const result = await api.post('/voice/import-number', { phoneNumber, terminationUri, sipUsername });
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--success)">Imported! ${result.message || ''}</span>`;
+    loadSettings();
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">Error: ${e.message}</span>`;
   }
 }
 

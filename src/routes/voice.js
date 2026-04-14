@@ -205,7 +205,7 @@ router.post('/setup', async (req, res) => {
       llmId: llm.llm_id,
       agentName: 'EIAAW Sales Agent',
       webhookUrl,
-      message: 'Voice agent created. Now buy a phone number in your Retell dashboard and enter it in Settings.',
+      message: 'Voice agent created! For Malaysian numbers: buy a +60 number from Twilio, create a SIP trunk, then import it below.',
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -220,6 +220,41 @@ router.get('/phones', async (req, res) => {
     if (!apiKey) return res.status(400).json({ error: 'Retell API key not configured.' });
     const phones = await retellAPI(apiKey, '/list-phone-numbers');
     res.json(phones);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/voice/import-number — import a Twilio/SIP number into Retell
+router.post('/import-number', async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Superadmin only' });
+    const { apiKey, agentId } = getVoiceConfig();
+    if (!apiKey) return res.status(400).json({ error: 'Retell API key not configured.' });
+
+    const { phoneNumber, terminationUri, sipUsername, sipPassword } = req.body;
+    if (!phoneNumber || !terminationUri) {
+      return res.status(400).json({ error: 'Phone number (E.164) and Twilio termination URI required.' });
+    }
+
+    const importBody = {
+      phone_number: phoneNumber,
+      termination_uri: terminationUri,
+    };
+    if (sipUsername) importBody.sip_trunk_auth_username = sipUsername;
+    if (sipPassword) importBody.sip_trunk_auth_password = sipPassword;
+    if (agentId) {
+      importBody.outbound_agents = [{ agent_id: agentId, weight: 100 }];
+      importBody.inbound_agents = [{ agent_id: agentId, weight: 100 }];
+    }
+
+    const result = await retellAPI(apiKey, '/import-phone-number', 'POST', importBody);
+
+    // Save the phone number to settings
+    db.prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)')
+      .run('voice_phone_number', phoneNumber);
+
+    res.json({ success: true, ...result, message: 'Phone number imported and saved. You can now make calls.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
