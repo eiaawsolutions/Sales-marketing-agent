@@ -19,7 +19,14 @@ export async function sendEmail({ to, subject, html, from }) {
 }
 
 async function sendViaResend(apiKey, { to, subject, html, from }) {
-  const fromEmail = from || db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value || 'noreply@eiaawsolutions.com';
+  const configuredFrom = from || db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value || '';
+
+  // Resend requires a verified domain. Use their default sender as fallback.
+  // Only custom domains verified in Resend dashboard can be used as "from".
+  // Default: "EIAAW SalesAgent <onboarding@resend.dev>" (works immediately on free tier)
+  const fromEmail = configuredFrom && !configuredFrom.includes('@gmail.com') && !configuredFrom.includes('@yahoo.') && !configuredFrom.includes('@hotmail.') && !configuredFrom.includes('@outlook.')
+    ? configuredFrom
+    : 'EIAAW SalesAgent <onboarding@resend.dev>';
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
