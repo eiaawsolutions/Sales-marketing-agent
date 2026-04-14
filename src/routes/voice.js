@@ -99,12 +99,18 @@ router.post('/webhook', async (req, res) => {
 // POST /api/voice/tool-callback — Retell tool callback dispatcher
 router.post('/tool-callback', async (req, res) => {
   try {
-    const toolName = req.body.name || req.body.tool_name || '';
-    const args = req.body.args || req.body.arguments || req.body;
+    // Log the full payload for debugging
+    console.log('[tool-callback] Full payload:', JSON.stringify(req.body, null, 2));
+
+    // Retell sends: { tool_call_id, name, args, call } or { tool_name, arguments, call_id, metadata }
+    const toolName = req.body.name || req.body.tool_name || req.body.tool_call_name || '';
+    const args = req.body.args || req.body.arguments || {};
     const callId = req.body.call_id || req.body.call?.call_id || '';
-    const metadata = req.body.metadata || req.body.call?.metadata || {};
+    const metadata = req.body.call?.metadata || req.body.metadata || {};
     const leadId = metadata.lead_id ? parseInt(metadata.lead_id) : null;
     const userId = metadata.user_id ? parseInt(metadata.user_id) : 1;
+
+    console.log(`[tool-callback] Tool: "${toolName}", Lead: ${leadId}, Args:`, JSON.stringify(args));
 
     if (toolName === 'schedule_meeting') {
       return handleScheduleMeeting(args, callId, leadId, userId, res);
