@@ -3950,12 +3950,19 @@ async function setupVoiceAgent() {
   const statusEl = document.getElementById('voice-setup-status');
   const btn = document.getElementById('btn-voice-setup');
   if (btn) btn.disabled = true;
-  if (statusEl) statusEl.innerHTML = '<span class="text-muted">Creating voice agent on Retell AI... This takes a few seconds.</span>';
+  if (statusEl) statusEl.innerHTML = '<span class="text-muted">Saving settings & creating voice agent on Retell AI... This takes a few seconds.</span>';
 
   try {
-    // Save settings first (so API key is stored)
-    await saveSettings();
+    // Save settings first WITHOUT re-rendering the page
+    const data = {
+      voice_ai_provider: gv('s-voice-provider') || 'retell',
+      voice_ai_api_key: document.getElementById('s-voice-key')?.value || '',
+      voice_ai_agent_id: gv('s-voice-agent') || '',
+      voice_phone_number: gv('s-voice-phone') || '',
+    };
+    await api.put('/settings', data);
 
+    // Now create the agent
     const result = await api.post('/voice/setup', {});
     if (statusEl) statusEl.innerHTML = `
       <div style="padding:12px;background:rgba(34,197,94,0.1);border-radius:var(--radius);border-left:3px solid #22c55e">
@@ -3965,10 +3972,13 @@ async function setupVoiceAgent() {
         <span class="text-sm text-muted">${result.message}</span>
       </div>
     `;
-    // Reload settings to show new agent ID
-    loadSettings();
+    showNotification('Voice agent created!', 'success');
+    // Update the agent ID field without full re-render
+    const agentInput = document.getElementById('s-voice-agent');
+    if (agentInput) agentInput.value = result.agentId;
   } catch (e) {
     if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">Setup error: ${e.message}</span>`;
+    showNotification('Voice setup failed: ' + e.message, 'error');
   }
   if (btn) btn.disabled = false;
 }
