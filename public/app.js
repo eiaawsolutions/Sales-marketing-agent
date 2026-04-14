@@ -599,10 +599,9 @@ async function aiVoiceCall(leadId) {
     // Create web call via backend
     const result = await api.post('/voice/web-call', { leadId });
 
-    // Initialize Retell Web SDK
-    const RetellWebClient = window.retellClientJsSdk?.RetellWebClient || window.RetellWebClient;
-    if (!RetellWebClient) throw new Error('Retell SDK not loaded. Please refresh the page and try again.');
-    const retellClient = new RetellWebClient();
+    // Initialize Retell Web SDK — loaded as ES module from esm.sh
+    if (!window.RetellWebClient) throw new Error('Retell SDK still loading. Please wait a moment and try again.');
+    const retellClient = new window.RetellWebClient();
 
     // Show call widget
     const widget = document.getElementById('voice-call-widget');
