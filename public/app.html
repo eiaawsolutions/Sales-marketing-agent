@@ -903,6 +903,35 @@
       color: #f59e0b;
     }
 
+    /* Voice Call Widget */
+    #voice-call-widget {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      width: 320px; border-radius: 16px;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(46,196,182,0.2);
+      padding: 24px; color: #fff;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .vc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .vc-status { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+    .vc-status.connecting { color: #f59e0b; }
+    .vc-status.active { color: #22c55e; }
+    .vc-status.ended { color: #94a3b8; }
+    .vc-lead { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .vc-meta { font-size: 12px; color: #94a3b8; }
+    .vc-timer { font-size: 28px; font-weight: 300; text-align: center; margin: 16px 0; font-variant-numeric: tabular-nums; }
+    .vc-wave { display: flex; align-items: center; justify-content: center; gap: 3px; height: 24px; margin-bottom: 16px; }
+    .vc-wave span { width: 3px; border-radius: 2px; background: var(--primary); animation: wave 1.2s ease-in-out infinite; }
+    .vc-wave span:nth-child(2) { animation-delay: 0.1s; }
+    .vc-wave span:nth-child(3) { animation-delay: 0.2s; }
+    .vc-wave span:nth-child(4) { animation-delay: 0.3s; }
+    .vc-wave span:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes wave { 0%,100% { height: 4px; } 50% { height: 20px; } }
+    .vc-transcript { font-size: 12px; color: #94a3b8; max-height: 60px; overflow-y: auto; margin-bottom: 12px; line-height: 1.5; }
+    .vc-btn-end { width: 100%; padding: 10px; border-radius: 10px; border: none; background: #ef4444; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; transition: background 0.15s; }
+    .vc-btn-end:hover { background: #dc2626; }
+
     @media (max-width: 768px) {
       .sidebar { display: none; }
       .main { margin-left: 0; }
@@ -920,6 +949,8 @@
 </head>
 <body>
   <div class="app" id="app"></div>
-  <script src="/app.js?v=20260414e"></script>
+  <div id="voice-call-widget" style="display:none"></div>
+  <script src="https://cdn.jsdelivr.net/npm/retell-client-js-sdk@3/bundle/index.js"></script>
+  <script src="/app.js?v=20260414f"></script>
 </body>
 </html>

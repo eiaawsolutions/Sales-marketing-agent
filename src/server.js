@@ -29,12 +29,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://cdn.jsdelivr.net"],
       scriptSrcAttr: ["'unsafe-inline'"], // Allow onclick handlers
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://checkout.stripe.com", "https://api.stripe.com"],
+      connectSrc: ["'self'", "https://checkout.stripe.com", "https://api.stripe.com", "wss://*.retellai.com", "https://*.retellai.com"],
       frameSrc: ["https://js.stripe.com", "https://checkout.stripe.com"],
     },
   },

@@ -452,7 +452,7 @@ async function loadLeads() {
                   <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id})">AI Score</button>
                   <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id})">Qualify</button>
                   <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id})">Outreach</button>
-                  ${l.phone ? `<button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="aiVoiceCall(${l.id})">&#9742; Call</button>` : ''}
+                  <button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="aiVoiceCall(${l.id})">&#9742; Call</button>
                   ${currentUser?.role === 'superadmin' ? `<button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>
                   <button class="btn btn-sm btn-danger" onclick="deleteLead(${l.id})">X</button>` : ''}
                 </div>
@@ -578,16 +578,123 @@ async function aiQualifyLead(id) {
   } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
 
+// Voice call state
+let activeCall = null;
+let callTimer = null;
+let callSeconds = 0;
+
 async function aiVoiceCall(leadId) {
-  if (!confirm('Initiate an AI voice call to this lead? The AI agent will call them now.')) return;
-  showNotification('Initiating voice call...');
+  if (activeCall) {
+    showNotification('A call is already in progress. End it first.', 'error');
+    return;
+  }
+  if (!confirm('Start a voice call with the AI agent for this lead? Your browser microphone will be used.')) return;
+  showNotification('Connecting to AI agent...');
+
   try {
-    const result = await api.post('/voice/call', { leadId });
-    showNotification(`Call initiated (${result.objective}). Call ID: ${result.callId}`, 'success');
-    loadLeads();
+    // Get lead info for display
+    const leads = await api.get('/leads');
+    const lead = leads.find(l => l.id === leadId) || { name: 'Lead', company: '' };
+
+    // Create web call via backend
+    const result = await api.post('/voice/web-call', { leadId });
+
+    // Initialize Retell Web SDK
+    const retellClient = new RetellWebClient();
+
+    // Show call widget
+    const widget = document.getElementById('voice-call-widget');
+    callSeconds = 0;
+    widget.style.display = 'block';
+    widget.innerHTML = `
+      <div class="vc-header">
+        <div class="vc-status connecting">Connecting...</div>
+        <button onclick="endVoiceCall()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:18px">&times;</button>
+      </div>
+      <div class="vc-lead">${lead.name || 'Lead'}</div>
+      <div class="vc-meta">${lead.company || ''}</div>
+      <div class="vc-timer" id="vc-timer">00:00</div>
+      <div class="vc-wave" id="vc-wave" style="display:none">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="vc-transcript" id="vc-transcript"></div>
+      <button class="vc-btn-end" onclick="endVoiceCall()">End Call</button>
+    `;
+
+    activeCall = { retellClient, callId: result.callId, leadId };
+
+    // Set up event listeners
+    retellClient.on('call_started', () => {
+      const statusEl = widget.querySelector('.vc-status');
+      if (statusEl) { statusEl.textContent = 'Active'; statusEl.className = 'vc-status active'; }
+      const waveEl = document.getElementById('vc-wave');
+      if (waveEl) waveEl.style.display = 'flex';
+      callTimer = setInterval(() => {
+        callSeconds++;
+        const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const s = String(callSeconds % 60).padStart(2, '0');
+        const timerEl = document.getElementById('vc-timer');
+        if (timerEl) timerEl.textContent = `${m}:${s}`;
+      }, 1000);
+    });
+
+    retellClient.on('call_ended', () => {
+      if (callTimer) clearInterval(callTimer);
+      const statusEl = widget.querySelector('.vc-status');
+      if (statusEl) { statusEl.textContent = 'Call Ended'; statusEl.className = 'vc-status ended'; }
+      const waveEl = document.getElementById('vc-wave');
+      if (waveEl) waveEl.style.display = 'none';
+      showNotification(`Call ended (${Math.floor(callSeconds/60)}m ${callSeconds%60}s)`, 'success');
+      setTimeout(() => { widget.style.display = 'none'; activeCall = null; }, 3000);
+      loadLeads();
+    });
+
+    retellClient.on('agent_start_talking', () => {
+      const waveEl = document.getElementById('vc-wave');
+      if (waveEl) waveEl.style.display = 'flex';
+    });
+
+    retellClient.on('agent_stop_talking', () => {
+      const waveEl = document.getElementById('vc-wave');
+      if (waveEl) waveEl.style.display = 'none';
+    });
+
+    retellClient.on('update', (update) => {
+      if (update.transcript) {
+        const el = document.getElementById('vc-transcript');
+        if (el) {
+          const lines = update.transcript.map(t => `<b>${t.role === 'agent' ? 'AI' : 'You'}:</b> ${t.content}`);
+          el.innerHTML = lines.slice(-3).join('<br>');
+          el.scrollTop = el.scrollHeight;
+        }
+      }
+    });
+
+    retellClient.on('error', (err) => {
+      showNotification('Call error: ' + (err.message || err), 'error');
+      widget.style.display = 'none';
+      activeCall = null;
+      if (callTimer) clearInterval(callTimer);
+    });
+
+    // Start the call
+    await retellClient.startCall({ accessToken: result.accessToken });
+
   } catch (e) {
     showNotification('Voice call error: ' + e.message, 'error');
+    document.getElementById('voice-call-widget').style.display = 'none';
+    activeCall = null;
   }
+}
+
+function endVoiceCall() {
+  if (activeCall?.retellClient) {
+    activeCall.retellClient.stopCall();
+  }
+  if (callTimer) clearInterval(callTimer);
+  const widget = document.getElementById('voice-call-widget');
+  if (widget) widget.style.display = 'none';
+  activeCall = null;
 }
 
 async function aiOutreach(id) {
@@ -3726,28 +3833,14 @@ async function loadSettings() {
           </div>
           <small class="text-muted">Get your API key from <a href="https://dashboard.retellai.com" target="_blank" style="color:var(--primary)">Retell Dashboard</a> &gt; API Keys</small>
         </div>
-        <div class="form-group">
-          <label>From Phone Number (E.164 format) ${settings.voice_phone_number ? '<span style="color:var(--success)">&#10003;</span>' : ''}</label>
-          <input id="s-voice-phone" value="${settings.voice_phone_number || ''}" placeholder="+60123456789 — Malaysian number via Twilio import">
-          <small class="text-muted">For Malaysian numbers: buy a +60 number from <a href="https://www.twilio.com/console/phone-numbers" target="_blank" style="color:var(--primary)">Twilio</a>, then import it below.</small>
+        <div style="margin-top:8px;padding:14px;background:rgba(34,197,94,0.06);border-radius:var(--radius);border:1px solid rgba(34,197,94,0.15)">
+          <div style="font-weight:700;font-size:13px;color:#22c55e;margin-bottom:4px">&#9889; Web Calls (No Phone Number Needed)</div>
+          <small class="text-muted">Voice calls run directly in the browser using your microphone. Click the green <b>Call</b> button on any lead to start. No phone number or Twilio setup required.</small>
         </div>
-        <div style="margin-top:8px;padding:14px;background:rgba(245,158,11,0.06);border-radius:var(--radius);border:1px solid rgba(245,158,11,0.15)">
-          <div style="font-weight:700;font-size:13px;color:var(--warning);margin-bottom:8px">Import Malaysian Number from Twilio</div>
-          <small class="text-muted" style="display:block;margin-bottom:10px">
-            Retell only has US numbers built-in. For Malaysian (+60) numbers:<br>
-            1. Buy a number in <a href="https://www.twilio.com/console/phone-numbers" target="_blank" style="color:var(--primary)">Twilio Console</a><br>
-            2. Create an <a href="https://www.twilio.com/console/elastic-sip-trunking/trunks" target="_blank" style="color:var(--primary)">Elastic SIP Trunk</a> &rarr; set Origination URI to <code>sip:sip.retellai.com</code><br>
-            3. Under Termination, whitelist IP <code>18.98.16.120/30</code> or add credentials<br>
-            4. Copy the Termination URI and paste below, then click Import
-          </small>
-          <div class="grid-2" style="gap:8px">
-            <input id="s-twilio-uri" placeholder="e.g., mytrunk.pstn.twilio.com" style="font-size:13px">
-            <input id="s-twilio-user" placeholder="SIP username (optional)" style="font-size:13px">
-          </div>
-          <div style="margin-top:8px">
-            <button class="btn btn-sm" style="background:var(--warning);color:#000;border:none" onclick="importTwilioNumber()">Import Number to Retell</button>
-            <span id="import-number-status" class="text-sm" style="margin-left:8px"></span>
-          </div>
+        <div class="form-group" style="margin-top:10px">
+          <label>Phone Number (optional — for outbound phone calls)</label>
+          <input id="s-voice-phone" value="${settings.voice_phone_number || ''}" placeholder="Optional: +60123456789 for actual phone calls (requires Twilio SIP trunk)">
+          <small class="text-muted">Leave empty to use web calls only. Only needed if you want the AI to dial actual phone numbers.</small>
         </div>
         <div class="flex gap-2" style="margin-top:12px">
           <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>

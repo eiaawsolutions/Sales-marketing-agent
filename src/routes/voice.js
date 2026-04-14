@@ -363,6 +363,83 @@ router.post('/call', async (req, res) => {
   }
 });
 
+// POST /api/voice/web-call — create a browser-based web call (no phone number needed)
+router.post('/web-call', async (req, res) => {
+  try {
+    checkPlanLimit(req, 'voice_call');
+
+    const { leadId, campaignId } = req.body;
+    const { apiKey, agentId } = getVoiceConfig();
+    if (!apiKey) return res.status(400).json({ error: 'Voice AI not configured. Add Retell API key in Settings.' });
+    if (!agentId) return res.status(400).json({ error: 'Voice agent not created. Run Auto-Setup in Settings first.' });
+
+    // Build dynamic variables for the agent
+    let dynamicVars = {};
+    let description = 'Web call';
+
+    if (leadId) {
+      const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+      const stage = lead.status || 'new';
+      const callObjective = stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify';
+
+      let beginMessage;
+      if (callObjective === 'introduce_and_qualify') {
+        beginMessage = `Hi! Thanks for connecting. I'm the AI sales assistant from EIAAW Solutions. I understand you might be interested in automating your sales process. Do you have a couple of minutes?`;
+      } else if (callObjective === 'follow_up') {
+        beginMessage = `Hi ${lead.name}! Great to connect again. I'm following up on our earlier conversation about EIAAW Solutions. Have you had a chance to think about what we discussed?`;
+      } else {
+        beginMessage = `Hi ${lead.name}! Thanks for hopping on. I'd love to quickly show you how our AI sales platform works for ${lead.company || 'your business'}. Do you have about 15 minutes?`;
+      }
+
+      dynamicVars = {
+        lead_name: lead.name,
+        lead_company: lead.company || 'their company',
+        lead_title: lead.title || '',
+        lead_stage: stage,
+        call_objective: callObjective,
+        begin_message: beginMessage,
+      };
+      description = `Web call with ${lead.name} (${callObjective})`;
+    } else {
+      dynamicVars = {
+        lead_name: 'there',
+        lead_company: '',
+        lead_stage: 'new',
+        call_objective: 'introduce_and_qualify',
+        begin_message: 'Hi! Thanks for connecting. I\'m the AI sales assistant from EIAAW Solutions. How can I help you today?',
+      };
+      description = 'Web call (no lead)';
+    }
+
+    const webCall = await retellAPI(apiKey, '/v2/create-web-call', 'POST', {
+      agent_id: agentId,
+      retell_llm_dynamic_variables: dynamicVars,
+      metadata: {
+        lead_id: leadId ? String(leadId) : '',
+        user_id: String(req.user.id),
+        campaign_id: campaignId ? String(campaignId) : '',
+      },
+    });
+
+    // Log the call
+    if (leadId) {
+      db.prepare('INSERT INTO activities (user_id, lead_id, campaign_id, type, description, outcome) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(req.user.id, leadId, campaignId || null, 'voice_call', description, JSON.stringify(webCall));
+    }
+
+    res.json({
+      success: true,
+      accessToken: webCall.access_token,
+      callId: webCall.call_id,
+      agentId: webCall.agent_id,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/voice/auto-call — batch AI calls to all leads in a campaign
 router.post('/auto-call', async (req, res) => {
   try {
