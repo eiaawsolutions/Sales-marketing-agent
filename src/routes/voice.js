@@ -453,12 +453,14 @@ router.post('/generate-link', async (req, res) => {
     // Get lead info
     let leadName = '';
     let leadEmail = '';
+    let leadPhone = '';
     let shareMessage = `Hi! I'd like to have a quick chat about how we can help your business. Click here to talk to our AI assistant: ${callUrl}`;
     if (leadId) {
-      const lead = db.prepare('SELECT name, company, email FROM leads WHERE id = ?').get(leadId);
+      const lead = db.prepare('SELECT name, company, email, phone FROM leads WHERE id = ?').get(leadId);
       if (lead) {
         leadName = lead.name;
         leadEmail = lead.email || '';
+        leadPhone = lead.phone || '';
         shareMessage = `Hi ${lead.name}! I'd love to show you how EIAAW Solutions can help ${lead.company || 'your business'}. Click here for a quick voice chat with our AI assistant: ${callUrl}`;
       }
     }
@@ -518,7 +520,7 @@ router.post('/generate-link', async (req, res) => {
       }
     }
 
-    res.json({ callUrl, token, expiresAt, shareMessage, leadName, leadEmail, emailSent });
+    res.json({ callUrl, token, expiresAt, shareMessage, leadName, leadEmail, leadPhone, emailSent });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
