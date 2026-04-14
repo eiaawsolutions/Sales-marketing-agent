@@ -431,9 +431,9 @@ router.post('/call', async (req, res) => {
 });
 
 // POST /api/voice/generate-link — create a shareable call link for a lead
-router.post('/generate-link', (req, res) => {
+router.post('/generate-link', async (req, res) => {
   try {
-    const { leadId } = req.body;
+    const { leadId, sendEmail } = req.body;
 
     const { agentId } = getVoiceConfig();
     if (!agentId) return res.status(400).json({ error: 'Voice agent not set up. Run Auto-Setup in Settings first.' });
@@ -450,13 +450,15 @@ router.post('/generate-link', (req, res) => {
     const baseUrl = req.headers.origin || `https://${req.headers.host}`;
     const callUrl = `${baseUrl}/call.html?t=${token}`;
 
-    // Get lead info for share message
+    // Get lead info
     let leadName = '';
+    let leadEmail = '';
     let shareMessage = `Hi! I'd like to have a quick chat about how we can help your business. Click here to talk to our AI assistant: ${callUrl}`;
     if (leadId) {
-      const lead = db.prepare('SELECT name, company FROM leads WHERE id = ?').get(leadId);
+      const lead = db.prepare('SELECT name, company, email FROM leads WHERE id = ?').get(leadId);
       if (lead) {
         leadName = lead.name;
+        leadEmail = lead.email || '';
         shareMessage = `Hi ${lead.name}! I'd love to show you how EIAAW Solutions can help ${lead.company || 'your business'}. Click here for a quick voice chat with our AI assistant: ${callUrl}`;
       }
     }
@@ -467,7 +469,56 @@ router.post('/generate-link', (req, res) => {
         .run(req.user.id, leadId, 'ai_action', `Generated call link for ${leadName || 'lead'}`);
     }
 
-    res.json({ callUrl, token, expiresAt, shareMessage, leadName });
+    // Auto-send email with call link if lead has email and SMTP is configured
+    let emailSent = false;
+    if (sendEmail && leadEmail) {
+      try {
+        const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value;
+        const smtpPort = db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || '587';
+        const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value;
+        const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value;
+        const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value;
+
+        if (smtpUser && smtpHost) {
+          const nodemailer = (await import('nodemailer')).default;
+          const transporter = nodemailer.createTransport({
+            host: smtpHost, port: parseInt(smtpPort), secure: parseInt(smtpPort) === 465,
+            auth: { user: smtpUser, pass: smtpPass },
+          });
+
+          await transporter.sendMail({
+            from: fromEmail || smtpUser,
+            to: leadEmail,
+            subject: `${leadName ? leadName + ', ' : ''}Quick voice chat with EIAAW Solutions`,
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px">
+                <h2 style="color:#2ec4b6;margin-bottom:16px">Let's Have a Quick Chat!</h2>
+                <p style="font-size:15px;line-height:1.6;color:#333">Hi ${leadName || 'there'},</p>
+                <p style="font-size:15px;line-height:1.6;color:#333">I'd love to show you how EIAAW Solutions can help automate your sales and marketing. Instead of reading a long email, how about a quick voice chat?</p>
+                <p style="font-size:15px;line-height:1.6;color:#333">Click the button below to talk to our AI assistant — it takes just 2 minutes, right from your browser. No app download needed.</p>
+                <div style="text-align:center;margin:24px 0">
+                  <a href="${callUrl}" style="display:inline-block;padding:14px 32px;background:#2ec4b6;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:16px">Start Voice Chat</a>
+                </div>
+                <p style="font-size:13px;color:#999;text-align:center">This link expires in 24 hours. Your browser will ask for microphone access.</p>
+                <hr style="margin:24px 0;border:none;border-top:1px solid #eee">
+                <p style="font-size:12px;color:#999;text-align:center">EIAAW Solutions — AI-Human Sales Partnerships<br><a href="https://eiaawsolutions.com" style="color:#2ec4b6">eiaawsolutions.com</a></p>
+              </div>
+            `,
+          });
+          emailSent = true;
+
+          // Log the email activity
+          if (leadId) {
+            db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+              .run(req.user.id, leadId, 'email', `Sent call link email to ${leadEmail}`);
+          }
+        }
+      } catch (emailErr) {
+        console.error('Call link email failed:', emailErr.message);
+      }
+    }
+
+    res.json({ callUrl, token, expiresAt, shareMessage, leadName, leadEmail, emailSent });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

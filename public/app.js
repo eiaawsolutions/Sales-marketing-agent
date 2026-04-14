@@ -631,32 +631,52 @@ let activeCall = null;
 let callTimer = null;
 let callSeconds = 0;
 
+// Store last generated call link data for share handlers
+let _lastCallLink = {};
+
 async function shareCallLink(leadId) {
   showNotification('Generating call link...');
   try {
-    const result = await api.post('/voice/generate-link', { leadId });
-    const url = result.callUrl;
-    const msg = result.shareMessage;
+    const result = await api.post('/voice/generate-link', { leadId, sendEmail: true });
+    _lastCallLink = { url: result.callUrl, message: result.shareMessage };
+
+    const emailSent = result.emailSent ? `<div style="background:rgba(34,197,94,0.1);border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:#22c55e;text-align:center">&#10003; Email with call link sent to ${result.leadEmail || 'lead'}</div>` : '';
 
     showResultModal('Call Link Generated', `
       <div style="text-align:center;margin-bottom:16px">
         <div style="font-size:28px;margin-bottom:8px">&#128279;</div>
-        <p class="text-muted text-sm">Send this link to <strong>${result.leadName || 'the lead'}</strong>. When they click it, they'll talk to your AI sales agent directly in their browser.</p>
+        <p class="text-muted text-sm">Send this link to <strong>${esc(result.leadName || 'the lead')}</strong>. When they click it, they'll talk to your AI sales agent directly in their browser.</p>
       </div>
+      ${emailSent}
       <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:16px;word-break:break-all">
-        <code style="font-size:13px;color:var(--primary)">${url}</code>
+        <code style="font-size:13px;color:var(--primary)">${esc(result.callUrl)}</code>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-        <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${url}');showNotification('Link copied!','success')">Copy Link</button>
-        <button class="btn btn-sm" style="background:#25D366;color:#fff;border:none" onclick="window.open('https://wa.me/?text=${encodeURIComponent(msg)}','_blank')">WhatsApp</button>
-        <button class="btn btn-sm" style="background:#0077B5;color:#fff;border:none" onclick="window.open('https://www.linkedin.com/messaging/compose/?body=${encodeURIComponent(msg)}','_blank')">LinkedIn</button>
-        <button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(\`${msg.replace(/`/g, "'")}\`);showNotification('Message copied!','success')">Copy Message</button>
+        <button class="btn btn-primary btn-sm" onclick="callLinkCopy()">Copy Link</button>
+        <button class="btn btn-sm" style="background:#25D366;color:#fff;border:none" onclick="callLinkWhatsApp()">WhatsApp</button>
+        <button class="btn btn-sm" style="background:#0077B5;color:#fff;border:none" onclick="callLinkLinkedIn()">LinkedIn</button>
+        <button class="btn btn-sm btn-outline" onclick="callLinkCopyMsg()">Copy Message</button>
       </div>
       <div class="text-muted text-sm" style="text-align:center;margin-top:12px">Link expires in 24 hours</div>
     `);
   } catch (e) {
     showNotification('Error: ' + e.message, 'error');
   }
+}
+
+function callLinkCopy() {
+  navigator.clipboard.writeText(_lastCallLink.url);
+  showNotification('Link copied!', 'success');
+}
+function callLinkWhatsApp() {
+  window.open('https://wa.me/?text=' + encodeURIComponent(_lastCallLink.message), '_blank');
+}
+function callLinkLinkedIn() {
+  window.open('https://www.linkedin.com/messaging/compose/?body=' + encodeURIComponent(_lastCallLink.message), '_blank');
+}
+function callLinkCopyMsg() {
+  navigator.clipboard.writeText(_lastCallLink.message);
+  showNotification('Message copied!', 'success');
 }
 
 async function aiVoiceCall(leadId) {
