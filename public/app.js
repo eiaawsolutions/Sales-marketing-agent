@@ -452,6 +452,7 @@ async function loadLeads() {
                   <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id})">AI Score</button>
                   <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id})">Qualify</button>
                   <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id})">Outreach</button>
+                  ${l.phone ? `<button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="aiVoiceCall(${l.id})">&#9742; Call</button>` : ''}
                   ${currentUser?.role === 'superadmin' ? `<button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>
                   <button class="btn btn-sm btn-danger" onclick="deleteLead(${l.id})">X</button>` : ''}
                 </div>
@@ -575,6 +576,18 @@ async function aiQualifyLead(id) {
     `);
     loadLeads();
   } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+async function aiVoiceCall(leadId) {
+  if (!confirm('Initiate an AI voice call to this lead? The AI agent will call them now.')) return;
+  showNotification('Initiating voice call...');
+  try {
+    const result = await api.post('/voice/call', { leadId });
+    showNotification(`Call initiated (${result.objective}). Call ID: ${result.callId}`, 'success');
+    loadLeads();
+  } catch (e) {
+    showNotification('Voice call error: ' + e.message, 'error');
+  }
 }
 
 async function aiOutreach(id) {
@@ -3701,8 +3714,8 @@ async function loadSettings() {
             </select>
           </div>
           <div class="form-group">
-            <label>Agent ID</label>
-            <input id="s-voice-agent" value="${settings.voice_ai_agent_id || ''}" placeholder="Your voice agent/assistant ID">
+            <label>Agent ID ${settings.voice_ai_agent_id ? '<span style="color:var(--success)">&#10003; configured</span>' : '<span class="text-muted">(auto-created by setup)</span>'}</label>
+            <input id="s-voice-agent" value="${settings.voice_ai_agent_id || ''}" placeholder="Auto-generated when you run setup below">
           </div>
         </div>
         <div class="form-group">
@@ -3711,8 +3724,20 @@ async function loadSettings() {
             <input id="s-voice-key" type="password" value="${settings.voice_ai_api_key || ''}" placeholder="Your Retell/Vapi API key">
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('s-voice-key').type = document.getElementById('s-voice-key').type === 'password' ? 'text' : 'password'">Show</button>
           </div>
+          <small class="text-muted">Get your API key from <a href="https://dashboard.retellai.com" target="_blank" style="color:var(--primary)">Retell Dashboard</a> &gt; API Keys</small>
         </div>
-        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:12px">Save Settings</button>
+        <div class="form-group">
+          <label>From Phone Number (E.164 format)</label>
+          <input id="s-voice-phone" value="${settings.voice_phone_number || ''}" placeholder="+14157774444 — buy a number in Retell Dashboard first">
+          <small class="text-muted">The phone number calls will come from. Buy one in your <a href="https://dashboard.retellai.com" target="_blank" style="color:var(--primary)">Retell Dashboard</a> &gt; Phone Numbers.</small>
+        </div>
+        <div class="flex gap-2" style="margin-top:12px">
+          <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+          <button class="btn" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="setupVoiceAgent()" id="btn-voice-setup">
+            ${settings.voice_ai_agent_id ? '&#8635; Rebuild Agent' : '&#9889; Auto-Setup Voice Agent'}
+          </button>
+        </div>
+        <div id="voice-setup-status" style="margin-top:10px"></div>
       </div>
 
       <div class="card">
@@ -3773,6 +3798,7 @@ async function saveSettings() {
     voice_ai_provider: gv('s-voice-provider') || 'retell',
     voice_ai_api_key: document.getElementById('s-voice-key')?.value || '',
     voice_ai_agent_id: gv('s-voice-agent') || '',
+    voice_phone_number: gv('s-voice-phone') || '',
   };
 
   try {
@@ -3782,6 +3808,33 @@ async function saveSettings() {
   } catch (e) {
     showNotification('Error saving: ' + e.message, 'error');
   }
+}
+
+async function setupVoiceAgent() {
+  const statusEl = document.getElementById('voice-setup-status');
+  const btn = document.getElementById('btn-voice-setup');
+  if (btn) btn.disabled = true;
+  if (statusEl) statusEl.innerHTML = '<span class="text-muted">Creating voice agent on Retell AI... This takes a few seconds.</span>';
+
+  try {
+    // Save settings first (so API key is stored)
+    await saveSettings();
+
+    const result = await api.post('/voice/setup', {});
+    if (statusEl) statusEl.innerHTML = `
+      <div style="padding:12px;background:rgba(34,197,94,0.1);border-radius:var(--radius);border-left:3px solid #22c55e">
+        <strong style="color:#22c55e">Voice Agent Created!</strong><br>
+        <span class="text-sm">Agent ID: ${result.agentId}</span><br>
+        <span class="text-sm">LLM ID: ${result.llmId}</span><br>
+        <span class="text-sm text-muted">${result.message}</span>
+      </div>
+    `;
+    // Reload settings to show new agent ID
+    loadSettings();
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">Setup error: ${e.message}</span>`;
+  }
+  if (btn) btn.disabled = false;
 }
 
 async function testAiConnection() {
