@@ -94,9 +94,9 @@ export function requireSuperadmin(req, res, next) {
 
 // Plan limits
 const PLAN_LIMITS = {
-  starter: { leads: 100, campaigns: 3, ai_actions: 50, contact_reveals: 10, model: 'claude-haiku-4-5-20251001', users: 1, auto_outreach: false, auto_leads: false, voice_calls: 0, chatbot: false },
-  pro:     { leads: 500, campaigns: 10, ai_actions: 200, contact_reveals: 50, model: 'claude-sonnet-4-20250514', users: 3, auto_outreach: true, auto_leads: true, voice_calls: 0, chatbot: true },
-  business:{ leads: 99999, campaigns: 99999, ai_actions: 1000, contact_reveals: 200, model: 'claude-sonnet-4-20250514', users: 10, auto_outreach: true, auto_leads: true, voice_calls: 0, chatbot: true },
+  starter: { leads: 100, campaigns: 3, ai_actions: 50, contact_reveals: 10, model: 'claude-haiku-4-5-20251001', users: 1, auto_outreach: false, auto_leads: false, voice_calls: 5, chatbot: false },
+  pro:     { leads: 500, campaigns: 10, ai_actions: 200, contact_reveals: 50, model: 'claude-sonnet-4-20250514', users: 3, auto_outreach: true, auto_leads: true, voice_calls: 20, chatbot: true },
+  business:{ leads: 99999, campaigns: 99999, ai_actions: 1000, contact_reveals: 200, model: 'claude-sonnet-4-20250514', users: 10, auto_outreach: true, auto_leads: true, voice_calls: 100, chatbot: true },
 };
 
 // Voice AI add-on pricing
@@ -170,8 +170,13 @@ export function checkPlanLimit(req, resource) {
       return true;
     }
     case 'voice_call': {
-      if (!limits.voice_calls) {
-        throw new Error('Voice AI calls require a Voice add-on. Add it from your plan settings.');
+      const voiceCount = db.prepare(
+        "SELECT COUNT(*) as c FROM activities WHERE user_id = ? AND type = 'voice_call' AND created_at >= datetime('now', 'start of month')"
+      ).get(userId);
+      const voiceAddonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`voice_addon_${userId}`)?.value || '0');
+      const totalVoiceLimit = limits.voice_calls + voiceAddonCredits;
+      if (voiceCount.c >= totalVoiceLimit) {
+        throw new Error(`Voice call limit reached (${totalVoiceLimit}/month on ${req.user.plan} plan${voiceAddonCredits > 0 ? ` + ${voiceAddonCredits} add-on` : ''}). Add more credits or upgrade from Plan & Billing.`);
       }
       return true;
     }

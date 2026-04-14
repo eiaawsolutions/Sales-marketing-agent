@@ -600,6 +600,8 @@ async function aiVoiceCall(leadId) {
     const result = await api.post('/voice/web-call', { leadId });
 
     // Initialize Retell Web SDK
+    const RetellWebClient = window.retellClientJsSdk?.RetellWebClient || window.RetellWebClient;
+    if (!RetellWebClient) throw new Error('Retell SDK not loaded. Please refresh the page and try again.');
     const retellClient = new RetellWebClient();
 
     // Show call widget
