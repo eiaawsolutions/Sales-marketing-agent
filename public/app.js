@@ -244,6 +244,8 @@ function render() {
     return;
   }
   app.innerHTML = `
+    ${renderMobileHeader()}
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileMenu()"></div>
     ${renderSidebar()}
     <div class="main">
       ${currentUser && !currentUser.emailVerified && currentUser.role !== 'superadmin' ? `
@@ -261,8 +263,52 @@ function render() {
       ${renderPage()}
     </div>
     ${modal ? renderModal() : ''}
+    ${renderMobileBottomNav()}
   `;
   afterRender();
+}
+
+function renderMobileHeader() {
+  return `
+    <div class="mobile-header">
+      <button class="hamburger" onclick="toggleMobileMenu()">&#9776;</button>
+      <h1>EIAAW SalesAgent</h1>
+      <button class="hamburger" onclick="navigate('chat')" style="font-size:18px">&#128172;</button>
+    </div>
+  `;
+}
+
+function renderMobileBottomNav() {
+  const items = [
+    { id: 'dashboard', icon: '&#9776;', label: 'Home' },
+    { id: 'leads', icon: '&#128101;', label: 'Leads' },
+    { id: 'campaigns', icon: '&#128227;', label: 'Campaigns' },
+    { id: 'content', icon: '&#9998;', label: 'Content' },
+    { id: 'chat', icon: '&#128172;', label: 'Chat' },
+  ];
+  return `
+    <nav class="mobile-bottom-nav">
+      ${items.map(i => `
+        <button class="mobile-nav-item ${currentPage === i.id ? 'active' : ''}" onclick="navigate('${i.id}')">
+          <span>${i.icon}</span>${i.label}
+        </button>
+      `).join('')}
+    </nav>
+  `;
+}
+
+function toggleMobileMenu() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.classList.toggle('mobile-open');
+  if (overlay) overlay.classList.toggle('open');
+}
+
+function closeMobileMenu() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.classList.remove('mobile-open');
+  if (overlay) overlay.classList.remove('open');
 }
 
 function renderSidebar() {
@@ -291,7 +337,7 @@ function renderSidebar() {
         <small>AI-Human Sales Partnerships</small>
       </div>
       ${items.map(i => `
-        <div class="nav-item ${currentPage === i.id ? 'active' : ''}" onclick="navigate('${i.id}')">
+        <div class="nav-item ${currentPage === i.id ? 'active' : ''}" onclick="closeMobileMenu(); navigate('${i.id}')">
           <span>${i.icon}</span> ${i.label}
         </div>
       `).join('')}

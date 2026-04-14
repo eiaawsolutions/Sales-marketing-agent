@@ -932,9 +932,61 @@
     .vc-btn-end { width: 100%; padding: 10px; border-radius: 10px; border: none; background: #ef4444; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; transition: background 0.15s; }
     .vc-btn-end:hover { background: #dc2626; }
 
+    /* Mobile hamburger button */
+    .mobile-header {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1001;
+      height: 52px; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+      align-items: center; justify-content: space-between;
+    }
+    .mobile-header h1 {
+      font-size: 15px; margin: 0;
+      background: var(--teal-gradient);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hamburger {
+      background: none; border: none; color: var(--text); font-size: 22px;
+      cursor: pointer; padding: 6px; border-radius: 6px;
+    }
+    .hamburger:active { background: rgba(255,255,255,0.1); }
+
+    /* Mobile sidebar overlay */
+    .sidebar-overlay {
+      display: none; position: fixed; inset: 0; z-index: 1002;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+    }
+    .sidebar-overlay.open { display: block; }
+    .sidebar.mobile-open {
+      display: flex !important;
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 1003;
+      width: 260px;
+      animation: slideRight 0.2s ease;
+    }
+    @keyframes slideRight { from { transform: translateX(-260px); } to { transform: translateX(0); } }
+
+    /* Mobile bottom nav */
+    .mobile-bottom-nav {
+      display: none;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
+      height: 56px; background: var(--surface);
+      border-top: 1px solid var(--border);
+      justify-content: space-around; align-items: center;
+    }
+    .mobile-nav-item {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 6px 0; color: var(--text-muted); font-size: 10px;
+      cursor: pointer; border: none; background: none; min-width: 50px;
+    }
+    .mobile-nav-item.active { color: var(--primary); }
+    .mobile-nav-item span { font-size: 18px; }
+
     @media (max-width: 768px) {
+      .mobile-header { display: flex; }
+      .mobile-bottom-nav { display: flex; }
       .sidebar { display: none; }
-      .main { margin-left: 0; }
+      .main { margin-left: 0; margin-top: 52px; margin-bottom: 56px; padding: 12px; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
       .grid-2 { grid-template-columns: 1fr; }
       .pipeline-board { grid-template-columns: 1fr; }
@@ -944,6 +996,15 @@
       .poster-style-grid { grid-template-columns: repeat(3, 1fr); }
       .share-grid { grid-template-columns: 1fr; }
       .poster-headline { font-size: 16px; }
+      .toolbar { flex-wrap: wrap; gap: 8px; }
+      .toolbar h2 { font-size: 16px; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+      .card { padding: 14px; }
+      .content-card { padding: 12px; }
+      #voice-call-widget { width: calc(100% - 24px); left: 12px; right: 12px; bottom: 64px; }
+    }
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -954,6 +1015,6 @@
     import { RetellWebClient } from 'https://esm.sh/retell-client-js-sdk@2.0.7';
     window.RetellWebClient = RetellWebClient;
   </script>
-  <script src="/app.js?v=20260414j"></script>
+  <script src="/app.js?v=20260414k"></script>
 </body>
 </html>
