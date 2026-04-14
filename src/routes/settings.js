@@ -61,7 +61,7 @@ router.put('/', (req, res) => {
   for (const [key, value] of Object.entries(req.body)) {
     if (!allowedKeys.includes(key)) continue;
     // Don't overwrite with masked values
-    if (['api_key', 'smtp_pass', 'admin_password', 'stripe_secret_key', 'voice_ai_api_key', 'resend_api_key'].includes(key) && (value.includes('•') || value.includes('...'))) continue;
+    if (['api_key', 'smtp_pass', 'admin_password', 'stripe_secret_key', 'voice_ai_api_key', 'resend_api_key'].includes(key) && (value === '' || value.includes('•') || value.includes('...'))) continue;
     // Encrypt sensitive values before storing
     const storeValue = isSensitive(key) ? encrypt(value) : value;
     upsert.run(key, storeValue, storeValue);

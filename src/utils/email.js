@@ -9,12 +9,16 @@ import { decrypt } from './crypto.js';
  */
 export async function sendEmail({ to, subject, html, from }) {
   // Try Resend first
-  const resendKey = decrypt(db.prepare("SELECT value FROM settings WHERE key = 'resend_api_key'").get()?.value) || '';
-  if (resendKey) {
+  const resendRow = db.prepare("SELECT value FROM settings WHERE key = 'resend_api_key'").get();
+  const resendKey = resendRow?.value ? decrypt(resendRow.value) : '';
+
+  if (resendKey && resendKey.length > 5 && !resendKey.includes('•')) {
+    console.log('Sending email via Resend to:', to);
     return sendViaResend(resendKey, { to, subject, html, from });
   }
 
   // Fall back to SMTP
+  console.log('Sending email via SMTP to:', to, '(Resend key:', resendKey ? 'present but invalid' : 'not configured', ')');
   return sendViaSMTP({ to, subject, html, from });
 }
 
