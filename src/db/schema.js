@@ -209,6 +209,31 @@ export function initializeDatabase(db) {
     try { db.exec(`ALTER TABLE ${table} ADD COLUMN user_id INTEGER DEFAULT 1`); } catch (e) { /* already exists */ }
   }
 
+  // Migrate activities table to add voice_call to CHECK constraint
+  // SQLite doesn't support ALTER CHECK — must recreate the table
+  try {
+    const hasVoiceCall = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'activities'").get();
+    if (hasVoiceCall?.sql && !hasVoiceCall.sql.includes('voice_call')) {
+      db.exec(`
+        CREATE TABLE activities_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          lead_id INTEGER,
+          campaign_id INTEGER,
+          type TEXT NOT NULL CHECK(type IN ('email','call','meeting','note','task','ai_action','contact_reveal','voice_call')),
+          description TEXT NOT NULL,
+          outcome TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          user_id INTEGER DEFAULT 1,
+          FOREIGN KEY (lead_id) REFERENCES leads(id),
+          FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+        );
+        INSERT INTO activities_new SELECT id, lead_id, campaign_id, type, description, outcome, created_at, user_id FROM activities;
+        DROP TABLE activities;
+        ALTER TABLE activities_new RENAME TO activities;
+      `);
+    }
+  } catch (e) { console.error('Activities migration:', e.message); }
+
   // Seed default superadmin
   const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
   if (userCount.c === 0) {
