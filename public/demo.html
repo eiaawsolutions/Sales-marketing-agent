@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EIAAW SalesAgent — Interactive Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a1628; color: #e0e6ed; min-height: 100vh; }
+    .demo-container { max-width: 800px; margin: 0 auto; padding: 20px; }
+    .demo-header { text-align: center; padding: 40px 20px 30px; }
+    .demo-header h1 { font-size: 28px; background: linear-gradient(135deg, #2ec4b6, #38d9a9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+    .demo-header p { color: #8899aa; font-size: 15px; }
+    .demo-section { background: #111d32; border: 1px solid #1e2d45; border-radius: 12px; margin-bottom: 20px; overflow: hidden; cursor: pointer; transition: all 0.2s; }
+    .demo-section:hover { border-color: #2ec4b6; }
+    .demo-section.active { border-color: #2ec4b6; }
+    .demo-section-header { padding: 20px; display: flex; align-items: center; gap: 16px; }
+    .demo-icon { width: 48px; height: 48px; background: linear-gradient(135deg, #2ec4b620, #2ec4b610); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+    .demo-section-header h3 { font-size: 17px; margin-bottom: 2px; }
+    .demo-section-header small { color: #8899aa; font-size: 13px; }
+    .demo-body { padding: 0 20px 20px; display: none; }
+    .demo-section.active .demo-body { display: block; }
+    .demo-step { background: #0a1628; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .demo-step h4 { font-size: 14px; color: #2ec4b6; margin-bottom: 8px; }
+    .demo-step p { font-size: 13px; color: #b0bcc8; line-height: 1.6; }
+    .demo-step .screenshot { width: 100%; border-radius: 6px; margin-top: 10px; background: #1a2a45; padding: 12px; font-size: 12px; color: #667788; border: 1px dashed #2a3a55; text-align: center; }
+    .demo-cta { text-align: center; padding: 40px 20px; }
+    .demo-cta h2 { font-size: 22px; margin-bottom: 12px; }
+    .demo-cta p { color: #8899aa; margin-bottom: 24px; font-size: 15px; }
+    .btn-demo { display: inline-block; padding: 14px 40px; background: #2ec4b6; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 16px; border: none; cursor: pointer; }
+    .btn-demo:hover { background: #28b0a3; }
+    .pricing-row { display: flex; gap: 12px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+    .pricing-card { background: #111d32; border: 1px solid #1e2d45; border-radius: 10px; padding: 16px 20px; text-align: center; min-width: 140px; }
+    .pricing-card .price { font-size: 24px; font-weight: 700; color: #2ec4b6; }
+    .pricing-card .plan { font-size: 13px; color: #8899aa; margin-top: 4px; }
+    .badge-new { font-size: 10px; background: #2ec4b6; color: #000; padding: 2px 6px; border-radius: 4px; margin-left: 8px; font-weight: 700; }
+    .expired-notice { text-align: center; padding: 80px 20px; }
+    .expired-notice h2 { color: #ef4444; margin-bottom: 12px; }
+    @media (max-width: 600px) {
+      .demo-header h1 { font-size: 22px; }
+      .pricing-row { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container" id="demo-app">
+    <div class="demo-header">
+      <h1>EIAAW SalesAgent</h1>
+      <p>AI-Powered Sales & Marketing Automation</p>
+      <p style="margin-top:8px;font-size:13px;color:#667">Click each section below to explore</p>
+    </div>
+
+    <div class="demo-section active" onclick="toggleSection(this)">
+      <div class="demo-section-header">
+        <div class="demo-icon">&#127919;</div>
+        <div>
+          <h3>AI Lead Scoring & Qualification</h3>
+          <small>Every lead gets scored 0-100 automatically</small>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="demo-step">
+          <h4>How it works</h4>
+          <p>When a lead comes in, our AI analyzes their profile, company size, title, engagement history, and behavior patterns. It assigns a score from 0-100 and uses the BANT framework (Budget, Authority, Need, Timeline) to determine if they're ready to buy.</p>
+        </div>
+        <div class="demo-step">
+          <h4>What you see</h4>
+          <p>Each lead card shows their score, qualification status, and recommended next action. Hot leads (80+) get flagged so your team focuses on the right people.</p>
+          <div class="screenshot">Lead card showing: Score 87/100 | Qualified | "Schedule demo this week"</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section" onclick="toggleSection(this)">
+      <div class="demo-section-header">
+        <div class="demo-icon">&#9993;</div>
+        <div>
+          <h3>Smart Outreach Sequences</h3>
+          <small>AI writes personalized multi-step campaigns</small>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="demo-step">
+          <h4>AI-generated sequences</h4>
+          <p>Give the AI a lead profile and it generates a complete 4-5 step outreach plan: email subjects, message bodies, follow-up timing, and channel mix (email, LinkedIn, call). Each step is personalized to the lead's industry and pain points.</p>
+        </div>
+        <div class="demo-step">
+          <h4>Campaign automation</h4>
+          <p>Create email campaigns, assign leads, and send with tracking. See open rates, click rates, and replies in real-time. The AI suggests optimal send times and subject line variations.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section" onclick="toggleSection(this)">
+      <div class="demo-section-header">
+        <div class="demo-icon">&#9998;</div>
+        <div>
+          <h3>AI Content Creation</h3>
+          <small>Social posts, emails, ads, SEO keywords in seconds</small>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="demo-step">
+          <h4>6 content types</h4>
+          <p>Generate email campaigns, social media posts, ad copy, blog outlines, SEO keywords, and landing page content — all from a single prompt. AI adapts tone, length, and format to each channel.</p>
+        </div>
+        <div class="demo-step">
+          <h4>Visual content</h4>
+          <p>Create branded posters and social graphics with AI image generation. Choose styles, add headlines, and export ready-to-publish visuals. No design skills needed.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section" onclick="toggleSection(this)">
+      <div class="demo-section-header">
+        <div class="demo-icon">&#9654;</div>
+        <div>
+          <h3>Visual Sales Pipeline</h3>
+          <small>Drag-and-drop deal tracking with AI analysis</small>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="demo-step">
+          <h4>Pipeline board</h4>
+          <p>Kanban-style pipeline: Prospecting → Qualification → Proposal → Negotiation → Won/Lost. Drag deals between stages. See deal value, probability, and expected close date at a glance.</p>
+        </div>
+        <div class="demo-step">
+          <h4>AI pipeline analysis</h4>
+          <p>The AI gives your pipeline a health score, identifies bottlenecks, forecasts revenue (optimistic/realistic/pessimistic), and flags priority deals that need attention.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section" onclick="toggleSection(this)">
+      <div class="demo-section-header">
+        <div class="demo-icon">&#128222;</div>
+        <div>
+          <h3>AI Voice Calling<span class="badge-new">NEW</span></h3>
+          <small>AI makes calls, qualifies leads, and books meetings</small>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="demo-step">
+          <h4>How it works</h4>
+          <p>Our AI voice agent (Sarah) calls leads on your behalf. She introduces your product naturally, asks qualifying questions, handles objections, and books demo meetings — all while sounding like a real person.</p>
+        </div>
+        <div class="demo-step">
+          <h4>What you get after each call</h4>
+          <p>Full transcript, interest level (hot/warm/cold), conversation summary, and recommended next steps. If the lead books a meeting, it appears in your calendar automatically with a calendar invite sent to the lead.</p>
+        </div>
+        <div class="demo-step">
+          <h4>3 ways to use it</h4>
+          <p><strong>Phone call:</strong> AI calls the lead's phone number directly.<br>
+          <strong>Web call:</strong> Browser-based call from your dashboard.<br>
+          <strong>Shareable link:</strong> Send a link — lead clicks and talks to the AI from their browser.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section" onclick="toggleSection(this)">
+      <div class="demo-section-header">
+        <div class="demo-icon">&#128172;</div>
+        <div>
+          <h3>AI Sales Assistant</h3>
+          <small>Chat with an AI that knows your CRM data</small>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="demo-step">
+          <h4>Context-aware chat</h4>
+          <p>Ask anything about your sales data: "Which leads should I focus on today?", "Write a follow-up email for the Acme deal", "What's my pipeline health?" The AI sees your real CRM data and gives actionable answers.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-cta">
+      <h2>Ready to see it live?</h2>
+      <p>The best way to judge is a 15-minute walkthrough with a real person.</p>
+      <a href="mailto:hello@eiaawsolutions.com?subject=I'd like a live demo of EIAAW SalesAgent" class="btn-demo">Request Live Demo</a>
+      <div class="pricing-row">
+        <div class="pricing-card">
+          <div class="price">RM 99</div>
+          <div class="plan">Starter / month</div>
+        </div>
+        <div class="pricing-card">
+          <div class="price">RM 199</div>
+          <div class="plan">Pro / month</div>
+        </div>
+        <div class="pricing-card">
+          <div class="price">RM 399</div>
+          <div class="plan">Business / month</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleSection(el) {
+      const wasActive = el.classList.contains('active');
+      document.querySelectorAll('.demo-section').forEach(s => s.classList.remove('active'));
+      if (!wasActive) el.classList.add('active');
+    }
+
+    // Track demo link token
+    const params = new URLSearchParams(location.search);
+    const token = params.get('t');
+    if (token) {
+      fetch(`/api/voice/demo-view?t=${token}`).catch(() => {});
+    }
+  </script>
+</body>
+</html>

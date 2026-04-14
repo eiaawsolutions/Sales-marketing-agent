@@ -282,7 +282,7 @@ function renderMobileBottomNav() {
   const items = [
     { id: 'dashboard', icon: '&#9776;', label: 'Home' },
     { id: 'leads', icon: '&#128101;', label: 'Leads' },
-    { id: 'campaigns', icon: '&#128227;', label: 'Campaigns' },
+    { id: 'appointments', icon: '&#128197;', label: 'Meetings' },
     { id: 'content', icon: '&#9998;', label: 'Content' },
     { id: 'chat', icon: '&#128172;', label: 'Chat' },
   ];
@@ -319,6 +319,7 @@ function renderSidebar() {
     { id: 'pipeline', icon: '&#9654;', label: 'Pipeline' },
     { id: 'campaigns', icon: '&#9993;', label: 'Campaigns' },
     { id: 'content', icon: '&#9998;', label: 'AI Content' },
+    { id: 'appointments', icon: '&#128197;', label: 'Appointments' },
     { id: 'chat', icon: '&#10070;', label: 'AI Assistant' },
     { id: 'billing', icon: '&#9733;', label: 'Plan & Billing' },
   ];
@@ -359,6 +360,7 @@ function renderPage() {
     case 'pipeline': return '<div id="page" class="loading">Loading pipeline...</div>';
     case 'campaigns': return '<div id="page" class="loading">Loading campaigns...</div>';
     case 'content': return '<div id="page" class="loading">Loading content...</div>';
+    case 'appointments': return '<div id="page" class="loading">Loading appointments...</div>';
     case 'chat': return renderChatPage();
     case 'billing': return '<div id="page" class="loading">Loading plan...</div>';
     case 'settings': return '<div id="page" class="loading">Loading settings...</div>';
@@ -376,6 +378,7 @@ async function afterRender() {
     case 'pipeline': return loadPipeline();
     case 'campaigns': return loadCampaigns();
     case 'content': return loadContent();
+    case 'appointments': return loadAppointments();
     case 'billing': return loadBilling();
     case 'settings': return loadSettings();
     case 'accounts': return loadAccounts();
@@ -3508,6 +3511,218 @@ async function deleteAccount(userId, username) {
   await api.del(`/users/${userId}`);
   showNotification('Account deleted', 'success');
   loadAccounts();
+}
+
+// ========== Appointments ==========
+async function loadAppointments() {
+  const page = document.getElementById('page');
+  try {
+    const [upcoming, all] = await Promise.all([
+      api('/api/appointments?upcoming=1'),
+      api('/api/appointments'),
+    ]);
+
+    const now = new Date();
+    const past = all.filter(a => new Date(a.scheduled_at) < now || a.status === 'completed' || a.status === 'cancelled' || a.status === 'no_show');
+    const upcomingList = all.filter(a => new Date(a.scheduled_at) >= now && a.status !== 'cancelled' && a.status !== 'completed' && a.status !== 'no_show');
+
+    page.innerHTML = `
+      <div class="toolbar">
+        <h2>Appointments</h2>
+        <button class="btn btn-primary" onclick="showNewAppointmentModal()">+ New Appointment</button>
+      </div>
+
+      ${upcomingList.length > 0 ? `
+        <div class="card" style="margin-bottom:16px">
+          <h3 style="margin-bottom:12px;font-size:15px">Upcoming (${upcomingList.length})</h3>
+          ${upcomingList.map(a => renderAppointmentCard(a, true)).join('')}
+        </div>
+      ` : `
+        <div class="card" style="margin-bottom:16px;text-align:center;padding:32px">
+          <p class="text-muted">No upcoming appointments</p>
+          <p class="text-sm text-muted">When the AI voice agent books meetings with leads, they'll appear here automatically.</p>
+        </div>
+      `}
+
+      ${past.length > 0 ? `
+        <div class="card">
+          <h3 style="margin-bottom:12px;font-size:15px">Past & Cancelled (${past.length})</h3>
+          ${past.map(a => renderAppointmentCard(a, false)).join('')}
+        </div>
+      ` : ''}
+    `;
+  } catch (err) {
+    page.innerHTML = `<div class="card"><p class="text-muted">Error loading appointments: ${esc(err.message)}</p></div>`;
+  }
+}
+
+function renderAppointmentCard(a, isUpcoming) {
+  const dt = new Date(a.scheduled_at);
+  const dateStr = dt.toLocaleDateString('en-MY', { weekday: 'short', month: 'short', day: 'numeric' });
+  const timeStr = dt.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
+  const statusColors = { scheduled: '#f59e0b', confirmed: '#2ec4b6', completed: '#10b981', cancelled: '#6b7280', no_show: '#ef4444' };
+  const statusColor = statusColors[a.status] || '#6b7280';
+  const typeLabels = { demo: 'Demo', call: 'Call', meeting: 'Meeting', follow_up: 'Follow-up' };
+
+  return `
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:12px;border-bottom:1px solid var(--border);${!isUpcoming ? 'opacity:0.7' : ''}">
+      <div style="min-width:56px;text-align:center;background:var(--surface2);border-radius:8px;padding:6px 8px">
+        <div style="font-size:11px;color:var(--text-muted)">${dt.toLocaleDateString('en-MY', { month: 'short' })}</div>
+        <div style="font-size:20px;font-weight:700">${dt.getDate()}</div>
+        <div style="font-size:10px;color:var(--text-muted)">${timeStr}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px;margin-bottom:2px">${esc(a.title)}</div>
+        ${a.lead_name ? `<div class="text-sm text-muted">${esc(a.lead_name)}${a.lead_company ? ` — ${esc(a.lead_company)}` : ''}</div>` : ''}
+        <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap">
+          <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${statusColor}22;color:${statusColor}">${a.status}</span>
+          <span style="font-size:11px;color:var(--text-muted)">${typeLabels[a.type] || a.type} &bull; ${a.duration_minutes}min</span>
+        </div>
+        ${a.notes ? `<div class="text-sm text-muted" style="margin-top:4px">${esc(a.notes).substring(0, 100)}</div>` : ''}
+      </div>
+      ${isUpcoming ? `
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          ${a.lead_email ? `<button class="btn btn-sm btn-primary" onclick="sendAppointmentInvite(${a.id})" title="Send calendar invite">Invite</button>` : ''}
+          <button class="btn btn-sm btn-outline" onclick="editAppointment(${a.id})" title="Edit">Edit</button>
+          <button class="btn btn-sm btn-outline" onclick="cancelAppointment(${a.id})" title="Cancel" style="color:var(--danger)">Cancel</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+async function sendAppointmentInvite(id) {
+  try {
+    const res = await api(`/api/appointments/${id}/send-invite`, { method: 'POST' });
+    notify(res.message || 'Calendar invite sent!', 'success');
+    loadAppointments();
+  } catch (err) {
+    notify(err.message, 'error');
+  }
+}
+
+async function cancelAppointment(id) {
+  if (!confirm('Cancel this appointment?')) return;
+  try {
+    await api(`/api/appointments/${id}`, { method: 'DELETE' });
+    notify('Appointment cancelled', 'success');
+    loadAppointments();
+  } catch (err) {
+    notify(err.message, 'error');
+  }
+}
+
+function editAppointment(id) {
+  showNewAppointmentModal(id);
+}
+
+async function showNewAppointmentModal(editId) {
+  let existing = null;
+  let leads = [];
+  try {
+    leads = await api('/api/leads');
+    if (editId) existing = await api(`/api/appointments/${editId}`);
+  } catch (e) { /* ignore */ }
+
+  const dtVal = existing ? existing.scheduled_at.replace('Z', '').substring(0, 16) : '';
+
+  modal = {
+    title: existing ? 'Edit Appointment' : 'New Appointment',
+    body: `
+      <div class="form-group">
+        <label>Title</label>
+        <input id="appt-title" class="input" value="${esc(existing?.title || '')}" placeholder="e.g. Demo with Acme Corp">
+      </div>
+      <div class="form-group">
+        <label>Lead</label>
+        <select id="appt-lead" class="input">
+          <option value="">— No lead —</option>
+          ${leads.map(l => `<option value="${l.id}" ${existing?.lead_id === l.id ? 'selected' : ''}>${esc(l.name)} ${l.company ? `(${esc(l.company)})` : ''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Date & Time</label>
+          <input id="appt-datetime" type="datetime-local" class="input" value="${dtVal}">
+        </div>
+        <div class="form-group">
+          <label>Duration</label>
+          <select id="appt-duration" class="input">
+            <option value="15" ${existing?.duration_minutes === 15 ? 'selected' : ''}>15 min</option>
+            <option value="30" ${existing?.duration_minutes === 30 ? 'selected' : ''}>30 min</option>
+            <option value="45" ${existing?.duration_minutes === 45 ? 'selected' : ''}>45 min</option>
+            <option value="60" ${existing?.duration_minutes === 60 ? 'selected' : ''}>60 min</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Type</label>
+          <select id="appt-type" class="input">
+            <option value="demo" ${existing?.type === 'demo' ? 'selected' : ''}>Demo</option>
+            <option value="call" ${existing?.type === 'call' ? 'selected' : ''}>Call</option>
+            <option value="meeting" ${existing?.type === 'meeting' ? 'selected' : ''}>Meeting</option>
+            <option value="follow_up" ${existing?.type === 'follow_up' ? 'selected' : ''}>Follow-up</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="appt-status" class="input">
+            <option value="scheduled" ${existing?.status === 'scheduled' ? 'selected' : ''}>Scheduled</option>
+            <option value="confirmed" ${existing?.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
+            <option value="completed" ${existing?.status === 'completed' ? 'selected' : ''}>Completed</option>
+            <option value="cancelled" ${existing?.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+            <option value="no_show" ${existing?.status === 'no_show' ? 'selected' : ''}>No Show</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Location (optional)</label>
+        <input id="appt-location" class="input" value="${esc(existing?.location || '')}" placeholder="e.g. Google Meet, Zoom link, office">
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="appt-notes" class="input" rows="3" placeholder="What to cover, context from call...">${esc(existing?.notes || '')}</textarea>
+      </div>
+    `,
+    actions: `
+      <button class="btn btn-outline" onclick="modal=null;render()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAppointment(${editId || 'null'})">${existing ? 'Update' : 'Create'}</button>
+    `,
+  };
+  render();
+  setTimeout(() => document.getElementById('appt-title')?.focus(), 100);
+}
+
+async function saveAppointment(editId) {
+  const title = document.getElementById('appt-title')?.value?.trim();
+  const scheduled_at = document.getElementById('appt-datetime')?.value;
+  if (!title || !scheduled_at) return notify('Title and date/time required', 'error');
+
+  const body = {
+    title,
+    lead_id: document.getElementById('appt-lead')?.value || null,
+    scheduled_at: new Date(scheduled_at).toISOString(),
+    duration_minutes: parseInt(document.getElementById('appt-duration')?.value) || 15,
+    type: document.getElementById('appt-type')?.value || 'demo',
+    status: document.getElementById('appt-status')?.value || 'scheduled',
+    location: document.getElementById('appt-location')?.value?.trim() || null,
+    notes: document.getElementById('appt-notes')?.value?.trim() || null,
+  };
+
+  try {
+    if (editId) {
+      await api(`/api/appointments/${editId}`, { method: 'PUT', body: JSON.stringify(body) });
+      notify('Appointment updated', 'success');
+    } else {
+      await api('/api/appointments', { method: 'POST', body: JSON.stringify(body) });
+      notify('Appointment created', 'success');
+    }
+    modal = null;
+    render();
+  } catch (err) {
+    notify(err.message, 'error');
+  }
 }
 
 // ========== System Overview (Superadmin) ==========

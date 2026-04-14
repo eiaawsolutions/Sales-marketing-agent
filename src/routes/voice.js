@@ -541,7 +541,7 @@ router.post('/setup', async (req, res) => {
           description: 'Log the call outcome and next steps after the conversation. Call this before ending.',
           url: `${baseUrl}/api/voice/tool-callback`,
           method: 'POST',
-          execution_message_description: 'Saving your response...',
+          execution_message_description: 'Saving your notes...',
           parameters: {
             type: 'object',
             properties: {
@@ -549,8 +549,55 @@ router.post('/setup', async (req, res) => {
               summary: { type: 'string', description: 'Brief 1-2 sentence summary of the conversation' },
               next_step: { type: 'string', description: 'Recommended next action (e.g., send proposal, schedule demo, follow up in 3 days)' },
               meeting_requested: { type: 'boolean', description: 'Whether the lead agreed to a meeting or demo' },
+              meeting_time: { type: 'string', description: 'If meeting was booked, the agreed date/time (e.g. "Thursday at 3pm", "next Monday 10am")' },
             },
             required: ['interest_level', 'summary', 'next_step'],
+          },
+        },
+        {
+          type: 'custom',
+          name: 'schedule_meeting',
+          description: 'Book a meeting or demo when the lead agrees to one. Use this immediately when they confirm a time.',
+          url: `${baseUrl}/api/voice/tool-callback`,
+          method: 'POST',
+          execution_message_description: 'Booking that in now...',
+          parameters: {
+            type: 'object',
+            properties: {
+              date_time: { type: 'string', description: 'The agreed date and time (e.g. "Thursday at 3pm", "tomorrow 10am", "next Monday 2:30pm")' },
+              duration: { type: 'string', description: 'Meeting duration in minutes (default 15)', enum: ['15', '30', '45', '60'] },
+              meeting_type: { type: 'string', enum: ['demo', 'call', 'meeting', 'follow_up'], description: 'Type of meeting' },
+              notes: { type: 'string', description: 'Any notes about what to cover in the meeting' },
+            },
+            required: ['date_time'],
+          },
+        },
+        {
+          type: 'custom',
+          name: 'send_overview',
+          description: 'Send a product overview email to the lead. Use when they say "send me info", "tell me more via email", or "send me an overview".',
+          url: `${baseUrl}/api/voice/tool-callback`,
+          method: 'POST',
+          execution_message_description: 'Sending that over now...',
+          parameters: {
+            type: 'object',
+            properties: {
+              focus: { type: 'string', description: 'What to focus on in the email', enum: ['general', 'automation', 'content', 'pipeline', 'voice'] },
+            },
+            required: [],
+          },
+        },
+        {
+          type: 'custom',
+          name: 'send_demo_link',
+          description: 'Send an interactive self-guided demo link to the lead via email. Use when they want to explore on their own or are not ready for a live demo.',
+          url: `${baseUrl}/api/voice/tool-callback`,
+          method: 'POST',
+          execution_message_description: 'Sending the demo link...',
+          parameters: {
+            type: 'object',
+            properties: {},
+            required: [],
           },
         },
       ],
@@ -1039,14 +1086,25 @@ IMPORTANT: After your opening, WAIT for them to respond. Don't launch into a pit
 ## Handling Objections
 - "I'm busy" → "Oh yeah, sorry about that — should I try you another day? Or I can just shoot you a quick email, like two sentences?"
 - "Not interested" → "Totally get it. Just out of curiosity — is it more of a timing thing or is it just not something you need right now?" (Then respect the answer, don't push)
-- "Send me an email" → "For sure. What should I focus on — the sales automation stuff or the AI content side? Just want to make it relevant."
+- "Send me an email" / "Send me more info" → "For sure!" Then use the send_overview tool to email them a product overview. Say: "Done, just sent it — check your inbox! It covers the main stuff. Want me to focus on anything specific?"
+- "Can I see a demo?" / "Show me how it works" → If they want to explore on their own: use send_demo_link to send a self-guided interactive demo. Say: "I just sent you a link — you can click through and explore everything at your own pace." If they want a live walkthrough with a person: use schedule_meeting to book a demo slot. Say: "Let's set that up! When works for you this week?"
 - "How much does it cost?" → "So it starts at RM99 a month, which is pretty reasonable. But honestly it's one of those things that's way easier to judge once you see it in action. Want me to set up a quick 15-minute demo?"
 - "We already use something" → "Oh nice, what are you using? ... Yeah I've heard of that. How are you finding it? ... The main thing that's different about us is [specific differentiator]. But hey, if what you have is working, no need to fix it right?"
 
+## Your Tools — USE THEM
+You have real tools that actually do things. Don't just promise — execute:
+
+1. **schedule_meeting** — When a lead agrees to a meeting/demo, use this IMMEDIATELY with the date and time they said. It creates a real calendar event and sends them an invite. Don't just say "I'll send a calendar invite" — actually do it.
+2. **send_overview** — When they ask for more info or say "send me an email", use this. It sends a beautiful product overview email instantly. Confirm: "Just sent it to your email!"
+3. **send_demo_link** — When they want to explore on their own, use this. Sends them a self-guided interactive demo they can click through. Say: "Just sent you a demo link — explore at your own pace!"
+4. **log_call_outcome** — Always use before ending. Logs interest level, summary, and next steps.
+5. **end_call** — Use after log_call_outcome to end the call.
+
 ## Before Ending Every Call
-1. Use the log_call_outcome tool to save the interest level, summary, and next step
-2. Thank them naturally — don't be overly formal: "Thanks for chatting, {{lead_name}}! Talk soon."
-3. Use end_call tool
+1. If a meeting was booked, confirm the details one more time
+2. Use the log_call_outcome tool to save the interest level, summary, next step, and meeting_time if applicable
+3. Thank them naturally — don't be overly formal: "Thanks for chatting, {{lead_name}}! Talk soon."
+4. Use end_call tool
 
 ## Rules
 - Keep it under 3 minutes unless they're genuinely engaged and asking questions
@@ -1054,6 +1112,7 @@ IMPORTANT: After your opening, WAIT for them to respond. Don't launch into a pit
 - Pricing: Starter RM99, Pro RM199, Business RM399. Don't share anything beyond that.
 - If {{custom_script}} is provided, weave those points in naturally — don't read them verbatim
 - NEVER say "I'm an AI" unless directly asked. If asked, be honest: "Yeah I'm actually an AI assistant — but everything I'm telling you is legit, and I can connect you with a real person anytime"
-- Sound like a person, not a brochure. Every response should feel like something a real human SDR would actually say on a call.`;
+- Sound like a person, not a brochure. Every response should feel like something a real human SDR would actually say on a call.
+- When they agree to something actionable (meeting, email, demo), USE THE TOOL immediately. Don't just say you will — do it on the call so they feel the value.`;
 
 export default router;
