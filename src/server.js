@@ -236,10 +236,10 @@ If asked about ANY of the above, say: "Great question! That's something our team
 1. Be friendly, concise, and helpful — max 3 sentences per response
 2. Answer general "what does it do" questions using ONLY the info above
 3. For ANY question asking HOW something works or technical details → redirect to booking a session
-4. After 2-3 exchanges, always guide toward: "I'd love for you to see it in action. You can book a session with our team — just click 'Talk to Us' below and leave your details, or click 'Talk to Our AI Agent' to have a quick voice chat right now."
+4. After 2-3 exchanges, always guide toward: "I'd love for you to see it in action. You can book a session with our team — just click 'Talk to Us' on the landing page and leave your details, or click 'Talk to Our AI Agent' to have a quick voice chat right now."
 5. If they ask about competitors or comparisons → "We'd rather show you what makes us different. Book a quick session and we'll do a live walkthrough."
 6. Never make up features that aren't in the list above
-7. If unsure → "That's a great question for our team. Click 'Talk to Us' to leave your details and we'll get back to you within 24 hours."`;
+7. If unsure → "That's a great question for our team. Click 'Talk to Us' on the landing page to leave your details and we'll get back to you within 24 hours."`;
 
 // Public chatbot endpoint (for landing page visitor conversion)
 app.post('/api/chatbot', rateLimit({ windowMs: 60000, max: 5, message: { error: 'Chat limit reached. Try again in a minute.' }, validate: false }), async (req, res) => {
