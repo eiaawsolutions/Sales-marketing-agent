@@ -20,7 +20,9 @@ import settingsRouter from './routes/settings.js';
 import systemLogicRouter from './routes/system-logic.js';
 import voiceRouter from './routes/voice.js';
 import appointmentsRouter from './routes/appointments.js';
+import trackingRouter from './routes/tracking.js';
 import { maskLeads, maskLead } from './services/leads.js';
+import { startScheduler } from './services/scheduler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -68,7 +70,7 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
   // Skip for GET/HEAD/OPTIONS and public routes
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/lookup') || req.path.startsWith('/api/auth/forgot') || req.path.startsWith('/api/auth/reset-password-with-token') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/billing/checkout') || req.path.startsWith('/api/contact') || req.path.startsWith('/api/voice/webhook') || req.path.startsWith('/api/voice/tool-callback') || req.path.startsWith('/api/voice/call-link-token') || req.path.startsWith('/api/voice/public-session')) return next();
+  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/lookup') || req.path.startsWith('/api/auth/forgot') || req.path.startsWith('/api/auth/reset-password-with-token') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/billing/checkout') || req.path.startsWith('/api/contact') || req.path.startsWith('/api/voice/webhook') || req.path.startsWith('/api/voice/tool-callback') || req.path.startsWith('/api/voice/call-link-token') || req.path.startsWith('/api/voice/public-session') || req.path.startsWith('/api/tracking/')) return next();
 
   // For authenticated requests, Bearer token in Authorization header provides CSRF protection
   // because third-party sites cannot set custom headers in cross-origin requests
@@ -230,6 +232,7 @@ app.use('/api/settings', requireAuth, settingsRouter);
 app.use('/api/system-logic', requireAuth, systemLogicRouter);
 app.use('/api/voice', voiceRouter);
 app.use('/api/appointments', appointmentsRouter);
+app.use('/api/tracking', trackingRouter);
 
 // Dashboard overview endpoint
 app.get('/api/dashboard', requireAuth, (req, res) => {
@@ -314,4 +317,5 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || config.port;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`EIAAW SalesAgent running on port ${PORT}`);
+  startScheduler();
 });

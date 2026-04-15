@@ -1,32 +1,5 @@
 import db from '../db/index.js';
-import nodemailer from 'nodemailer';
-import { decrypt } from '../utils/crypto.js';
-
-// Read SMTP settings from DB (consistent with auth, billing, contact form)
-function getSmtpConfig() {
-  const get = (key) => db.prepare("SELECT value FROM settings WHERE key = ?").get(key)?.value || '';
-  const host = get('smtp_host') || process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = parseInt(get('smtp_port') || process.env.SMTP_PORT || '587');
-  const user = get('smtp_user') || process.env.SMTP_USER || '';
-  const rawPass = get('smtp_pass');
-  const pass = (rawPass ? decrypt(rawPass) : null) || process.env.SMTP_PASS || '';
-  const from = get('from_email') || process.env.FROM_EMAIL || '';
-  return { host, port, user, pass, from };
-}
-
-function createTransporter() {
-  const smtp = getSmtpConfig();
-  if (!smtp.user) return null;
-  return nodemailer.createTransport({
-    host: smtp.host,
-    port: smtp.port,
-    secure: smtp.port === 465,
-    auth: { user: smtp.user, pass: smtp.pass },
-    connectionTimeout: 10000, // 10s connection timeout
-    greetingTimeout: 10000,
-    socketTimeout: 15000,     // 15s socket timeout
-  });
-}
+import { sendEmail } from '../utils/email.js';
 
 export const campaignsService = {
   getAll(userId, filters = {}) {
@@ -48,7 +21,7 @@ export const campaignsService = {
     if (!campaign) return null;
 
     campaign.leads = db.prepare(`
-      SELECT l.*, cl.status as campaign_status, cl.sent_at, cl.opened_at
+      SELECT l.*, cl.status as campaign_status, cl.sent_at, cl.opened_at, cl.clicked_at
       FROM campaign_leads cl JOIN leads l ON cl.lead_id = l.id
       WHERE cl.campaign_id = ?
     `).all(id);
@@ -113,8 +86,8 @@ export const campaignsService = {
     if (campaign.type !== 'email') throw new Error('Only email campaigns can be sent');
     if (!campaign.leads?.length) throw new Error('No leads assigned to campaign');
 
-    const smtp = getSmtpConfig();
-    const mailer = createTransporter();
+    // Get base URL for tracking
+    const baseUrl = db.prepare("SELECT value FROM settings WHERE key = 'base_url'").get()?.value || 'https://sa.eiaawsolutions.com';
 
     let sentCount = 0;
     const results = [];
@@ -122,12 +95,15 @@ export const campaignsService = {
     for (const lead of campaign.leads) {
       if (lead.campaign_status !== 'pending') continue;
       try {
-        if (mailer) {
-          await mailer.sendMail({
-            from: smtp.from || smtp.user, to: lead.email,
-            subject: campaign.subject, html: campaign.body,
-          });
-        }
+        // Inject tracking pixel and link tracking into email HTML
+        const trackedHtml = injectTracking(campaign.body, campaignId, lead.id, baseUrl);
+
+        await sendEmail({
+          to: lead.email,
+          subject: campaign.subject,
+          html: trackedHtml,
+        });
+
         db.prepare('UPDATE campaign_leads SET status = ?, sent_at = CURRENT_TIMESTAMP WHERE campaign_id = ? AND lead_id = ?')
           .run('sent', campaignId, lead.id);
         db.prepare('INSERT INTO activities (user_id, lead_id, campaign_id, type, description) VALUES (?, ?, ?, ?, ?)')
@@ -162,3 +138,32 @@ export const campaignsService = {
     return { total: total.count, byStatus, byType, emailStats };
   },
 };
+
+/**
+ * Inject tracking pixel and rewrite links for click tracking.
+ * Exported so scheduler and pipeline can reuse it.
+ */
+export function injectTracking(html, campaignId, leadId, baseUrl) {
+  if (!html || !campaignId || !leadId) return html;
+  const base = baseUrl || 'https://sa.eiaawsolutions.com';
+
+  // Rewrite <a href="https://..."> to go through click tracker (skip mailto: and # anchors)
+  let tracked = html.replace(
+    /href="(https?:\/\/[^"]+)"/g,
+    (match, url) => {
+      // Don't track our own tracking URLs
+      if (url.includes('/api/tracking/')) return match;
+      return `href="${base}/api/tracking/click/${campaignId}/${leadId}?url=${encodeURIComponent(url)}"`;
+    }
+  );
+
+  // Add tracking pixel at the end
+  const pixel = `<img src="${base}/api/tracking/open/${campaignId}/${leadId}" width="1" height="1" style="display:none;width:1px;height:1px" alt="" />`;
+  if (tracked.includes('</body>')) {
+    tracked = tracked.replace('</body>', pixel + '</body>');
+  } else {
+    tracked += pixel;
+  }
+
+  return tracked;
+}

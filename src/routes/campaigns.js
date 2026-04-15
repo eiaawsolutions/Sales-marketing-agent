@@ -100,6 +100,37 @@ router.post('/:id/auto-outreach', async (req, res) => {
   }
 });
 
+// POST /:id/launch — launch the full automated pipeline
+router.post('/:id/launch', async (req, res) => {
+  try {
+    checkPlanLimit(req, 'ai_action');
+    const campaignId = parseInt(req.params.id);
+
+    // Mark as running immediately
+    db.prepare("UPDATE campaigns SET pipeline_status = 'running' WHERE id = ?").run(campaignId);
+    res.json({ status: 'launching', campaignId });
+
+    // Run pipeline in background (don't await — already responded)
+    import('../services/pipeline-automation.js').then(({ launchCampaignPipeline }) => {
+      launchCampaignPipeline(req.user.id, campaignId).catch(err => {
+        console.error('Pipeline failed:', err.message);
+        db.prepare("UPDATE campaigns SET pipeline_status = 'failed' WHERE id = ?").run(campaignId);
+      });
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /:id/pipeline-status — check pipeline progress
+router.get('/:id/pipeline-status', (req, res) => {
+  const campaign = db.prepare('SELECT pipeline_status, pipeline_log FROM campaigns WHERE id = ?').get(req.params.id);
+  res.json({
+    status: campaign?.pipeline_status || 'idle',
+    log: campaign?.pipeline_log ? JSON.parse(campaign.pipeline_log) : [],
+  });
+});
+
 router.get('/:id/outreach-queue', (req, res) => {
   let queue = getOutreachQueue(parseInt(req.params.id));
   if (req.user.role !== 'superadmin') {

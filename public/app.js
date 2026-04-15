@@ -1044,6 +1044,9 @@ async function loadCampaigns() {
               ` : ''}
             </div>
             <div class="camp-actions flex gap-2" onclick="event.stopPropagation()">
+              <button class="btn btn-sm" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none" onclick="launchPipeline(${c.id})" title="AI generates leads, scores, creates content, sends outreach — fully automated">
+                &#9889; Launch Pipeline
+              </button>
               <button class="btn btn-sm btn-primary" onclick="aiGenerateLeads(${c.id})" title="AI finds leads matching your target audience">
                 Auto-Find Leads
               </button>
@@ -1367,6 +1370,9 @@ function renderCampaignWizard() {
           ` : `
             <button class="btn btn-primary" onclick="wizardSave('draft')">Save Campaign</button>
           `}
+          ${wizardState.data.type === 'email' ? `
+            <button class="btn" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none" onclick="wizardSave('launch')">&#9889; Launch AI Pipeline</button>
+          ` : ''}
         ` : ''}
       </div>
     </div>
@@ -1746,6 +1752,14 @@ async function wizardSave(action) {
     if (action === 'send' && campaign.id && d.type === 'email') {
       const sendResult = await api.post(`/campaigns/${campaign.id}/send`);
       showNotification(`Campaign saved & sent to ${sendResult.sent}/${sendResult.total} leads!`, 'success');
+    } else if (action === 'launch' && campaign.id) {
+      await api.post(`/campaigns/${campaign.id}/launch`);
+      showNotification('AI Pipeline launched! Generating leads, scoring, creating content, sending outreach...', 'success');
+      wizardState = null;
+      loadCampaigns();
+      // Start polling for pipeline status
+      pollPipelineStatus(campaign.id);
+      return;
     } else {
       showNotification('Campaign saved as draft!', 'success');
     }
@@ -1758,6 +1772,43 @@ async function wizardSave(action) {
     const btns2 = document.querySelectorAll('.wizard-nav button');
     btns2.forEach(b => { b.disabled = false; b.style.opacity = '1'; });
   }
+}
+
+async function launchPipeline(campaignId) {
+  if (!confirm('Launch the AI pipeline? This will auto-generate leads, score them, create content, and send outreach emails.')) return;
+  showNotification('Launching AI pipeline...');
+  try {
+    await api.post(`/campaigns/${campaignId}/launch`);
+    showNotification('Pipeline launched! AI is working...', 'success');
+    pollPipelineStatus(campaignId);
+  } catch (e) {
+    showNotification('Pipeline error: ' + e.message, 'error');
+  }
+}
+
+function pollPipelineStatus(campaignId) {
+  let polls = 0;
+  const maxPolls = 60; // 5 minutes max (5s * 60)
+  const interval = setInterval(async () => {
+    polls++;
+    try {
+      const data = await api.get(`/campaigns/${campaignId}/pipeline-status`);
+      if (data.status === 'completed') {
+        clearInterval(interval);
+        showNotification('Pipeline complete! Leads generated, scored, content created, outreach sent.', 'success');
+        loadCampaigns();
+      } else if (data.status === 'failed') {
+        clearInterval(interval);
+        const lastMsg = data.log?.length ? data.log[data.log.length - 1].msg : 'Unknown error';
+        showNotification('Pipeline error: ' + lastMsg, 'error');
+        loadCampaigns();
+      } else if (data.log?.length) {
+        const lastMsg = data.log[data.log.length - 1].msg;
+        showNotification(lastMsg);
+      }
+      if (polls >= maxPolls) clearInterval(interval);
+    } catch (e) { clearInterval(interval); }
+  }, 5000);
 }
 
 async function sendCampaign(id) {

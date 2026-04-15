@@ -258,6 +258,14 @@ export function initializeDatabase(db) {
     }
   } catch (e) { console.error('Activities migration error:', e.message); }
 
+  // Pipeline automation columns
+  try { db.exec("ALTER TABLE campaigns ADD COLUMN pipeline_status TEXT DEFAULT 'idle'"); } catch (e) { /* exists */ }
+  try { db.exec("ALTER TABLE campaigns ADD COLUMN pipeline_log TEXT"); } catch (e) { /* exists */ }
+  try { db.exec("ALTER TABLE campaign_leads ADD COLUMN clicked_at DATETIME"); } catch (e) { /* exists */ }
+
+  // Base URL setting
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('base_url', 'https://sa.eiaawsolutions.com')").run();
+
   // Seed default superadmin
   const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
   if (userCount.c === 0) {
