@@ -122,6 +122,9 @@ router.post('/tool-callback', async (req, res) => {
     if (toolName === 'send_demo_link') {
       return handleSendDemoLink(args, callId, leadId, userId, res);
     }
+    if (toolName === 'capture_lead') {
+      return handleCaptureLead(args, callId, leadId, userId, req.body.call?.metadata || req.body.metadata || {}, res);
+    }
 
     // Default: log_call_outcome
     let apptMsg = '';
@@ -230,6 +233,71 @@ async function handleSendDemoLink(args, callId, leadId, userId, res) {
   }
 
   res.json({ result: `I've sent an interactive demo link to ${lead.email}. It's a self-guided walkthrough they can explore at their own pace.` });
+}
+
+async function handleCaptureLead(args, callId, leadId, userId, metadata, res) {
+  const { name, email, company } = args;
+  if (!name || !email) {
+    return res.json({ result: "I need at least their name and email to save their details. Could you ask for those?" });
+  }
+  // Validate email format
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.json({ result: "That email doesn't look right. Could you confirm the spelling?" });
+  }
+
+  try {
+    // Check if lead already exists by email
+    const existing = db.prepare('SELECT id FROM leads WHERE email = ?').get(email);
+    let newLeadId;
+
+    if (existing) {
+      // Update existing lead with any new info
+      db.prepare('UPDATE leads SET name = ?, company = COALESCE(?, company), source = CASE WHEN source = ? THEN source ELSE ? END, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(name, company || null, 'voice_landing', 'voice_landing', existing.id);
+      newLeadId = existing.id;
+    } else {
+      // Create new lead
+      const result = db.prepare(
+        'INSERT INTO leads (name, email, company, source, status, score, notes, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(name, email, company || null, 'voice_landing', 'new', 20, 'Captured via AI voice agent on landing page', userId);
+      newLeadId = result.lastInsertRowid;
+    }
+
+    // Log the capture activity
+    db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+      .run(userId, newLeadId, 'ai_action', `Lead captured via voice call on landing page: ${name} (${email})${company ? ` — ${company}` : ''}`);
+
+    // Update the call metadata with the new lead ID (for webhook to reference later)
+    if (metadata.token) {
+      const linkKey = `call_link_${metadata.token}`;
+      const linkRow = db.prepare("SELECT value FROM settings WHERE key = ?").get(linkKey);
+      if (linkRow) {
+        const linkData = JSON.parse(linkRow.value);
+        linkData.leadId = newLeadId;
+        db.prepare("UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?")
+          .run(JSON.stringify(linkData), linkKey);
+      }
+    }
+
+    // Auto-send the product overview email
+    const lead = { name, email, company: company || null };
+    sendProductOverviewEmail(lead).catch(err => console.error('Auto overview email error:', err.message));
+
+    // Log the email activity
+    db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+      .run(userId, newLeadId, 'email', `Auto-sent product overview email to ${email} after voice capture`);
+
+    res.json({ result: `Perfect, I've saved ${name}'s details and sent them an overview email at ${email}. You can now guide them to click "Talk to Us" on the landing page for more detailed follow-up.` });
+  } catch (err) {
+    console.error('Capture lead error:', err);
+    // If it's a unique constraint error, the lead already exists
+    if (err.message?.includes('UNIQUE')) {
+      res.json({ result: `It looks like ${email} is already in our system. I'll send them the overview email anyway.` });
+      sendProductOverviewEmail({ name, email, company }).catch(e => console.error('Overview email error:', e.message));
+    } else {
+      res.json({ result: "I had trouble saving that. Let me note the details and our team will follow up." });
+    }
+  }
 }
 
 // --- Email helpers ---
@@ -402,12 +470,15 @@ router.get('/call-link-token', async (req, res) => {
 
     // Determine dynamic variables from lead data
     const lead = data.leadId ? db.prepare('SELECT * FROM leads WHERE id = ?').get(data.leadId) : null;
+    const isLandingVisitor = !data.leadId || data.source === 'landing';
     const stage = lead?.status || 'new';
-    const callObjective = stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify';
+    const callObjective = isLandingVisitor ? 'landing_conversion' : (stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify');
 
-    const beginMessage = lead
-      ? `Hey ${lead.name}! I'm Sarah from E-I-A-A-W A.I. Sales Agent. Let me quickly walk you through what we can do for ${lead.company || 'your business'} — I think you'll like this.`
-      : `Hey! I'm Sarah from E-I-A-A-W A.I. Sales Agent. Let me give you a quick rundown of what we do — it'll take a minute.`;
+    const beginMessage = isLandingVisitor
+      ? `Hey! Thanks for clicking. I'm Sarah, the AI sales assistant for E-I-A-A-W. I can give you a quick overview of what we do and help you get started. What's your name?`
+      : lead
+        ? `Hey ${lead.name}! I'm Sarah from E-I-A-A-W A.I. Sales Agent. Let me quickly walk you through what we can do for ${lead.company || 'your business'} — I think you'll like this.`
+        : `Hey! I'm Sarah from E-I-A-A-W A.I. Sales Agent. Let me give you a quick rundown of what we do — it'll take a minute.`;
 
     // Create web call with Retell
     const webCall = await retellAPI(apiKey, '/v2/create-web-call', 'POST', {
@@ -419,10 +490,11 @@ router.get('/call-link-token', async (req, res) => {
         lead_stage: stage,
         call_objective: callObjective,
         begin_message: beginMessage,
+        landing_mode: isLandingVisitor ? 'true' : 'false',
       },
       metadata: {
         lead_id: data.leadId ? String(data.leadId) : '',
-        source: 'call_link',
+        source: data.source || 'call_link',
         token: t,
       },
     });
@@ -596,6 +668,23 @@ router.post('/setup', async (req, res) => {
             type: 'object',
             properties: {},
             required: [],
+          },
+        },
+        {
+          type: 'custom',
+          name: 'capture_lead',
+          description: 'Save a landing page visitor\'s details (name, email, company) to the database and automatically send them a product overview email. Use this during landing_conversion calls once you have collected their name and email.',
+          url: `${baseUrl}/api/voice/tool-callback`,
+          method: 'POST',
+          execution_message_description: 'Saving your details and sending the overview...',
+          parameters: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'The lead\'s full name' },
+              email: { type: 'string', description: 'The lead\'s email address' },
+              company: { type: 'string', description: 'The lead\'s company name (optional)' },
+            },
+            required: ['name', 'email'],
           },
         },
       ],
@@ -1089,6 +1178,19 @@ Examples of things NOT to promise:
 
 ## Call Playbooks
 
+### call_objective = "landing_conversion"
+This is a landing page visitor — they clicked "Talk to Our AI Agent" on the website. They are NOT in the database yet.
+1. Greet warmly. Give a quick 30-second overview of what E-I-A-A-W does: "AI platform that generates leads, scores them, writes personalized outreach, and I'm actually the AI voice agent — part of the product."
+2. Ask their name if you don't have it: "By the way, what's your name?"
+3. Ask what they do: "And what's your company? What kind of business are you in?"
+4. Ask for their email: "What's the best email to reach you? I'll send you a quick overview of everything we just talked about."
+5. Once you have name + email (and optionally company), use the **capture_lead** tool to save their details. This will also send them a follow-up overview email automatically.
+6. After capturing: "Perfect, I've just sent you a quick overview email — check your inbox shortly."
+7. Guide them to leave more details: "If you'd like to tell us more about what you're looking for, just click 'Talk to Us' on the landing page and fill in your details. Our team will reach out within 24 hours with a personalized demo."
+8. Close warm: "Really appreciate your time! Have a great day."
+
+IMPORTANT for landing visitors: Your #1 goal is to capture their name and email so we can follow up. Be natural about it — weave it into conversation, don't interrogate.
+
 ### call_objective = "introduce_and_qualify"
 1. Get to the point: "I'm reaching out because we work with companies like {{lead_company}} that want to scale sales without hiring more people."
 2. Hook: "We've built an AI platform that generates leads, scores them with reasoning, writes personalized outreach emails, and I'm actually the AI voice agent — talking to you right now as part of the product."
@@ -1119,8 +1221,9 @@ Examples of things NOT to promise:
 - "Can it do [something not in the feature list]?" → "That's something we could explore with you. Let me connect you with our team to walk through the specifics. Would a quick 15-minute chat work?"
 
 ## Tools
-1. **log_call_outcome** — Always call before ending. Log interest level, summary, next step.
-2. **end_call** — After log_call_outcome.
+1. **capture_lead** — For landing page visitors: once you have their name and email, call this to save their details and auto-send them an overview email. ALWAYS use this for landing_conversion calls before ending.
+2. **log_call_outcome** — Always call before ending. Log interest level, summary, next step.
+3. **end_call** — After log_call_outcome.
 
 ## Closing Every Call
 1. Recap commitments: "So I'll send you the overview. Anything else you'd like to know?"
