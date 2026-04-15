@@ -446,6 +446,27 @@ router.get('/call-link-token', async (req, res) => {
   }
 });
 
+// POST /api/voice/public-session — create a voice call link for landing page visitors (no auth)
+router.post('/public-session', async (req, res) => {
+  try {
+    const { apiKey, agentId } = getVoiceConfig();
+    if (!apiKey || !agentId) return res.status(400).json({ error: 'Voice agent not configured.' });
+
+    // Generate token for this visitor
+    const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // 2 hours
+
+    const linkData = { leadId: null, userId: 1, expiresAt, source: req.body.source || 'landing' };
+    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+      .run(`call_link_${token}`, JSON.stringify(linkData));
+
+    const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+    res.json({ callUrl: `${baseUrl}/call.html?t=${token}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Authenticated routes ---
 router.use(requireAuth);
 

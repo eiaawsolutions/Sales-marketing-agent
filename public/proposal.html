@@ -195,10 +195,11 @@
 
 <!-- Nav -->
 <nav class="nav">
-  <div class="nav-logo">EIAAW AI Sales Agent<small>AI-Human Partnerships</small></div>
+  <div class="nav-logo">EIAAW SalesAgent<small>AI-Human Partnerships</small></div>
   <div class="nav-links">
-    <a href="#what">What It Does</a>
-    <a href="#proof">Results</a>
+    <a href="#features">Features</a>
+    <a href="#how">How It Works</a>
+    <a href="#compare">Why Us</a>
     <a href="#pricing">Pricing</a>
     <a href="/app" class="btn btn-primary">Sign In</a>
   </div>
@@ -207,147 +208,276 @@
 <!-- Hero -->
 <section class="hero">
   <div class="hero-content">
-    <div class="hero-badge">Built for Malaysian Sales Teams</div>
-    <h1>What If Your Sales Team <span>Never Slept?</span></h1>
-    <p>An AI agent that finds your next customer, talks to them, qualifies them, and books the meeting — before you even open your laptop. Sound too good? Let our AI show you. Right now.</p>
+    <div class="hero-badge">Powered by EIAAW Solutions</div>
+    <h1>Your AI Sales Agent That <span>Actually Does The Work</span></h1>
+    <p>AI that generates leads, scores them with reasoning, writes personalized outreach, creates marketing content, and even talks to prospects on your behalf — so you focus on closing, not chasing. Built for Malaysian sales teams.</p>
     <div class="hero-cta">
-      <button class="btn btn-primary btn-lg" onclick="bookSession()">Talk to Our AI Agent Now</button>
-      <a href="#what" class="btn btn-outline btn-lg">See What It Does</a>
+      <button class="btn btn-primary btn-lg" onclick="openSignup('pro')">Start 14-Day Free Trial</button>
+      <a href="#pricing" class="btn btn-outline btn-lg">View Pricing</a>
     </div>
     <div class="hero-stats">
       <div><div class="hero-stat-value">0</div><div class="hero-stat-label">Cold Calls You Make</div></div>
-      <div><div class="hero-stat-value">AI</div><div class="hero-stat-label">Does The Outreach</div></div>
-      <div><div class="hero-stat-value">24/7</div><div class="hero-stat-label">Always Working</div></div>
-      <div><div class="hero-stat-value">RM 99</div><div class="hero-stat-label">Starting Price</div></div>
+      <div><div class="hero-stat-value">AI</div><div class="hero-stat-label">Writes Every Email</div></div>
+      <div><div class="hero-stat-value">0-100</div><div class="hero-stat-label">Lead Score + Why</div></div>
+      <div><div class="hero-stat-value">24/7</div><div class="hero-stat-label">AI Voice Agent</div></div>
     </div>
   </div>
 </section>
 
-<!-- What It Does — Tease, don't reveal -->
-<section id="what">
+<!-- Features -->
+<section id="features">
   <div class="container">
-    <div class="section-tag">The Problem</div>
-    <h2 class="section-title">Your Sales Team is Doing Work <span style="color:var(--primary)">That AI Should Handle</span></h2>
-    <p class="section-desc">How many hours does your team spend on these every week?</p>
+    <div class="section-tag">Features</div>
+    <h2 class="section-title">What a Manual Salesperson Does in a Day. <span style="color:var(--primary)">Your AI Does in Seconds.</span></h2>
+    <p class="section-desc">Every feature replaces hours of manual work with one click. Here's what your AI sales agent handles for you.</p>
 
     <div class="features-grid">
       <div class="feature-card">
-        <div class="feature-icon">&#128269;</div>
-        <h3>Finding Leads</h3>
-        <p>Manually searching LinkedIn, directories, and Google for potential customers. Hours spent just building a list.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#9993;</div>
-        <h3>Writing Outreach</h3>
-        <p>Typing the same cold emails over and over. Personalizing each one. Writing follow-ups. Copy-pasting templates.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#128172;</div>
-        <h3>Cold Calling</h3>
-        <p>50 dials a day. 45 don't answer. 4 say "not interested." Maybe 1 agrees to a meeting. Exhausting.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#9998;</div>
-        <h3>Creating Content</h3>
-        <p>Struggling with that LinkedIn post. Agonizing over ad copy. The social media calendar is always behind.</p>
+        <div class="feature-icon">&#9679;</div>
+        <h3>AI Lead Generation</h3>
+        <p><strong>Manual:</strong> Hours searching LinkedIn, directories, Google.<br><strong>AI:</strong> Describe your target audience — AI generates matching leads with names, companies, titles, emails, and phone numbers. One click.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">&#9733;</div>
-        <h3>Qualifying Leads</h3>
-        <p>Gut feeling on who's "ready to buy." No framework. No reasoning. Just guessing who to call first.</p>
+        <h3>AI Lead Scoring with Reasoning</h3>
+        <p><strong>Manual:</strong> Gut feeling on who's "ready to buy".<br><strong>AI:</strong> Scores every lead 0-100 using BANT framework and tells you exactly WHY — budget fit, authority level, need urgency, timeline. You read the reasoning, not just a number.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#9993;</div>
+        <h3>AI Email Outreach Sequences</h3>
+        <p><strong>Manual:</strong> Writing the same follow-up emails over and over.<br><strong>AI:</strong> Generates personalized multi-step email sequences per lead — intro, value add, case study, follow-up. Set it up and the system sends on schedule.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#9998;</div>
+        <h3>AI Content for Every Platform</h3>
+        <p><strong>Manual:</strong> Struggling to write a LinkedIn post or ad copy.<br><strong>AI:</strong> Generates marketing emails, social posts (LinkedIn, IG, FB, X), ad copy, and SEO/GEO strategies — with color palettes, design briefs, and copy ready to publish.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#128172;</div>
+        <h3>AI Voice Agent</h3>
+        <p><strong>Manual:</strong> You make 50 cold calls a day, most don't answer.<br><strong>AI:</strong> Send any lead a link — they click it and your AI agent talks to them live in their browser. It introduces your product, qualifies interest, and reports back. You never pick up the phone.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">&#10070;</div>
-        <h3>Tracking Everything</h3>
-        <p>Spreadsheets, sticky notes, forgotten follow-ups. Deals falling through the cracks because nobody tracked them.</p>
+        <h3>AI Sales Assistant + Pipeline</h3>
+        <p><strong>Manual:</strong> Spreadsheets, sticky notes, forgotten follow-ups.<br><strong>AI:</strong> Full CRM with pipeline tracking, deal stages, and an AI assistant that knows your entire lead database. Ask it anything — it gives specific, actionable answers.</p>
       </div>
-    </div>
-
-    <div style="text-align:center;margin-top:48px">
-      <h3 style="font-size:24px;margin-bottom:12px">What if AI handled <span style="color:var(--primary)">all of this</span> for you?</h3>
-      <p style="color:var(--text-muted);font-size:16px;margin-bottom:24px">Not a tool you have to learn. An AI agent that actually does the work — finds leads, writes emails, talks to prospects, and reports back.</p>
-      <button class="btn btn-primary btn-lg" onclick="bookSession()">Talk to Our AI Agent — See For Yourself</button>
     </div>
   </div>
 </section>
 
-<!-- Social Proof / Results -->
-<section id="proof" style="background:var(--surface)">
-  <div class="container" style="text-align:center">
-    <div class="section-tag">What Changes</div>
-    <h2 class="section-title">When AI Handles The Busywork</h2>
-    <p class="section-desc" style="margin:0 auto 48px">Here's what your week looks like with an AI sales agent.</p>
+<!-- How It Works -->
+<section id="how" style="background:var(--surface)">
+  <div class="container">
+    <div class="section-tag">How It Works</div>
+    <h2 class="section-title">Up and Running in 5 Minutes</h2>
+    <p class="section-desc">No complex setup. No training needed. Start closing deals today.</p>
 
     <div class="steps">
       <div class="step">
-        <h3>Monday Morning</h3>
-        <p>You log in. AI has already generated a fresh list of leads matching your ideal customer profile. Each one scored and ranked.</p>
+        <h3>AI Generates Your Leads</h3>
+        <p>Tell the AI your target audience. It generates a list of matching prospects with contact details — or import your own via CSV.</p>
       </div>
       <div class="step">
-        <h3>By Lunch</h3>
-        <p>AI has written and sent personalized outreach emails to your top leads. Social content for the week is ready to publish.</p>
+        <h3>AI Scores & Explains Why</h3>
+        <p>One click scores any lead 0-100 with BANT reasoning. AI tells you "this lead is hot because..." — not just a number.</p>
       </div>
       <div class="step">
-        <h3>Afternoon</h3>
-        <p>Leads are clicking your voice chat links. Your AI agent is talking to them, qualifying interest, and booking meetings on your calendar.</p>
+        <h3>AI Writes & Sends Outreach</h3>
+        <p>AI generates personalized email sequences and marketing content for each lead. Set up the campaign — emails send on schedule.</p>
       </div>
       <div class="step">
-        <h3>End of Week</h3>
-        <p>Your pipeline is full. You spent your time on calls with qualified prospects — not chasing cold leads.</p>
+        <h3>AI Talks to Your Leads</h3>
+        <p>Send a voice chat link to any lead. Your AI agent introduces your product, qualifies them, and reports back — while you focus on closing.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Pricing — Simple, push toward conversation -->
+<!-- Why Us -->
+<section id="compare">
+  <div class="container">
+    <div class="section-tag">Why Choose Us</div>
+    <h2 class="section-title">Other Tools Store Data. <span style="color:var(--primary)">Ours Does The Selling.</span></h2>
+    <p class="section-desc">Most CRMs are fancy spreadsheets. We built an AI agent that generates leads, writes emails, creates content, and talks to prospects — so you focus on closing.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:48px">
+      <!-- Problem -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px">
+        <div style="font-size:24px;margin-bottom:12px">&#10060;</div>
+        <h3 style="font-size:16px;margin-bottom:12px;color:var(--danger)">Other Sales Tools</h3>
+        <ul style="list-style:none;font-size:14px;color:var(--text-muted);line-height:2.2">
+          <li>&#8226; You manually enter every lead</li>
+          <li>&#8226; You write every email yourself</li>
+          <li>&#8226; You decide who to follow up with</li>
+          <li>&#8226; You score leads by gut feeling</li>
+          <li>&#8226; Separate tools for CRM, email, content</li>
+          <li>&#8226; RM 800-3,000+/month for enterprise features</li>
+          <li>&#8226; Weeks of setup and training</li>
+        </ul>
+      </div>
+      <!-- Solution -->
+      <div style="background:var(--surface);border:1.5px solid var(--primary);border-radius:14px;padding:28px;box-shadow:0 0 30px rgba(46,196,182,0.08)">
+        <div style="font-size:24px;margin-bottom:12px">&#10004;</div>
+        <h3 style="font-size:16px;margin-bottom:12px;color:var(--primary)">EIAAW SalesAgent AI</h3>
+        <ul style="list-style:none;font-size:14px;color:var(--text);line-height:2.2">
+          <li>&#10003; <strong>AI generates leads for you</strong> — describe audience, get prospects</li>
+          <li>&#10003; <strong>AI scores with reasoning</strong> — 0-100 + why, not gut feeling</li>
+          <li>&#10003; <strong>AI writes & sends outreach</strong> — personalized per lead, on schedule</li>
+          <li>&#10003; <strong>AI creates all your content</strong> — emails, social, ads, SEO</li>
+          <li>&#10003; <strong>AI voice agent talks to leads</strong> — qualifies them without you</li>
+          <li>&#10003; <strong>All-in-one</strong> — CRM + email + content + pipeline + voice</li>
+          <li>&#10003; <strong>From RM 99/month</strong> — fraction of enterprise tools</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:14px 18px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:0.5px">Feature</th>
+            <th style="text-align:center;padding:14px 18px;background:rgba(46,196,182,0.08);color:var(--primary);font-weight:700">EIAAW SalesAgent</th>
+            <th style="text-align:center;padding:14px 18px;color:var(--text-muted)">HubSpot</th>
+            <th style="text-align:center;padding:14px 18px;color:var(--text-muted)">Apollo.io</th>
+            <th style="text-align:center;padding:14px 18px;color:var(--text-muted)">Instantly.ai</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">AI Lead Generation</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; Built-in</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Database only</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">AI Content Generation</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; Email, Social, Ads, SEO</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Paid add-on</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">AI Lead Scoring</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; With reasoning</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Enterprise only</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Basic</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">Auto-Outreach Sequences</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; AI-personalized</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Add-on</td>
+            <td style="text-align:center;padding:12px;color:var(--success)">&#10003;</td>
+            <td style="text-align:center;padding:12px;color:var(--success)">&#10003;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">AI Chat Assistant (CRM context)</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; Full CRM context</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Beta</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">Sales Pipeline</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; + AI Analysis</td>
+            <td style="text-align:center;padding:12px;color:var(--success)">&#10003;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">Basic</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">AI Voice Agent (talks to leads)</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; Via browser link</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
+            <td style="padding:12px 18px">Social Media Poster Design</td>
+            <td style="text-align:center;padding:12px;background:rgba(46,196,182,0.04);color:var(--primary);font-weight:700">&#10003; Built-in</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
+          </tr>
+          <tr>
+            <td style="padding:14px 18px;font-weight:700">Starting Price</td>
+            <td style="text-align:center;padding:14px;background:rgba(46,196,182,0.08);color:var(--primary);font-weight:800;font-size:15px">RM 99/mo</td>
+            <td style="text-align:center;padding:14px;color:var(--text-muted)">Free - RM 3,600/mo</td>
+            <td style="text-align:center;padding:14px;color:var(--text-muted)">Free - $99/mo</td>
+            <td style="text-align:center;padding:14px;color:var(--text-muted)">$30-$77/mo</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="text-align:center;margin-top:32px">
+      <button class="btn btn-primary btn-lg" onclick="openSignup('pro')">Start Selling Smarter — 14 Days Free</button>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
 <section id="pricing">
-  <div class="container" style="text-align:center">
+  <div class="container">
     <div class="section-tag">Pricing</div>
-    <h2 class="section-title">Plans That Fit Your Team</h2>
-    <p class="section-desc" style="margin:0 auto 48px">Start with a 14-day free trial. No commitment.</p>
+    <h2 class="section-title">Simple, Transparent Pricing</h2>
+    <p class="section-desc">Choose the plan that fits your sales team. Upgrade anytime as you grow.</p>
 
     <div class="pricing-grid">
       <div class="price-card">
         <div class="price-name">Starter</div>
-        <div class="price-desc">For individual salespeople</div>
+        <div class="price-desc">For individual salespeople getting started</div>
         <div class="price-amount">RM 99<span>/mo</span></div>
-        <div class="price-period">14-day free trial</div>
+        <div class="price-period">Billed monthly</div>
         <ul class="price-features">
-          <li>AI content generation</li>
-          <li>Lead scoring with reasoning</li>
+          <li>100 leads</li>
+          <li>3 campaigns</li>
+          <li>50 AI actions/month</li>
+          <li>5 voice calls/month</li>
+          <li>AI email & social content</li>
           <li>Sales pipeline</li>
           <li>AI chat assistant</li>
-          <li>5 voice calls/month</li>
+          <li class="disabled">Auto-outreach & lead gen</li>
         </ul>
-        <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="bookSession()">Book a Session</button>
+        <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="openSignup('starter')">Start 14-Day Free Trial</button>
       </div>
+
       <div class="price-card featured">
         <div class="price-name">Pro</div>
-        <div class="price-desc">For salespeople who want AI advantage</div>
+        <div class="price-desc">For serious salespeople who want AI advantage</div>
         <div class="price-amount">RM 199<span>/mo</span></div>
-        <div class="price-period">14-day free trial</div>
+        <div class="price-period">14-day free trial, then billed monthly</div>
         <ul class="price-features">
-          <li>Everything in Starter</li>
-          <li>AI lead generation</li>
-          <li>Auto-outreach sequences</li>
-          <li>AI voice agent</li>
+          <li>500 leads</li>
+          <li>10 campaigns</li>
+          <li>200 AI actions/month</li>
           <li>20 voice calls/month</li>
+          <li>AI email, social, ads & GEO</li>
+          <li>Sales pipeline + AI analysis</li>
+          <li>AI chat assistant (full CRM)</li>
+          <li>Auto-outreach + AI lead gen</li>
         </ul>
-        <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="bookSession()">Book a Session</button>
+        <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="openSignup('pro')">Start 14-Day Free Trial</button>
       </div>
+
       <div class="price-card">
         <div class="price-name">Business</div>
-        <div class="price-desc">For sales teams & agencies</div>
+        <div class="price-desc">For sales teams and agencies</div>
         <div class="price-amount">RM 399<span>/mo</span></div>
-        <div class="price-period">14-day free trial</div>
+        <div class="price-period">14-day free trial, then billed monthly</div>
         <ul class="price-features">
-          <li>Everything in Pro</li>
-          <li>Unlimited leads & campaigns</li>
+          <li>Unlimited leads</li>
+          <li>Unlimited campaigns</li>
           <li>1,000 AI actions/month</li>
           <li>100 voice calls/month</li>
+          <li>All AI content tools</li>
+          <li>Pipeline + AI analysis</li>
+          <li>Priority AI model (Claude Sonnet)</li>
           <li>Up to 10 team users</li>
         </ul>
-        <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="bookSession()">Book a Session</button>
+        <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="openSignup('business')">Start 14-Day Free Trial</button>
       </div>
     </div>
   </div>
@@ -355,11 +485,11 @@
 
 <!-- CTA -->
 <section class="cta-section">
-  <h2>Curious? Let Our AI Show You.</h2>
-  <p>Click below to have a 2-minute voice conversation with our AI sales agent. It'll ask about your needs and set up a personalized demo with our team.</p>
+  <h2>Ready to Let AI Do The Selling?</h2>
+  <p>Generate leads, score them, write outreach, create content, and let your AI voice agent talk to prospects — all from one platform. 14-day free trial.</p>
   <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
-    <button class="btn btn-white btn-lg" onclick="bookSession()">Talk to Our AI Agent</button>
-    <button class="btn btn-outline btn-lg" onclick="openContact()">Or Send Us a Message</button>
+    <button class="btn btn-white btn-lg" onclick="openSignup('pro')">Start 14-Day Free Trial</button>
+    <button class="btn btn-outline btn-lg" onclick="openContact()">Talk to Us</button>
   </div>
 </section>
 
@@ -483,29 +613,6 @@
 
 <script>
 let selectedPlan = 'pro';
-
-async function bookSession() {
-  // Create a voice call link for this visitor — no login needed
-  try {
-    const res = await fetch('/api/voice/public-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: 'landing_page' }),
-    });
-    const data = await res.json();
-    if (data.callUrl) {
-      // Open the voice call page
-      window.open(data.callUrl, '_blank');
-    } else if (data.error) {
-      // Fallback: open contact form
-      alert('Voice agent is being set up. Please use the contact form instead.');
-      openContact();
-    }
-  } catch (e) {
-    // Fallback to contact form
-    openContact();
-  }
-}
 
 function openSignup(plan) {
   selectedPlan = plan || 'pro';

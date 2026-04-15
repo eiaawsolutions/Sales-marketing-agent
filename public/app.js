@@ -329,6 +329,7 @@ function renderSidebar() {
     items.push({ id: 'accounts', icon: '&#9775;', label: 'Accounts' });
     items.push({ id: 'system-overview', icon: '&#9881;', label: 'System Overview' });
     items.push({ id: 'system-logic', icon: '&#9883;', label: 'System Logic' });
+    items.push({ id: 'proposal', icon: '&#128196;', label: 'Sales Proposal' });
   }
 
   return `
@@ -367,6 +368,7 @@ function renderPage() {
     case 'accounts': return '<div id="page" class="loading">Loading accounts...</div>';
     case 'system-overview': return '<div id="page" class="loading">Loading overview...</div>';
     case 'system-logic': return '<div id="page" class="loading">Loading...</div>';
+    case 'proposal': window.open(`/proposal.html?token=${authToken}`, '_blank'); currentPage = 'dashboard'; return renderPage();
     default: return '<div>Page not found</div>';
   }
 }
