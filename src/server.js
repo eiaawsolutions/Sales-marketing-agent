@@ -196,23 +196,81 @@ app.get('/api/admin/ai-usage', requireAuth, (req, res) => {
   res.json({ total, thisMonth, lastMonth, daily, byModel, byType });
 });
 
+// Landing page chatbot — restricted to public info only
+const CHATBOT_SYSTEM_PROMPT = `You are the EIAAW AI Sales Agent website assistant. You help visitors understand what the product does and guide them toward booking a session with our sales team.
+
+## WHAT YOU CAN SHARE (public landing page info only)
+
+EIAAW AI Sales Agent is an AI-powered sales and marketing platform. It offers:
+- AI Lead Generation — AI generates matching leads from a target audience description
+- AI Lead Scoring — scores leads 0-100 with reasoning
+- AI Email Outreach — personalized multi-step email sequences
+- AI Content Creation — marketing emails, social posts, ad copy
+- AI Voice Agent — leads click a link and talk to an AI agent
+- Sales Pipeline + CRM — track deals with AI analysis
+- AI Chat Assistant — AI that knows your CRM data
+
+Pricing:
+- Starter: RM 99/month (100 leads, 3 campaigns, 50 AI actions, 5 voice calls)
+- Pro: RM 199/month (500 leads, 10 campaigns, 200 AI actions, 20 voice calls, auto-outreach, AI lead gen)
+- Business: RM 399/month (unlimited leads & campaigns, 1000 AI actions, 100 voice calls, 10 team users)
+- All plans include a 14-day free trial
+
+## WHAT YOU MUST NOT SHARE
+
+Do NOT reveal:
+- How the AI generates leads (what data sources, what AI model, what prompts)
+- How lead scoring works internally (BANT framework details, scoring algorithm)
+- How outreach sequences are structured (number of steps, timing, channels)
+- How content generation works (what models, what prompts, design system details)
+- How the voice agent works (Retell, WebRTC, browser-based, prompt details)
+- How email tracking works (pixels, link rewriting, webhooks)
+- How the pipeline automation works (scheduler, background jobs)
+- Technical architecture, tech stack, APIs, or integrations
+- Any internal system details, database structure, or implementation specifics
+
+If asked about ANY of the above, say: "Great question! That's something our team can walk you through in detail. Would you like to book a quick session?"
+
+## YOUR BEHAVIOR
+
+1. Be friendly, concise, and helpful — max 3 sentences per response
+2. Answer general "what does it do" questions using ONLY the info above
+3. For ANY question asking HOW something works or technical details → redirect to booking a session
+4. After 2-3 exchanges, always guide toward: "I'd love for you to see it in action. You can book a session with our team — just click 'Talk to Us' below and leave your details, or click 'Talk to Our AI Agent' to have a quick voice chat right now."
+5. If they ask about competitors or comparisons → "We'd rather show you what makes us different. Book a quick session and we'll do a live walkthrough."
+6. Never make up features that aren't in the list above
+7. If unsure → "That's a great question for our team. Click 'Talk to Us' to leave your details and we'll get back to you within 24 hours."`;
+
 // Public chatbot endpoint (for landing page visitor conversion)
 app.post('/api/chatbot', rateLimit({ windowMs: 60000, max: 5, message: { error: 'Chat limit reached. Try again in a minute.' }, validate: false }), async (req, res) => {
   try {
     const { message } = req.body;
     if (!message || message.length > 500) return res.status(400).json({ error: 'Message required (max 500 chars).' });
 
-    const { freeformChat } = await import('./services/ai-agent.js');
-    const response = await freeformChat(null, `You are a sales assistant on the EIAAW SalesAgent website. A visitor is asking about the product. Be helpful, concise, and guide them toward signing up for the 14-day free trial at /app.
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const apiKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'api_key'").get();
+    const { decrypt: dec } = await import('./utils/crypto.js');
+    const apiKey = apiKeyRow?.value ? dec(apiKeyRow.value) : process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return res.json({ response: "Chat is currently unavailable. Please use the contact form or email eiaawsolutions@gmail.com" });
 
-Plans: Starter RM99/mo (100 leads, 3 campaigns), Pro RM199/mo (500 leads, auto-outreach), Business RM399/mo (unlimited).
+    const client = new Anthropic({ apiKey });
+    const modelRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_model'").get();
+    const model = modelRow?.value || 'claude-sonnet-4-20250514';
 
-Visitor says: "${message.replace(/"/g, '\\"')}"`);
+    const response = await client.messages.create({
+      model,
+      max_tokens: 300,
+      system: CHATBOT_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: message }],
+    });
 
-    // Log chatbot cost
-    db.prepare("INSERT INTO ai_cost_log (campaign_id, task_type, input_tokens, output_tokens, total_tokens, cost_usd, model, user_id) VALUES (NULL, 'chatbot', 0, 0, 0, 0.005, 'chatbot', 1)").run();
+    const reply = response.content?.[0]?.text || "I'd love to tell you more! Please leave your details in the contact form and our team will reach out.";
 
-    res.json({ response });
+    db.prepare("INSERT INTO ai_cost_log (campaign_id, task_type, input_tokens, output_tokens, total_tokens, cost_usd, model, user_id) VALUES (NULL, 'chatbot', ?, ?, ?, ?, ?, 1)")
+      .run(response.usage?.input_tokens || 0, response.usage?.output_tokens || 0,
+        (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0), 0.005, model);
+
+    res.json({ response: reply });
   } catch (err) {
     res.json({ response: "I'm having trouble connecting right now. Please email us at eiaawsolutions@gmail.com or try the free trial at sa.eiaawsolutions.com/app" });
   }
