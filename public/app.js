@@ -3582,11 +3582,12 @@ function renderAppointmentCard(a, isUpcoming) {
           <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${statusColor}22;color:${statusColor}">${a.status}</span>
           <span style="font-size:11px;color:var(--text-muted)">${typeLabels[a.type] || a.type} &bull; ${a.duration_minutes}min</span>
         </div>
+        ${a.location && a.location.includes('meet.google.com') ? `<div style="margin-top:4px"><a href="${esc(a.location)}" target="_blank" style="font-size:12px;color:#1a73e8;text-decoration:none">&#127909; ${esc(a.location)}</a></div>` : a.location ? `<div class="text-sm text-muted" style="margin-top:4px">&#128205; ${esc(a.location)}</div>` : ''}
         ${a.notes ? `<div class="text-sm text-muted" style="margin-top:4px">${esc(a.notes).substring(0, 100)}</div>` : ''}
       </div>
       ${isUpcoming ? `
         <div style="display:flex;gap:4px;flex-shrink:0">
-          ${a.lead_email ? `<button class="btn btn-sm btn-primary" onclick="sendAppointmentInvite(${a.id})" title="Send calendar invite">Invite</button>` : ''}
+          ${a.lead_email ? `<button class="btn btn-sm btn-outline" onclick="sendAppointmentInvite(${a.id})" title="Resend calendar invite">Resend</button>` : ''}
           <button class="btn btn-sm btn-outline" onclick="editAppointment(${a.id})" title="Edit">Edit</button>
           <button class="btn btn-sm btn-outline" onclick="cancelAppointment(${a.id})" title="Cancel" style="color:var(--danger)">Cancel</button>
         </div>

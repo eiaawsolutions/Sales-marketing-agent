@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { checkPlanLimit, VOICE_ADDONS } from '../middleware/auth.js';
 import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
+import { generateMeetLink, sendCalendarInviteEmail } from './appointments.js';
 
 const router = Router();
 
@@ -167,27 +168,28 @@ async function handleScheduleMeeting(args, callId, leadId, userId, res) {
 
   const lead = leadId ? db.prepare('SELECT name, company, email FROM leads WHERE id = ?').get(leadId) : null;
   const title = `${meeting_type === 'demo' ? 'Demo' : 'Meeting'} with ${lead?.name || 'Lead'}`;
+  const meetLink = generateMeetLink();
+  const dur = parseInt(duration) || 15;
 
   const result = db.prepare(
-    `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, call_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(leadId, userId, title, scheduled.toISOString(), parseInt(duration) || 15, meeting_type || 'demo', notes || '', callId);
+    `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, call_id, location)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(leadId, userId, title, scheduled.toISOString(), dur, meeting_type || 'demo', notes || '', callId, meetLink);
 
   if (leadId) {
     db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
       .run(userId, leadId, 'meeting', `Meeting booked via voice call: ${title}`);
   }
 
-  // Fire-and-forget: send calendar invite if lead has email
+  // Fire-and-forget: send calendar invite with Google Meet link
   if (lead?.email) {
-    sendCalendarInvite(result.lastInsertRowid, lead, scheduled, title, parseInt(duration) || 15).catch(err =>
-      console.error('Calendar invite send error:', err.message)
-    );
+    sendCalendarInviteEmail(result.lastInsertRowid, lead, scheduled, title, dur, meetLink, notes, meeting_type, userId, leadId)
+      .catch(err => console.error('Calendar invite send error:', err.message));
   }
 
   const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Kuala_Lumpur' });
   const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' });
-  res.json({ result: `Perfect, I've booked that for ${dateStr} at ${timeStr}. ${lead?.email ? "I'm sending a calendar invite to their email now." : 'All set!'}` });
+  res.json({ result: `Perfect, I've booked that for ${dateStr} at ${timeStr}. ${lead?.email ? "I'm sending a calendar invite with a Google Meet link to their email now." : 'All set!'}` });
 }
 
 async function handleSendOverview(args, callId, leadId, userId, res) {
@@ -232,60 +234,7 @@ async function handleSendDemoLink(args, callId, leadId, userId, res) {
 
 // --- Email helpers ---
 
-async function sendCalendarInvite(apptId, lead, scheduled, title, duration) {
-  const end = new Date(scheduled.getTime() + duration * 60000);
-  const now = new Date();
-  const fmt = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-
-  const icsContent = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//EIAAW Solutions//SalesAgent//EN',
-    'CALSCALE:GREGORIAN', 'METHOD:REQUEST', 'BEGIN:VEVENT',
-    `UID:appt-${apptId}@eiaaw.com`, `DTSTAMP:${fmt(now)}`,
-    `DTSTART:${fmt(scheduled)}`, `DTEND:${fmt(end)}`,
-    `SUMMARY:${title}`, `ATTENDEE;CN=${lead.name}:mailto:${lead.email}`,
-    'ORGANIZER;CN=EIAAW Solutions:mailto:noreply@eiaaw.com',
-    'STATUS:CONFIRMED',
-    'BEGIN:VALARM', 'TRIGGER:-PT15M', 'ACTION:DISPLAY', 'DESCRIPTION:Meeting in 15 minutes', 'END:VALARM',
-    'END:VEVENT', 'END:VCALENDAR',
-  ].join('\r\n');
-
-  const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' });
-
-  const nodemailer = (await import('nodemailer')).default;
-  const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value;
-  const smtpPort = parseInt(db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || '587');
-  const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value;
-  const smtpPass = decrypt(db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value) || '';
-  const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value;
-  if (!smtpUser) return;
-
-  const transporter = nodemailer.createTransport({
-    host: smtpHost, port: smtpPort, secure: smtpPort === 465,
-    auth: { user: smtpUser, pass: smtpPass },
-    connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000,
-  });
-
-  await transporter.sendMail({
-    from: fromEmail || smtpUser, to: lead.email,
-    subject: `Meeting Confirmed: ${title} — ${dateStr}`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px">
-        <h2 style="color:#2ec4b6">You're Booked!</h2>
-        <p>Hi ${lead.name},</p>
-        <p>Your meeting with EIAAW Solutions is confirmed:</p>
-        <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin:16px 0">
-          <p style="margin:4px 0"><strong>Date:</strong> ${dateStr}</p>
-          <p style="margin:4px 0"><strong>Time:</strong> ${timeStr}</p>
-          <p style="margin:4px 0"><strong>Duration:</strong> ${duration} minutes</p>
-        </div>
-        <p style="font-size:14px;color:#666">A calendar invite is attached — add it to your calendar!</p>
-        <hr style="margin:24px 0;border:none;border-top:1px solid #eee">
-        <p style="font-size:12px;color:#999;text-align:center">EIAAW Solutions — AI-Human Sales Partnerships</p>
-      </div>`,
-    icalEvent: { filename: 'invite.ics', method: 'REQUEST', content: icsContent },
-  });
-}
+// sendCalendarInvite removed — now using shared sendCalendarInviteEmail from appointments.js
 
 async function sendProductOverviewEmail(lead) {
   await sendEmail({
