@@ -3823,7 +3823,8 @@ function loadSystemOverview() {
         <tr><td>Sales Pipeline Kanban</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
         <tr><td>AI Lead Scoring</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
         <tr><td>AI Chat Assistant</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
-        <tr><td>Poster Design</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td><strong>AI Voice Agent (calls/mo)</strong></td><td style="text-align:center">5</td><td style="text-align:center">20</td><td style="text-align:center">100</td></tr>
+        <tr><td>Social Content Design</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
         <tr><td>Social Sharing</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
         <tr><td><strong>Auto-Outreach (AI sequences)</strong></td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
         <tr><td><strong>AI Lead Generation</strong></td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
@@ -3874,8 +3875,9 @@ function loadSystemOverview() {
           { icon: '&#9993;', title: 'Outreach & Follow-up', desc: 'Day 0/3/7/14 cadence. Channel mix (email, LinkedIn, WhatsApp). Subject lines designed for 40%+ open rates. Every message has exactly ONE call-to-action.' },
           { icon: '&#9998;', title: 'Content & Copywriting', desc: 'AIDA framework emails (Attention → Interest → Desire → Action). P.S. lines (most-read part of emails). Benefit-led, not feature-led. Ready to copy-paste.' },
           { icon: '&#128269;', title: 'SEO & Digital Marketing', desc: 'Commercial intent keywords that drive SALES. Competitor gap analysis. Quick wins for THIS WEEK. Malaysian local SEO. Meta descriptions as ad copy for organic search.' },
-          { icon: '&#127912;', title: 'Social Media & Design', desc: 'Platform-specific: LinkedIn (long-form), Instagram (visual), Twitter (punchy), Facebook (community). Design suggestions with color psychology. Best times for MYT.' },
-          { icon: '&#128222;', title: 'Cold Call to Buyer Conversion', desc: 'Opening scripts with personal observations. Pain-discovery questions. Bridge-to-solution framework. Handles "send me an email" objection. Converts cold to warm.' },
+          { icon: '&#127912;', title: 'Social Media & Design', desc: 'Platform-specific: LinkedIn (long-form), Instagram (visual), Twitter (punchy), Facebook (community). Design direction with color psychology. Best times for MYT.' },
+          { icon: '&#128222;', title: 'AI Voice Agent (Sarah)', desc: 'Browser-based voice calls via Retell AI. Introduces product, qualifies leads, books meetings, sends overviews. Landing page conversion + outbound lead calls. 5-min sessions.' },
+          { icon: '&#128214;', title: 'Cold Call to Buyer Conversion', desc: 'Opening scripts with personal observations. Pain-discovery questions. Bridge-to-solution framework. Handles "send me an email" objection. Converts cold to warm.' },
           { icon: '&#128200;', title: 'Pipeline Management', desc: 'Identifies stuck deals and at-risk opportunities. Activity-based scoring. Revenue forecasting (optimistic/realistic/pessimistic). Win/loss pattern analysis.' },
         ].map(s => `
           <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px">
@@ -3897,8 +3899,9 @@ function loadSystemOverview() {
         <tr><td>AI Lead Scoring + Reasoning</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center">Enterprise</td><td style="text-align:center">Basic</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
         <tr><td>Auto-Outreach (AI-personalized)</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center">Add-on</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
         <tr><td>AI Chat (full CRM context)</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center">Beta</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
+        <tr><td><strong>AI Voice Agent (browser calls)</strong></td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003; Built-in</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
         <tr><td>Pipeline + AI Analysis</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center">Basic</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
-        <tr><td>Poster Design for Social</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
+        <tr><td>Social Content + Design Direction</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
         <tr><td>Cold Call Script Generator</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
         <tr style="font-weight:700"><td>Starting Price</td><td style="text-align:center;color:var(--primary)">RM 99/mo</td><td style="text-align:center">Free-RM 3,600</td><td style="text-align:center">Free-$99</td><td style="text-align:center">$30-$77</td></tr>
       </table>
@@ -3910,10 +3913,11 @@ function loadSystemOverview() {
       <table>
         <tr><th>Cost Item</th><th>Per User/Month</th><th>Notes</th></tr>
         <tr><td>AI API (Sonnet avg)</td><td>RM 9-18 ($2-4)</td><td>50-200 AI actions</td></tr>
+        <tr><td>Voice Agent (Retell)</td><td>RM 2-11 ($0.50-2.50)</td><td>5-100 calls/mo @ ~$0.50/call</td></tr>
+        <tr><td>Email Delivery (Resend)</td><td>RM 0.05-0.45</td><td>~$0.002/email, scales with campaigns</td></tr>
         <tr><td>Server (shared)</td><td>~RM 2</td><td>Railway $5/mo shared</td></tr>
-        <tr><td>SMTP (email)</td><td>~RM 0.45</td><td>Gmail/SendGrid</td></tr>
-        <tr style="font-weight:700"><td>Total Cost/User</td><td>RM 12-21</td><td></td></tr>
-        <tr style="font-weight:700;color:var(--success)"><td>Gross Margin</td><td>80-85%</td><td>At RM 99-399 pricing</td></tr>
+        <tr style="font-weight:700"><td>Total Cost/User</td><td>RM 13-32</td><td></td></tr>
+        <tr style="font-weight:700;color:var(--success)"><td>Gross Margin</td><td>75-87%</td><td>At RM 99-399 pricing</td></tr>
       </table>
     </div>
 
@@ -3932,6 +3936,8 @@ function loadSystemOverview() {
         <tr><td>Auto-Outreach (per 3 leads)</td><td>~800</td><td>~600</td><td>$0.015</td></tr>
         <tr><td>AI Chat (full CRM context)</td><td>~3000-8000</td><td>~500</td><td>$0.03-0.13</td></tr>
         <tr><td>Auto-Generate 5 Leads</td><td>~400</td><td>~1000</td><td>$0.020</td></tr>
+        <tr><td>Voice Agent Call (Retell)</td><td colspan="2" style="text-align:center">External — Retell AI</td><td>~$0.50/call</td></tr>
+        <tr><td>Landing Chatbot Response</td><td>~800</td><td>~200</td><td>$0.005</td></tr>
       </table>
     </div>
 
@@ -4030,7 +4036,7 @@ function loadSystemOverview() {
           </div>
           <div style="text-align:right">
             <div style="font-size:11px;color:var(--text-muted)">RANGE</div>
-            <div style="font-size:20px;font-weight:800;color:var(--primary)">RM 60K - 960K</div>
+            <div style="font-size:20px;font-weight:800;color:var(--primary)">RM 90K - 960K</div>
           </div>
         </div>
         <table style="margin-top:12px;font-size:13px">
@@ -4052,22 +4058,23 @@ function loadSystemOverview() {
           </div>
           <div style="text-align:right">
             <div style="font-size:11px;color:var(--text-muted)">ESTIMATE</div>
-            <div style="font-size:20px;font-weight:800;color:var(--primary)">RM 150K - 350K</div>
+            <div style="font-size:20px;font-weight:800;color:var(--primary)">RM 200K - 400K</div>
           </div>
         </div>
         <table style="margin-top:12px;font-size:13px">
           <tr><th>Asset</th><th>Details</th><th>Dev Time</th><th style="text-align:right">Value (RM)</th></tr>
-          <tr><td>Full-stack codebase</td><td>7,779 lines, 30 files, 75 API endpoints</td><td>8-12 weeks</td><td style="text-align:right">RM 80,000</td></tr>
-          <tr><td>AI integration layer</td><td>10 AI task handlers, Claude API, prompt engineering, cost tracking</td><td>3-4 weeks</td><td style="text-align:right">RM 40,000</td></tr>
+          <tr><td>Full-stack codebase</td><td>~14,000 lines, 32 files, 107 API endpoints</td><td>12-16 weeks</td><td style="text-align:right">RM 120,000</td></tr>
+          <tr><td>AI integration layer</td><td>12 AI task handlers, Claude API, prompt engineering, cost tracking</td><td>3-4 weeks</td><td style="text-align:right">RM 40,000</td></tr>
           <tr><td>Multi-tenant auth system</td><td>User management, plans, bcrypt, sessions, role-based access</td><td>2-3 weeks</td><td style="text-align:right">RM 25,000</td></tr>
           <tr><td>Stripe billing integration</td><td>Checkout, subscriptions, trials, webhooks, plan enforcement</td><td>2 weeks</td><td style="text-align:right">RM 20,000</td></tr>
           <tr><td>Landing page + branding</td><td>Full marketing site, pricing, signup flow, contact form</td><td>1-2 weeks</td><td style="text-align:right">RM 15,000</td></tr>
           <tr><td>Super Sales Agent prompt</td><td>8 specialized skills, AIDA emails, SEO, cold call scripts</td><td>2-3 weeks</td><td style="text-align:right">RM 30,000</td></tr>
-          <tr><td>Database schema (13 tables)</td><td>119 columns, foreign keys, user isolation, cost logging</td><td>1-2 weeks</td><td style="text-align:right">RM 15,000</td></tr>
+          <tr><td>AI Voice Agent system</td><td>Retell AI integration, call management, tool callbacks, landing conversion</td><td>2-3 weeks</td><td style="text-align:right">RM 30,000</td></tr>
+          <tr><td>Database schema (14 tables)</td><td>131 columns, foreign keys, user isolation, cost logging</td><td>1-2 weeks</td><td style="text-align:right">RM 15,000</td></tr>
           <tr><td>DevOps & deployment</td><td>Dockerfile, Railway config, health checks, rate limiting</td><td>1 week</td><td style="text-align:right">RM 10,000</td></tr>
           <tr style="font-weight:700;border-top:2px solid var(--border)">
-            <td>TOTAL REBUILD COST</td><td>Senior full-stack dev @ RM 15-20K/mo</td><td>20-30 weeks</td>
-            <td style="text-align:right;color:var(--primary);font-size:15px">RM 235,000</td>
+            <td>TOTAL REBUILD COST</td><td>Senior full-stack dev @ RM 15-20K/mo</td><td>24-34 weeks</td>
+            <td style="text-align:right;color:var(--primary);font-size:15px">RM 295,000</td>
           </tr>
         </table>
       </div>
@@ -4100,7 +4107,7 @@ function loadSystemOverview() {
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
           <div style="text-align:center">
             <div style="font-size:12px;color:var(--text-muted)">MINIMUM (asset value)</div>
-            <div style="font-size:24px;font-weight:800;color:var(--warning)">RM 150,000</div>
+            <div style="font-size:24px;font-weight:800;color:var(--warning)">RM 200,000</div>
             <div style="font-size:11px;color:var(--text-muted)">Before any revenue</div>
           </div>
           <div style="text-align:center">
@@ -4116,14 +4123,14 @@ function loadSystemOverview() {
         </div>
         <div style="font-size:13px;color:var(--text-muted);line-height:1.8">
           <strong style="color:var(--text)">Justification:</strong><br>
-          1. <strong>Working product</strong> — 75 API endpoints, 13 DB tables, full auth, billing, deployment. Not a prototype.<br>
-          2. <strong>AI moat</strong> — Super Sales Agent with 8 specialized skills + AIDA emails + SEO + cold call conversion. Hard to replicate prompt engineering.<br>
+          1. <strong>Working product</strong> — 107 API endpoints, 14 DB tables, full auth, billing, deployment. Not a prototype.<br>
+          2. <strong>AI moat</strong> — Super Sales Agent with 9 specialized skills + AI Voice Agent + AIDA emails + SEO + cold call conversion. Hard to replicate prompt engineering.<br>
           3. <strong>Revenue-ready</strong> — Stripe billing live, 3 subscription tiers, 14-day trials, auto account creation. Can accept payments TODAY.<br>
           4. <strong>Multi-tenant</strong> — Full user isolation, plan enforcement, budget controls. Ready for 100+ users.<br>
           5. <strong>Deployed</strong> — Live on Railway with Docker, health checks, auto-deploy from GitHub. Not localhost.<br>
           6. <strong>Malaysian market fit</strong> — Built for MY salespeople, MYR pricing, local SEO, APAC timezone. First-mover in this niche.<br>
-          7. <strong>80%+ gross margins</strong> — AI costs ~RM 12-21/user vs RM 99-399 subscription. Highly profitable at scale.<br>
-          8. <strong>Rebuild cost RM 235K+</strong> — 20-30 weeks of senior dev time. Buyer saves 6+ months vs building from scratch.
+          7. <strong>75%+ gross margins</strong> — AI + voice costs ~RM 13-32/user vs RM 99-399 subscription. Highly profitable at scale.<br>
+          8. <strong>Rebuild cost RM 295K+</strong> — 24-34 weeks of senior dev time. Buyer saves 6+ months vs building from scratch.
         </div>
       </div>
     </div>
