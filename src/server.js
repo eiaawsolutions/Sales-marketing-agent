@@ -196,6 +196,32 @@ app.get('/api/admin/ai-usage', requireAuth, (req, res) => {
   res.json({ total, thisMonth, lastMonth, daily, byModel, byType });
 });
 
+// Operating expenses stats (superadmin only)
+app.get('/api/admin/opex', requireAuth, (req, res) => {
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Superadmin only' });
+
+  // Voice calls this month (from activities table)
+  const voiceCalls = db.prepare(
+    "SELECT COUNT(*) as count FROM activities WHERE type = 'voice_call' AND created_at >= datetime('now','start of month')"
+  ).get();
+
+  // Emails sent this month (from outreach_queue + campaigns)
+  const emailsSent = db.prepare(
+    "SELECT COUNT(*) as count FROM outreach_queue WHERE status = 'sent' AND sent_at >= datetime('now','start of month')"
+  ).get();
+
+  // Check which services are configured
+  const resendKey = db.prepare("SELECT value FROM settings WHERE key = 'resend_api_key'").get();
+  const voiceKey = db.prepare("SELECT value FROM settings WHERE key = 'voice_ai_api_key'").get();
+
+  res.json({
+    voiceCalls: voiceCalls.count,
+    emailsSent: emailsSent.count,
+    hasResend: !!(resendKey?.value && resendKey.value.length > 5),
+    hasVoice: !!(voiceKey?.value && voiceKey.value.length > 5),
+  });
+});
+
 // Landing page chatbot — restricted to public info only
 const CHATBOT_SYSTEM_PROMPT = `You are the EIAAW AI Sales Agent website assistant. Your job is to give visitors a quick overview and guide them to take action.
 

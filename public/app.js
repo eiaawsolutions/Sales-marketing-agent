@@ -3084,6 +3084,7 @@ async function loadAccounts() {
     const costData = await api.get('/campaigns/ai-costs').catch(() => ({ overall: { total_cost: 0 } }));
     const aiUsage = await api.get('/admin/ai-usage').catch(() => ({ total: { cost: 0, calls: 0, tokens: 0 }, thisMonth: { cost: 0, calls: 0 }, lastMonth: { cost: 0, calls: 0 }, daily: [], byModel: [], byType: [] }));
     const settingsData = await api.get('/settings').catch(() => ({}));
+    const opex = await api.get('/admin/opex').catch(() => ({ voiceCalls: 0, emailsSent: 0, hasResend: false, hasVoice: false }));
     const aiCreditBalance = parseFloat(settingsData.ai_credit_balance || '5.00');
 
     // Calculate revenue & profit
@@ -3209,6 +3210,22 @@ async function loadAccounts() {
             <td>${aiUsage.thisMonth.calls} calls this month. Pay-per-use.</td>
           </tr>
           <tr>
+            <td><strong>Voice Agent</strong></td>
+            <td>Retell AI</td>
+            <td>RM ${(opex.voiceCalls * 0.50 * 4.5).toFixed(2)}</td>
+            <td>$${(opex.voiceCalls * 0.50).toFixed(2)}</td>
+            <td><span class="badge badge-${opex.hasVoice ? (opex.voiceCalls > 0 ? 'active' : 'draft') : 'draft'}">${opex.hasVoice ? 'THIS MONTH' : 'NOT SET'}</span></td>
+            <td>${opex.voiceCalls} calls this month. ~$0.50/call avg.</td>
+          </tr>
+          <tr>
+            <td><strong>Email Delivery</strong></td>
+            <td>${opex.hasResend ? 'Resend' : 'Gmail SMTP'}</td>
+            <td>RM ${opex.hasResend ? (opex.emailsSent * 0.002 * 4.5).toFixed(2) : '0'}</td>
+            <td>$${opex.hasResend ? (opex.emailsSent * 0.002).toFixed(2) : '0'}</td>
+            <td><span class="badge badge-${opex.hasResend ? 'active' : 'active'}">${opex.hasResend ? 'THIS MONTH' : 'FREE'}</span></td>
+            <td>${opex.emailsSent} emails sent this month.${opex.hasResend ? ' ~$0.002/email.' : ' Free tier.'}</td>
+          </tr>
+          <tr>
             <td><strong>Payment Processing</strong></td>
             <td>Stripe</td>
             <td>RM ${(totalMRR * 0.029 + activeSubscribers.length * 1).toFixed(2)}</td>
@@ -3232,21 +3249,13 @@ async function loadAccounts() {
             <td><span class="badge badge-active">FREE</span></td>
             <td>Free tier — DNS, SSL, CDN</td>
           </tr>
-          <tr>
-            <td><strong>Email (SMTP)</strong></td>
-            <td>Gmail</td>
-            <td>RM 0</td>
-            <td>$0</td>
-            <td><span class="badge badge-active">FREE</span></td>
-            <td>Free tier — 500 emails/day</td>
-          </tr>
           <tr style="font-weight:700;border-top:2px solid var(--border)">
             <td>TOTAL MONTHLY</td>
             <td></td>
-            <td style="color:var(--warning)">RM ${(22.50 + (aiUsage.thisMonth.cost * 4.5) + (totalMRR * 0.029 + activeSubscribers.length) + 5).toFixed(2)}</td>
+            <td style="color:var(--warning)">RM ${(22.50 + (aiUsage.thisMonth.cost * 4.5) + (opex.voiceCalls * 0.50 * 4.5) + (opex.hasResend ? opex.emailsSent * 0.002 * 4.5 : 0) + (totalMRR * 0.029 + activeSubscribers.length) + 5).toFixed(2)}</td>
             <td></td>
             <td></td>
-            <td>Excludes one-time costs</td>
+            <td>Auto-calculated from actual usage</td>
           </tr>
         </table>
       </div>
