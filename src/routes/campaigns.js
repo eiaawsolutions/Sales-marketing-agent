@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import db from '../db/index.js';
 import { campaignsService } from '../services/campaigns.js';
 import { runAgent, getAICostStats, getAICostByCampaign, getAICostLog, getOutreachQueue } from '../services/ai-agent.js';
 import { checkPlanLimit } from '../middleware/auth.js';
