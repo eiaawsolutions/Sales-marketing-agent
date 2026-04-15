@@ -3800,11 +3800,19 @@ async function saveAppointment(editId) {
 }
 
 // ========== System Overview (Superadmin) ==========
-function loadSystemOverview() {
+async function loadSystemOverview() {
   if (currentUser?.role !== 'superadmin') { navigate('dashboard'); return; }
 
+  const m = await api.get('/admin/metrics').catch(() => ({
+    totalLines: 0, totalFiles: 0, endpoints: 0, tables: 0, columns: 0,
+    aiCostByType: [], avgCostPerUser: 0, totalUsers: 0, activeSubscribers: 0, updated_at: null,
+  }));
+
   document.getElementById('page').innerHTML = `
-    <div class="toolbar"><h2>System Overview</h2></div>
+    <div class="toolbar">
+      <h2>System Overview</h2>
+      ${m.updated_at ? `<small class="text-muted">Metrics updated: ${new Date(m.updated_at).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' })}</small>` : ''}
+    </div>
 
     <!-- Pricing & Plans -->
     <div class="card">
@@ -3912,7 +3920,7 @@ function loadSystemOverview() {
       <h3>UNIT ECONOMICS — COST PER USER</h3>
       <table>
         <tr><th>Cost Item</th><th>Per User/Month</th><th>Notes</th></tr>
-        <tr><td>AI API (Sonnet avg)</td><td>RM 9-18 ($2-4)</td><td>50-200 AI actions</td></tr>
+        <tr><td>AI API (Sonnet avg)</td><td>${m.avgCostPerUser > 0 ? `RM ${(m.avgCostPerUser * 4.5).toFixed(2)} ($${m.avgCostPerUser.toFixed(2)})` : 'RM 9-18 ($2-4)'}</td><td>${m.avgCostPerUser > 0 ? 'Actual avg this month' : '50-200 AI actions'}</td></tr>
         <tr><td>Voice Agent (Retell)</td><td>RM 2-11 ($0.50-2.50)</td><td>5-100 calls/mo @ ~$0.50/call</td></tr>
         <tr><td>Email Delivery (Resend)</td><td>RM 0.05-0.45</td><td>~$0.002/email, scales with campaigns</td></tr>
         <tr><td>Server (shared)</td><td>~RM 2</td><td>Railway $5/mo shared</td></tr>
@@ -3923,22 +3931,27 @@ function loadSystemOverview() {
 
     <!-- AI Cost Per Action -->
     <div class="card">
-      <h3>AI COST PER ACTION (SONNET)</h3>
+      <h3>AI COST PER ACTION ${m.aiCostByType?.length > 0 ? '<span class="badge badge-active" style="font-size:10px;margin-left:8px">LIVE DATA</span>' : '(ESTIMATES)'}</h3>
       <table>
-        <tr><th>Action</th><th>Input Tokens</th><th>Output Tokens</th><th>Cost (USD)</th></tr>
-        <tr><td>Lead Scoring</td><td>~600</td><td>~150</td><td>$0.011</td></tr>
-        <tr><td>Lead Qualification (BANT)</td><td>~400</td><td>~200</td><td>$0.009</td></tr>
-        <tr><td>Email Generation (AIDA)</td><td>~500</td><td>~400</td><td>$0.012</td></tr>
-        <tr><td>Social Post + Design Tips</td><td>~400</td><td>~300</td><td>$0.008</td></tr>
-        <tr><td>Ad Copy + A/B Plan</td><td>~400</td><td>~500</td><td>$0.013</td></tr>
-        <tr><td>SEO Strategy</td><td>~350</td><td>~400</td><td>$0.010</td></tr>
-        <tr><td>Pipeline Analysis</td><td>~2000</td><td>~300</td><td>$0.012</td></tr>
-        <tr><td>Auto-Outreach (per 3 leads)</td><td>~800</td><td>~600</td><td>$0.015</td></tr>
-        <tr><td>AI Chat (full CRM context)</td><td>~3000-8000</td><td>~500</td><td>$0.03-0.13</td></tr>
-        <tr><td>Auto-Generate 5 Leads</td><td>~400</td><td>~1000</td><td>$0.020</td></tr>
-        <tr><td>Voice Agent Call (Retell)</td><td colspan="2" style="text-align:center">External — Retell AI</td><td>~$0.50/call</td></tr>
-        <tr><td>Landing Chatbot Response</td><td>~800</td><td>~200</td><td>$0.005</td></tr>
+        <tr><th>Action</th><th>Avg Input Tokens</th><th>Avg Output Tokens</th><th>Avg Cost (USD)</th>${m.aiCostByType?.length > 0 ? '<th>Samples</th>' : ''}</tr>
+        ${m.aiCostByType?.length > 0 ? m.aiCostByType.map(t => `
+          <tr><td>${t.task_type}</td><td>~${Number(t.avg_input).toLocaleString()}</td><td>~${Number(t.avg_output).toLocaleString()}</td><td>$${Number(t.avg_cost).toFixed(4)}</td><td>${t.count}</td></tr>
+        `).join('') : `
+          <tr><td>Lead Scoring</td><td>~600</td><td>~150</td><td>$0.011</td></tr>
+          <tr><td>Lead Qualification (BANT)</td><td>~400</td><td>~200</td><td>$0.009</td></tr>
+          <tr><td>Email Generation (AIDA)</td><td>~500</td><td>~400</td><td>$0.012</td></tr>
+          <tr><td>Social Post + Design Tips</td><td>~400</td><td>~300</td><td>$0.008</td></tr>
+          <tr><td>Ad Copy + A/B Plan</td><td>~400</td><td>~500</td><td>$0.013</td></tr>
+          <tr><td>SEO Strategy</td><td>~350</td><td>~400</td><td>$0.010</td></tr>
+          <tr><td>Pipeline Analysis</td><td>~2000</td><td>~300</td><td>$0.012</td></tr>
+          <tr><td>Auto-Outreach (per 3 leads)</td><td>~800</td><td>~600</td><td>$0.015</td></tr>
+          <tr><td>AI Chat (full CRM context)</td><td>~3000-8000</td><td>~500</td><td>$0.03-0.13</td></tr>
+          <tr><td>Auto-Generate 5 Leads</td><td>~400</td><td>~1000</td><td>$0.020</td></tr>
+        `}
+        <tr><td>Voice Agent Call (Retell)</td><td colspan="2" style="text-align:center">External — Retell AI</td><td>~$0.50/call</td>${m.aiCostByType?.length > 0 ? '<td>—</td>' : ''}</tr>
+        <tr><td>Landing Chatbot Response</td><td>~800</td><td>~200</td><td>$0.005</td>${m.aiCostByType?.length > 0 ? '<td>—</td>' : ''}</tr>
       </table>
+      ${m.avgCostPerUser > 0 ? `<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">Avg AI cost per active user this month: <strong style="color:var(--warning)">$${m.avgCostPerUser.toFixed(4)}</strong></div>` : ''}
     </div>
 
     <!-- Security Report Card -->
@@ -4063,14 +4076,14 @@ function loadSystemOverview() {
         </div>
         <table style="margin-top:12px;font-size:13px">
           <tr><th>Asset</th><th>Details</th><th>Dev Time</th><th style="text-align:right">Value (RM)</th></tr>
-          <tr><td>Full-stack codebase</td><td>~14,000 lines, 32 files, 107 API endpoints</td><td>12-16 weeks</td><td style="text-align:right">RM 120,000</td></tr>
-          <tr><td>AI integration layer</td><td>12 AI task handlers, Claude API, prompt engineering, cost tracking</td><td>3-4 weeks</td><td style="text-align:right">RM 40,000</td></tr>
+          <tr><td>Full-stack codebase</td><td>${m.totalLines ? `~${(m.totalLines / 1000).toFixed(0)}K` : '~14K'} lines, ${m.totalFiles || 32} files, ${m.endpoints || 107} API endpoints</td><td>12-16 weeks</td><td style="text-align:right">RM 120,000</td></tr>
+          <tr><td>AI integration layer</td><td>${m.aiCostByType?.length || 12} AI task types, Claude API, prompt engineering, cost tracking</td><td>3-4 weeks</td><td style="text-align:right">RM 40,000</td></tr>
           <tr><td>Multi-tenant auth system</td><td>User management, plans, bcrypt, sessions, role-based access</td><td>2-3 weeks</td><td style="text-align:right">RM 25,000</td></tr>
           <tr><td>Stripe billing integration</td><td>Checkout, subscriptions, trials, webhooks, plan enforcement</td><td>2 weeks</td><td style="text-align:right">RM 20,000</td></tr>
           <tr><td>Landing page + branding</td><td>Full marketing site, pricing, signup flow, contact form</td><td>1-2 weeks</td><td style="text-align:right">RM 15,000</td></tr>
           <tr><td>Super Sales Agent prompt</td><td>8 specialized skills, AIDA emails, SEO, cold call scripts</td><td>2-3 weeks</td><td style="text-align:right">RM 30,000</td></tr>
           <tr><td>AI Voice Agent system</td><td>Retell AI integration, call management, tool callbacks, landing conversion</td><td>2-3 weeks</td><td style="text-align:right">RM 30,000</td></tr>
-          <tr><td>Database schema (14 tables)</td><td>131 columns, foreign keys, user isolation, cost logging</td><td>1-2 weeks</td><td style="text-align:right">RM 15,000</td></tr>
+          <tr><td>Database schema (${m.tables || 14} tables)</td><td>${m.columns || 131} columns, foreign keys, user isolation, cost logging</td><td>1-2 weeks</td><td style="text-align:right">RM 15,000</td></tr>
           <tr><td>DevOps & deployment</td><td>Dockerfile, Railway config, health checks, rate limiting</td><td>1 week</td><td style="text-align:right">RM 10,000</td></tr>
           <tr style="font-weight:700;border-top:2px solid var(--border)">
             <td>TOTAL REBUILD COST</td><td>Senior full-stack dev @ RM 15-20K/mo</td><td>24-34 weeks</td>
@@ -4123,7 +4136,7 @@ function loadSystemOverview() {
         </div>
         <div style="font-size:13px;color:var(--text-muted);line-height:1.8">
           <strong style="color:var(--text)">Justification:</strong><br>
-          1. <strong>Working product</strong> — 107 API endpoints, 14 DB tables, full auth, billing, deployment. Not a prototype.<br>
+          1. <strong>Working product</strong> — ${m.endpoints || 107} API endpoints, ${m.tables || 14} DB tables, full auth, billing, deployment. Not a prototype.<br>
           2. <strong>AI moat</strong> — Super Sales Agent with 9 specialized skills + AI Voice Agent + AIDA emails + SEO + cold call conversion. Hard to replicate prompt engineering.<br>
           3. <strong>Revenue-ready</strong> — Stripe billing live, 3 subscription tiers, 14-day trials, auto account creation. Can accept payments TODAY.<br>
           4. <strong>Multi-tenant</strong> — Full user isolation, plan enforcement, budget controls. Ready for 100+ users.<br>

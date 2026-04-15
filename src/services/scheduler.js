@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import db from '../db/index.js';
 import { sendEmail } from '../utils/email.js';
 import { injectTracking } from './campaigns.js';
+import { refreshMetrics } from './metrics.js';
 
 /**
  * Background scheduler — runs every 30 minutes.
@@ -16,14 +17,21 @@ export function startScheduler() {
     await processScheduledCampaigns();
   });
 
+  // Daily midnight: refresh system metrics (code stats, AI costs, DB counts)
+  cron.schedule('0 0 * * *', async () => {
+    console.log('[Scheduler] Midnight metrics refresh');
+    await refreshMetrics();
+  }, { timezone: 'Asia/Kuala_Lumpur' });
+
   // Also run once on startup (after 15-second delay to let DB initialize)
   setTimeout(async () => {
     console.log('[Scheduler] Initial run');
     await processOutreachQueue();
     await processScheduledCampaigns();
+    await refreshMetrics();
   }, 15000);
 
-  console.log('[Scheduler] Started — runs every 30 minutes');
+  console.log('[Scheduler] Started — outreach every 30min, metrics daily at midnight MYT');
 }
 
 async function processOutreachQueue() {

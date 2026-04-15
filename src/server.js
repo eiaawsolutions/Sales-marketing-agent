@@ -222,6 +222,17 @@ app.get('/api/admin/opex', requireAuth, (req, res) => {
   });
 });
 
+// System metrics (superadmin only) — cached by midnight cron job
+app.get('/api/admin/metrics', requireAuth, async (req, res) => {
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Superadmin only' });
+  const cached = db.prepare("SELECT value FROM settings WHERE key = 'system_metrics'").get();
+  if (cached?.value) return res.json(JSON.parse(cached.value));
+  // First request before midnight job has run — compute now
+  const { refreshMetrics } = await import('./services/metrics.js');
+  const metrics = await refreshMetrics();
+  res.json(metrics || {});
+});
+
 // Landing page chatbot — restricted to public info only
 const CHATBOT_SYSTEM_PROMPT = `You are the EIAAW AI Sales Agent website assistant. Your job is to give visitors a quick overview and guide them to take action.
 
