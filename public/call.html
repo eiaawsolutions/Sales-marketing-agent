@@ -9,8 +9,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Inter', sans-serif;
-      background: #0b1929;
-      color: #e8f4f8;
+      background: #FAF7F2;
+      color: #1A2A2E;
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -27,24 +27,24 @@
       font-weight: 700;
       letter-spacing: 1.5px;
       text-transform: uppercase;
-      color: #2ec4b6;
+      color: #1FA896;
       margin-bottom: 32px;
     }
     .avatar {
       width: 80px; height: 80px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #2ec4b6, #0e8b7d);
+      background: linear-gradient(135deg, #1FA896, #167A6D);
       display: flex; align-items: center; justify-content: center;
       margin: 0 auto 20px;
       font-size: 32px;
-      box-shadow: 0 0 30px rgba(46,196,182,0.3);
+      box-shadow: 0 0 30px rgba(31,168,150,0.3);
     }
     .avatar.active {
       animation: pulse-glow 2s ease-in-out infinite;
     }
     @keyframes pulse-glow {
-      0%, 100% { box-shadow: 0 0 30px rgba(46,196,182,0.3); }
-      50% { box-shadow: 0 0 50px rgba(46,196,182,0.5); }
+      0%, 100% { box-shadow: 0 0 30px rgba(31,168,150,0.3); }
+      50% { box-shadow: 0 0 50px rgba(31,168,150,0.5); }
     }
     h1 {
       font-size: 22px;
@@ -52,7 +52,7 @@
       margin-bottom: 8px;
     }
     .subtitle {
-      color: #7fb5c9;
+      color: #6B7A7F;
       font-size: 14px;
       margin-bottom: 32px;
       line-height: 1.5;
@@ -67,7 +67,7 @@
     .status.waiting { color: #f59e0b; }
     .status.connecting { color: #f59e0b; }
     .status.active { color: #22c55e; }
-    .status.ended { color: #94a3b8; }
+    .status.ended { color: #6B7A7F; }
     .status.error { color: #ef4444; }
 
     .timer {
@@ -87,7 +87,7 @@
     .wave.visible { display: flex; }
     .wave span {
       width: 4px; border-radius: 2px;
-      background: #2ec4b6;
+      background: #1FA896;
       animation: wave 1.2s ease-in-out infinite;
     }
     .wave span:nth-child(2) { animation-delay: 0.1s; }
@@ -97,7 +97,7 @@
     @keyframes wave { 0%,100% { height: 6px; } 50% { height: 28px; } }
 
     .transcript {
-      background: rgba(255,255,255,0.05);
+      background: rgba(31,168,150,0.06);
       border-radius: 12px;
       padding: 16px;
       margin-bottom: 24px;
@@ -105,12 +105,12 @@
       overflow-y: auto;
       font-size: 13px;
       line-height: 1.6;
-      color: #94a3b8;
+      color: #6B7A7F;
       text-align: left;
       display: none;
     }
     .transcript.visible { display: block; }
-    .transcript b { color: #e8f4f8; }
+    .transcript b { color: #1A2A2E; }
 
     .btn-start {
       width: 100%;
@@ -140,7 +140,7 @@
     .permissions-note {
       margin-top: 16px;
       font-size: 12px;
-      color: #7fb5c9;
+      color: #6B7A7F;
     }
 
     .error-msg {
@@ -158,14 +158,18 @@
     .powered-by {
       margin-top: 40px;
       font-size: 11px;
-      color: #4a6b7f;
+      color: #6B7A7F;
     }
-    .powered-by a { color: #2ec4b6; text-decoration: none; }
+    .powered-by a { color: #1FA896; text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="call-container">
-    <div class="brand">EIAAW AI Sales Agent</div>
+    <div class="brand" style="display:flex;align-items:center;justify-content:center;gap:10px;color:#1A2A2E">
+      <img src="/brand/shield.png" alt="EIAAW" style="width:36px;height:36px;object-fit:contain">
+      <span style="color:#1FA896">EIAAW</span>
+      <span style="color:#6B7A7F;font-weight:500;letter-spacing:0.8px">AI SALES AGENT</span>
+    </div>
     <div class="avatar" id="avatar">&#129302;</div>
     <h1 id="heading">AI Sales Assistant</h1>
     <p class="subtitle" id="subtitle">Hi! I'm ready to tell you about how we can help automate your sales and marketing. Click below to start a voice conversation.</p>
@@ -184,7 +188,16 @@
 
     <p class="permissions-note" id="permissions-note">Your browser will ask for microphone access. This is required for the voice call.</p>
 
-    <div class="powered-by">Powered by <a href="https://eiaawsolutions.com">EIAAW AI Sales Agent</a></div>
+    <div class="powered-by" style="margin-top:40px;padding-top:24px;border-top:1px solid #E6DDCC">
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px">
+        <img src="/brand/shield.png" alt="EIAAW" style="width:32px;height:32px;object-fit:contain;opacity:0.9">
+        <div style="text-align:left;line-height:1.2">
+          <div style="font-size:13px;font-weight:800;color:#1A2A2E">EIAAW SalesAgent AI</div>
+          <div style="font-size:10px;color:#1FA896;text-transform:uppercase;letter-spacing:0.6px">AI-Human Partnerships</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#6B7A7F">Powered by <a href="https://eiaawsolutions.com">EIAAW Solutions</a></div>
+    </div>
   </div>
 
   <script type="module">

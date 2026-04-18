@@ -9,20 +9,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0b1929;
-      --surface: #132337;
-      --surface2: #1e3a52;
-      --border: #2a5470;
-      --text: #e8f4f8;
-      --text-muted: #7fb5c9;
-      --primary: #2ec4b6;
-      --primary-dark: #0e8b7d;
-      --primary-light: rgba(46,196,182,0.12);
+      --bg: #FAF7F2;
+      --surface: #FFFFFF;
+      --surface2: #F3EEE4;
+      --border: #E6DDCC;
+      --text: #1A2A2E;
+      --text-muted: #6B7A7F;
+      --primary: #1FA896;
+      --primary-dark: #167A6D;
+      --primary-light: rgba(31,168,150,0.10);
       --success: #22c55e;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --gradient: linear-gradient(135deg, #2ec4b6, #0e8b7d);
-      --gradient-bg: linear-gradient(180deg, #0b1929 0%, #0f2235 50%, #132337 100%);
+      --warning: #d97706;
+      --danger: #dc2626;
+      --gradient: linear-gradient(135deg, #1FA896, #167A6D);
+      --gradient-bg: linear-gradient(180deg, #FAF7F2 0%, #F7F1E6 55%, #F3EEE4 100%);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -40,26 +40,29 @@
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       padding: 16px 40px;
       display: flex; justify-content: space-between; align-items: center;
-      background: rgba(11,25,41,0.85);
+      background: rgba(250,247,242,0.88);
       backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(46,196,182,0.1);
+      border-bottom: 1px solid rgba(31,168,150,0.18);
     }
-    .nav-logo {
-      font-size: 20px; font-weight: 800;
+    .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .nav-logo img { width: 36px; height: 36px; object-fit: contain; display: block; }
+    .nav-logo-text { display: flex; flex-direction: column; line-height: 1.1; }
+    .nav-logo-text strong {
+      font-size: 18px; font-weight: 800; letter-spacing: 0.5px;
       background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
-    .nav-logo small { font-size: 11px; font-weight: 500; display: block; -webkit-text-fill-color: var(--text-muted); }
+    .nav-logo-text small { font-size: 10px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.4px; }
     .nav-links { display: flex; gap: 28px; align-items: center; }
     .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
     .nav-links a:hover { color: var(--primary); }
     .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.25s; border: none; text-decoration: none; }
-    .btn-primary { background: var(--gradient); color: #fff; box-shadow: 0 4px 20px rgba(46,196,182,0.3); }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(46,196,182,0.4); }
+    .btn-primary { background: var(--gradient); color: #fff; box-shadow: 0 4px 20px rgba(31,168,150,0.3); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(31,168,150,0.4); }
     .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
     .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
     .btn-lg { padding: 14px 32px; font-size: 16px; border-radius: 10px; }
-    .btn-white { background: #fff; color: var(--bg); font-weight: 700; }
-    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(255,255,255,0.2); }
+    .btn-white { background: var(--text); color: #fff; font-weight: 700; }
+    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(26,42,46,0.25); }
 
     /* Hero */
     .hero {
@@ -72,12 +75,12 @@
     }
     .hero::before {
       content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: radial-gradient(ellipse at 50% 30%, rgba(46,196,182,0.08) 0%, transparent 60%);
+      background: radial-gradient(ellipse at 50% 30%, rgba(31,168,150,0.08) 0%, transparent 60%);
     }
     .hero-content { position: relative; max-width: 800px; }
     .hero-badge {
       display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
-      background: var(--primary-light); color: var(--primary); border: 1px solid rgba(46,196,182,0.2);
+      background: var(--primary-light); color: var(--primary); border: 1px solid rgba(31,168,150,0.2);
       margin-bottom: 24px; letter-spacing: 0.5px;
     }
     .hero h1 { font-size: 56px; font-weight: 900; line-height: 1.1; margin-bottom: 20px; letter-spacing: -1px; }
@@ -86,7 +89,7 @@
     .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
     .hero-stats {
       display: flex; gap: 48px; justify-content: center; margin-top: 60px;
-      padding-top: 40px; border-top: 1px solid rgba(46,196,182,0.1);
+      padding-top: 40px; border-top: 1px solid rgba(31,168,150,0.1);
     }
     .hero-stat-value { font-size: 32px; font-weight: 800; color: var(--primary); }
     .hero-stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
@@ -107,7 +110,7 @@
       background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
       padding: 28px; transition: all 0.3s;
     }
-    .feature-card:hover { border-color: var(--primary); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(46,196,182,0.08); }
+    .feature-card:hover { border-color: var(--primary); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(31,168,150,0.08); }
     .feature-icon {
       width: 44px; height: 44px; border-radius: 10px; background: var(--primary-light);
       display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 16px;
@@ -137,7 +140,7 @@
       background: var(--bg); border: 1.5px solid var(--border); border-radius: 16px;
       padding: 32px; position: relative; transition: all 0.3s;
     }
-    .price-card.featured { border-color: var(--primary); box-shadow: 0 0 40px rgba(46,196,182,0.12); }
+    .price-card.featured { border-color: var(--primary); box-shadow: 0 0 40px rgba(31,168,150,0.12); }
     .price-card.featured::before {
       content: 'MOST POPULAR'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
       background: var(--gradient); color: #fff; padding: 4px 16px; border-radius: 12px;
@@ -167,16 +170,27 @@
     /* CTA */
     .cta-section {
       text-align: center; padding: 100px 24px;
-      background: radial-gradient(ellipse at 50% 50%, rgba(46,196,182,0.1) 0%, transparent 60%);
+      background: radial-gradient(ellipse at 50% 50%, rgba(31,168,150,0.1) 0%, transparent 60%);
     }
     .cta-section h2 { font-size: 38px; font-weight: 800; margin-bottom: 16px; }
     .cta-section p { color: var(--text-muted); font-size: 16px; margin-bottom: 32px; }
 
     /* Footer */
     footer {
-      padding: 40px 24px; text-align: center;
-      border-top: 1px solid var(--border); color: var(--text-muted); font-size: 13px;
+      padding: 56px 24px 32px; border-top: 1px solid var(--border);
+      background: var(--surface2); color: var(--text-muted); font-size: 13px;
     }
+    .footer-inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+    .footer-lockup { display: flex; align-items: center; gap: 14px; }
+    .footer-lockup img { width: 52px; height: 52px; object-fit: contain; }
+    .footer-brand { display: flex; flex-direction: column; line-height: 1.15; text-align: left; }
+    .footer-brand strong { font-size: 22px; font-weight: 800; letter-spacing: 0.5px; color: var(--text); }
+    .footer-brand span { font-size: 12px; font-weight: 500; color: var(--primary); letter-spacing: 0.8px; text-transform: uppercase; }
+    .footer-tagline { font-size: 14px; color: var(--text); font-style: italic; max-width: 520px; line-height: 1.55; }
+    .footer-links { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+    .footer-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; }
+    .footer-links a:hover { color: var(--primary); }
+    .footer-copy { font-size: 12px; color: var(--text-muted); padding-top: 8px; border-top: 1px solid var(--border); width: 100%; }
     footer a { color: var(--primary); text-decoration: none; }
 
     /* Responsive */
@@ -195,7 +209,13 @@
 
 <!-- Nav -->
 <nav class="nav">
-  <div class="nav-logo">EIAAW AI Sales Agent<small>AI-Human Partnerships</small></div>
+  <a href="/" class="nav-logo">
+    <img src="/brand/shield.png" alt="EIAAW Solutions shield">
+    <span class="nav-logo-text">
+      <strong>EIAAW</strong>
+      <small>AI Sales Agent</small>
+    </span>
+  </a>
   <div class="nav-links">
     <a href="#features">Features</a>
     <a href="#how">How It Works</a>
@@ -314,7 +334,7 @@
           <li>&#8226; Weeks of setup and training</li>
         </ul>
       </div>
-      <div style="background:var(--surface);border:1.5px solid var(--primary);border-radius:14px;padding:28px;box-shadow:0 0 30px rgba(46,196,182,0.08)">
+      <div style="background:var(--surface);border:1.5px solid var(--primary);border-radius:14px;padding:28px;box-shadow:0 0 30px rgba(31,168,150,0.08)">
         <div style="font-size:24px;margin-bottom:12px">&#10004;</div>
         <h3 style="font-size:16px;margin-bottom:12px;color:var(--primary)">EIAAW SalesAgent AI</h3>
         <ul style="list-style:none;font-size:14px;color:var(--text);line-height:2.2">
@@ -409,15 +429,27 @@
 
 <!-- Footer -->
 <footer>
-  <div class="container">
-    <p style="margin-bottom:8px"><strong style="color:var(--primary)">EIAAW SalesAgent AI</strong> by <a href="https://eiaawsolutions.com" target="_blank">EIAAW Solutions</a></p>
-    <p>AI-Human Partnerships for Sales & Marketing</p>
-    <p style="margin-top:12px">&copy; 2026 EIAAW Solutions. All rights reserved.</p>
+  <div class="footer-inner">
+    <div class="footer-lockup">
+      <img src="/brand/shield.png" alt="EIAAW Solutions shield">
+      <div class="footer-brand">
+        <strong>EIAAW SalesAgent AI</strong>
+        <span>AI-Human Partnerships</span>
+      </div>
+    </div>
+    <p class="footer-tagline">&ldquo;AI that generates leads, writes outreach, creates content, and talks to prospects &mdash; so you focus on closing.&rdquo;</p>
+    <div class="footer-links">
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="/app">Sign In</a>
+      <a href="https://eiaawsolutions.com" target="_blank">EIAAW Solutions</a>
+    </div>
+    <div class="footer-copy">&copy; 2026 EIAAW Solutions. All rights reserved.</div>
   </div>
 </footer>
 
 <!-- AI Chatbot Widget -->
-<div id="chatbot-toggle" onclick="toggleChatbot()" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:300;box-shadow:0 4px 20px rgba(46,196,182,0.4);transition:transform 0.2s">
+<div id="chatbot-toggle" onclick="toggleChatbot()" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:300;box-shadow:0 4px 20px rgba(31,168,150,0.4);transition:transform 0.2s">
   <span style="font-size:24px;color:#fff" id="chatbot-icon">&#128172;</span>
 </div>
 

@@ -335,8 +335,11 @@ function renderSidebar() {
   return `
     <div class="sidebar">
       <div class="sidebar-logo">
-        <h1>EIAAW SalesAgent</h1>
-        <small>AI-Human Sales Partnerships</small>
+        <img src="/brand/shield.png" alt="EIAAW" class="sidebar-shield">
+        <div class="sidebar-logo-text">
+          <h1>EIAAW</h1>
+          <small>SalesAgent AI</small>
+        </div>
       </div>
       <div class="sidebar-nav-items" style="flex:1;overflow-y:auto">
       ${items.map(i => `
