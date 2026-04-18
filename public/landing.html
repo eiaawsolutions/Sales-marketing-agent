@@ -6,345 +6,804 @@
   <title>EIAAW AI Sales Agent — AI That Generates Leads, Writes Outreach & Talks to Prospects</title>
   <meta name="description" content="AI sales agent that generates leads, scores them with reasoning, writes personalized email outreach, creates marketing content, and talks to prospects via voice — on your behalf. From RM 99/month.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #FAF7F2;
+      --bg-warm: #F3EDE0;
       --surface: #FFFFFF;
-      --surface2: #F3EEE4;
-      --border: #E6DDCC;
-      --text: #1A2A2E;
-      --text-muted: #6B7A7F;
+      --ink: #0F1A1D;
+      --ink-2: #2A3438;
+      --mute: #6B7A7F;
+      --line: #D9CFBC;
+      --line-soft: #E8DFCC;
       --primary: #1FA896;
-      --primary-dark: #167A6D;
-      --primary-light: rgba(31,168,150,0.10);
-      --success: #22c55e;
-      --warning: #d97706;
-      --danger: #dc2626;
-      --gradient: linear-gradient(135deg, #1FA896, #167A6D);
-      --gradient-bg: linear-gradient(180deg, #FAF7F2 0%, #F7F1E6 55%, #F3EEE4 100%);
+      --primary-dark: #11766A;
+      --primary-tint: #E5F4F1;
+      --danger: #B4412B;
+
+      --serif: 'Instrument Serif', 'Times New Roman', serif;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
+
+      --fs-eyebrow: 11px;
+      --fs-body: 16px;
+      --fs-lead: clamp(18px, 1.1vw + 14px, 22px);
+
+      --tracking-ui: -0.01em;
+      --tracking-display: -0.035em;
+      --tracking-eyebrow: 0.14em;
+
+      --ease: cubic-bezier(.2,.7,.2,1);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    *::selection { background: var(--ink); color: var(--bg); }
 
+    html { scroll-behavior: smooth; }
     body {
-      font-family: 'Inter', -apple-system, sans-serif;
+      font-family: var(--sans);
       background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
+      color: var(--ink);
+      line-height: 1.5;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: "ss01", "cv11", "kern";
+      letter-spacing: var(--tracking-ui);
+    }
+
+    /* Subtle paper grain */
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: radial-gradient(rgba(15,26,29,0.035) 1px, transparent 1px);
+      background-size: 3px 3px;
+      mix-blend-mode: multiply;
+      opacity: 0.5;
+    }
+
+    /* Typography primitives */
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: var(--fs-eyebrow);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-eyebrow);
+      color: var(--primary-dark);
+      display: inline-flex; align-items: center; gap: 10px;
+    }
+    .eyebrow::before {
+      content: ''; width: 28px; height: 1px; background: currentColor; opacity: 0.5;
+    }
+    .serif-it { font-family: var(--serif); font-style: italic; font-weight: 400; letter-spacing: 0; }
+
+    .display {
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: clamp(44px, 8vw, 112px);
+      line-height: 0.96;
+      letter-spacing: var(--tracking-display);
+      color: var(--ink);
+    }
+    .display em {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 400;
+      color: var(--primary-dark);
+      letter-spacing: -0.01em;
+    }
+
+    .section-h {
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: clamp(32px, 4.4vw, 64px);
+      line-height: 1.02;
+      letter-spacing: var(--tracking-display);
+      color: var(--ink);
+    }
+    .section-h em {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      color: var(--primary-dark); letter-spacing: -0.01em;
+    }
+
+    .lead {
+      font-size: var(--fs-lead);
+      line-height: 1.5;
+      color: var(--ink-2);
+      max-width: 54ch;
     }
 
     /* Nav */
     .nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      padding: 16px 40px;
+      padding: 20px clamp(20px, 4vw, 56px);
       display: flex; justify-content: space-between; align-items: center;
-      background: rgba(250,247,242,0.88);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(31,168,150,0.18);
+      background: rgba(250,247,242,0.72);
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s var(--ease), background 0.3s var(--ease);
     }
+    .nav.scrolled { border-bottom-color: var(--line-soft); background: rgba(250,247,242,0.88); }
+
     .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-    .nav-logo img { width: 36px; height: 36px; object-fit: contain; display: block; }
-    .nav-logo-text { display: flex; flex-direction: column; line-height: 1.1; }
+    .nav-logo img { width: 34px; height: 34px; object-fit: contain; display: block; }
+    .nav-logo-text { display: flex; flex-direction: column; line-height: 1.05; }
     .nav-logo-text strong {
-      font-size: 18px; font-weight: 800; letter-spacing: 0.5px;
-      background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      font-family: var(--sans);
+      font-size: 15px; font-weight: 700; letter-spacing: 0.08em;
+      color: var(--primary-dark);
+      text-transform: uppercase;
     }
-    .nav-logo-text small { font-size: 10px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.4px; }
-    .nav-links { display: flex; gap: 28px; align-items: center; }
-    .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
-    .nav-links a:hover { color: var(--primary); }
-    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.25s; border: none; text-decoration: none; }
-    .btn-primary { background: var(--gradient); color: #fff; box-shadow: 0 4px 20px rgba(31,168,150,0.3); }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(31,168,150,0.4); }
-    .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
-    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
-    .btn-lg { padding: 14px 32px; font-size: 16px; border-radius: 10px; }
-    .btn-white { background: var(--text); color: #fff; font-weight: 700; }
-    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(26,42,46,0.25); }
+    .nav-logo-text small {
+      font-family: var(--mono);
+      font-size: 10px; font-weight: 400; color: var(--mute);
+      text-transform: uppercase; letter-spacing: 0.12em; margin-top: 2px;
+    }
 
-    /* Hero */
+    .nav-links { display: flex; gap: 36px; align-items: center; }
+    .nav-links a:not(.btn) {
+      color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 500;
+      position: relative; transition: color 0.25s var(--ease);
+    }
+    .nav-links a:not(.btn)::after {
+      content: ''; position: absolute; left: 0; bottom: -4px; height: 1px; width: 0;
+      background: var(--ink); transition: width 0.35s var(--ease);
+    }
+    .nav-links a:not(.btn):hover { color: var(--ink); }
+    .nav-links a:not(.btn):hover::after { width: 100%; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 13px 22px;
+      font-family: var(--sans);
+      font-size: 14px; font-weight: 500;
+      letter-spacing: -0.005em;
+      border-radius: 999px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.35s var(--ease);
+      border: 1px solid transparent;
+      position: relative; overflow: hidden;
+    }
+    .btn-primary { background: var(--ink); color: var(--bg); }
+    .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .btn-outline { background: transparent; color: var(--ink); border-color: var(--ink); }
+    .btn-outline:hover { background: var(--ink); color: var(--bg); }
+    .btn-ghost { background: transparent; color: var(--ink); padding: 13px 4px; border-radius: 0; }
+    .btn-ghost::after {
+      content: ''; position: absolute; left: 4px; right: 4px; bottom: 10px;
+      height: 1px; background: var(--ink); transform-origin: right; transform: scaleX(1);
+      transition: transform 0.45s var(--ease);
+    }
+    .btn-ghost:hover::after { transform-origin: left; transform: scaleX(1); }
+    .btn .arrow {
+      display: inline-block; transition: transform 0.35s var(--ease);
+    }
+    .btn:hover .arrow { transform: translateX(4px); }
+    .btn-lg { padding: 17px 28px; font-size: 15px; }
+
+    /* Kept aliases for modals/forms — do not delete */
+    .btn-white { background: var(--ink); color: var(--bg); font-weight: 500; border-radius: 999px; }
+    .btn-white:hover { background: var(--primary-dark); }
+
+    /* Layout primitives */
+    .wrap {
+      max-width: 1440px; margin: 0 auto;
+      padding: 0 clamp(20px, 4vw, 56px);
+      position: relative; z-index: 1;
+    }
+    .grid-12 {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: clamp(16px, 1.6vw, 28px);
+    }
+
+    section { position: relative; z-index: 1; }
+
+    /* Hero — editorial, asymmetric */
     .hero {
-      min-height: 100vh;
-      display: flex; align-items: center; justify-content: center;
-      text-align: center;
-      padding: 120px 24px 80px;
+      padding: clamp(140px, 18vh, 200px) 0 clamp(80px, 12vh, 140px);
       position: relative;
-      background: var(--gradient-bg);
     }
-    .hero::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: radial-gradient(ellipse at 50% 30%, rgba(31,168,150,0.08) 0%, transparent 60%);
+    .hero-eyebrow-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: clamp(56px, 9vh, 96px);
+      border-bottom: 1px solid var(--line-soft);
+      margin-bottom: clamp(56px, 9vh, 96px);
     }
-    .hero-content { position: relative; max-width: 800px; }
-    .hero-badge {
-      display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
-      background: var(--primary-light); color: var(--primary); border: 1px solid rgba(31,168,150,0.2);
-      margin-bottom: 24px; letter-spacing: 0.5px;
+    .hero-eyebrow-row .availability {
+      font-family: var(--mono); font-size: 11px; color: var(--mute);
+      letter-spacing: 0.12em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px;
     }
-    .hero h1 { font-size: 56px; font-weight: 900; line-height: 1.1; margin-bottom: 20px; letter-spacing: -1px; }
-    .hero h1 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .hero p { font-size: 18px; color: var(--text-muted); max-width: 600px; margin: 0 auto 36px; line-height: 1.7; }
-    .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-    .hero-stats {
-      display: flex; gap: 48px; justify-content: center; margin-top: 60px;
-      padding-top: 40px; border-top: 1px solid rgba(31,168,150,0.1);
+    .hero-eyebrow-row .availability .dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--primary);
+      box-shadow: 0 0 0 4px rgba(31,168,150,0.15);
+      animation: pulse-dot 2.4s ease-in-out infinite;
     }
-    .hero-stat-value { font-size: 32px; font-weight: 800; color: var(--primary); }
-    .hero-stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(31,168,150,0.15); }
+      50% { box-shadow: 0 0 0 9px rgba(31,168,150,0.0); }
+    }
+    .hero-headline {
+      grid-column: 1 / span 10;
+    }
+    .hero-headline .display {
+      text-wrap: balance;
+    }
+    .hero-headline .display .line { display: block; }
+    .hero-headline .display .indent { padding-left: clamp(40px, 10vw, 200px); }
 
-    /* Sections */
-    section { padding: 100px 24px; }
-    .container { max-width: 1100px; margin: 0 auto; }
-    .section-tag {
-      display: inline-block; padding: 5px 14px; border-radius: 16px; font-size: 11px; font-weight: 600;
-      background: var(--primary-light); color: var(--primary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;
+    .hero-meta {
+      margin-top: clamp(48px, 7vh, 80px);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 32px;
+      padding-top: 32px;
+      border-top: 1px solid var(--line-soft);
     }
-    .section-title { font-size: 38px; font-weight: 800; margin-bottom: 16px; letter-spacing: -0.5px; }
-    .section-desc { font-size: 16px; color: var(--text-muted); max-width: 600px; margin-bottom: 48px; }
+    .hero-meta .lead { max-width: 48ch; }
+    .hero-cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
 
-    /* Features */
-    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .feature-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-      padding: 28px; transition: all 0.3s;
+    .hero-index {
+      margin-top: clamp(80px, 12vh, 140px);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: clamp(16px, 1.6vw, 28px);
+      padding-top: 24px;
+      border-top: 1px solid var(--line-soft);
     }
-    .feature-card:hover { border-color: var(--primary); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(31,168,150,0.08); }
-    .feature-icon {
-      width: 44px; height: 44px; border-radius: 10px; background: var(--primary-light);
-      display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 16px;
+    .hero-index-item {
+      display: flex; flex-direction: column; gap: 8px;
     }
-    .feature-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
-    .feature-card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+    .hero-index-num {
+      font-family: var(--mono); font-size: 11px; color: var(--mute);
+      letter-spacing: 0.14em; text-transform: uppercase;
+    }
+    .hero-index-label {
+      font-family: var(--sans); font-size: 15px; font-weight: 500; color: var(--ink);
+      letter-spacing: -0.01em; line-height: 1.25;
+    }
+    .hero-index-label em { font-family: var(--serif); font-style: italic; color: var(--primary-dark); font-weight: 400; }
 
-    /* How it Works */
-    .steps { display: flex; gap: 32px; counter-reset: step; }
-    .step {
-      flex: 1; position: relative; padding: 28px; background: var(--surface);
-      border: 1px solid var(--border); border-radius: 14px;
+    /* Section structure */
+    .section-pad { padding: clamp(100px, 14vh, 180px) 0; }
+    .section-head {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: clamp(16px, 1.6vw, 28px);
+      margin-bottom: clamp(64px, 10vh, 120px);
+      align-items: end;
     }
-    .step::before {
-      counter-increment: step; content: counter(step);
-      width: 32px; height: 32px; border-radius: 50%; background: var(--gradient);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 800; color: #fff; margin-bottom: 14px;
-    }
-    .step h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
-    .step p { font-size: 13px; color: var(--text-muted); }
+    .section-head .label { grid-column: 1 / span 2; padding-top: 8px; }
+    .section-head .title { grid-column: 3 / span 8; }
+    .section-head .aside { grid-column: 11 / span 2; text-align: right; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--mute); text-transform: uppercase; padding-top: 12px; }
 
-    /* Pricing */
-    #pricing { background: var(--surface); }
-    .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .price-card {
-      background: var(--bg); border: 1.5px solid var(--border); border-radius: 16px;
-      padding: 32px; position: relative; transition: all 0.3s;
+    /* Features — editorial numbered list with marginalia */
+    .capabilities {
+      border-top: 1px solid var(--line);
     }
-    .price-card.featured { border-color: var(--primary); box-shadow: 0 0 40px rgba(31,168,150,0.12); }
-    .price-card.featured::before {
-      content: 'MOST POPULAR'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-      background: var(--gradient); color: #fff; padding: 4px 16px; border-radius: 12px;
-      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    .cap-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 1fr 200px;
+      gap: clamp(16px, 3vw, 48px);
+      padding: clamp(32px, 5vh, 56px) 0;
+      border-bottom: 1px solid var(--line);
+      align-items: baseline;
+      position: relative;
+      transition: background 0.5s var(--ease);
     }
-    .price-card:hover { transform: translateY(-4px); }
-    .price-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-    .price-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
-    .price-amount { font-size: 42px; font-weight: 900; margin-bottom: 4px; }
-    .price-amount span { font-size: 16px; font-weight: 500; color: var(--text-muted); }
-    .price-period { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
-    .price-features { list-style: none; margin-bottom: 28px; }
-    .price-features li { padding: 8px 0; font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; }
-    .price-features li::before { content: '\2713'; color: var(--primary); font-weight: 700; font-size: 14px; }
-    .price-features li.disabled { opacity: 0.4; }
-    .price-features li.disabled::before { content: '\2717'; color: var(--text-muted); }
+    .cap-row::before {
+      content: ''; position: absolute; left: -24px; right: -24px; top: 0; bottom: 0;
+      background: var(--bg-warm); opacity: 0; transition: opacity 0.5s var(--ease);
+      z-index: -1; border-radius: 2px;
+    }
+    .cap-row:hover::before { opacity: 0.6; }
+    .cap-row:hover .cap-arrow { transform: translate(4px, -4px); }
+    .cap-num {
+      font-family: var(--mono); font-size: 12px; color: var(--mute);
+      letter-spacing: 0.1em; padding-top: 6px;
+    }
+    .cap-title {
+      font-family: var(--sans); font-size: clamp(22px, 2.2vw, 32px); font-weight: 500;
+      letter-spacing: -0.02em; line-height: 1.1; color: var(--ink);
+    }
+    .cap-title em {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      color: var(--primary-dark);
+    }
+    .cap-body {
+      font-size: 15px; line-height: 1.55; color: var(--ink-2);
+      max-width: 42ch;
+    }
+    .cap-body .crossed {
+      display: block; color: var(--mute); font-size: 13px;
+      text-decoration: line-through; text-decoration-thickness: 1px;
+      margin-bottom: 6px; font-style: italic;
+    }
+    .cap-meta {
+      font-family: var(--mono); font-size: 11px; color: var(--mute);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      text-align: right; padding-top: 6px;
+    }
+    .cap-arrow {
+      display: inline-block; font-size: 18px; color: var(--ink);
+      transition: transform 0.4s var(--ease);
+      margin-left: 6px;
+    }
 
-    /* Testimonial */
-    .testimonial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .testimonial {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px;
+    /* Approach — how it works, big serif moments */
+    .approach {
+      background: var(--bg-warm);
+      position: relative;
     }
-    .testimonial-text { font-size: 14px; line-height: 1.7; margin-bottom: 16px; font-style: italic; color: var(--text-muted); }
-    .testimonial-author { font-size: 13px; font-weight: 600; }
-    .testimonial-role { font-size: 12px; color: var(--text-muted); }
-
-    /* CTA */
-    .cta-section {
-      text-align: center; padding: 100px 24px;
-      background: radial-gradient(ellipse at 50% 50%, rgba(31,168,150,0.1) 0%, transparent 60%);
+    .approach-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: clamp(16px, 1.6vw, 28px);
     }
-    .cta-section h2 { font-size: 38px; font-weight: 800; margin-bottom: 16px; }
-    .cta-section p { color: var(--text-muted); font-size: 16px; margin-bottom: 32px; }
+    .approach-step {
+      grid-column: span 6;
+      padding: clamp(40px, 6vh, 72px) 0;
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    .approach-step:nth-child(even) { grid-column: 7 / span 6; padding-left: clamp(24px, 4vw, 64px); }
+    .approach-step:nth-child(1), .approach-step:nth-child(2) { border-top: none; }
+    .approach-step-num {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: clamp(32px, 4vw, 52px); line-height: 0.9;
+      color: var(--primary-dark);
+    }
+    .approach-step h3 {
+      font-family: var(--sans); font-weight: 500; font-size: clamp(20px, 1.8vw, 26px);
+      letter-spacing: -0.015em; line-height: 1.15; margin-bottom: 10px; color: var(--ink);
+    }
+    .approach-step p { font-size: 15px; line-height: 1.55; color: var(--ink-2); max-width: 36ch; }
 
-    /* Footer */
+    /* Compare — asymmetric split */
+    .compare-split {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: clamp(16px, 1.6vw, 28px);
+    }
+    .compare-col {
+      padding: clamp(32px, 5vh, 56px) 0;
+      display: flex; flex-direction: column; gap: 24px;
+    }
+    .compare-col.them { grid-column: 1 / span 5; border-top: 1px solid var(--line); }
+    .compare-col.us { grid-column: 7 / span 6; border-top: 2px solid var(--ink); }
+    .compare-col h3 {
+      font-family: var(--sans); font-weight: 500;
+      font-size: clamp(22px, 2vw, 28px); letter-spacing: -0.015em; line-height: 1.15;
+      color: var(--ink);
+    }
+    .compare-col.them h3 em { color: var(--mute); font-family: var(--serif); font-style: italic; font-weight: 400; }
+    .compare-col.us h3 em { color: var(--primary-dark); font-family: var(--serif); font-style: italic; font-weight: 400; }
+    .compare-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+    .compare-list li {
+      font-size: 15px; color: var(--ink-2); line-height: 1.45;
+      padding-left: 22px; position: relative;
+    }
+    .compare-col.them .compare-list li::before {
+      content: '–'; position: absolute; left: 0; top: 0; color: var(--mute);
+      font-family: var(--serif); font-size: 18px; line-height: 1;
+    }
+    .compare-col.us .compare-list li::before {
+      content: ''; position: absolute; left: 0; top: 9px; width: 10px; height: 1px;
+      background: var(--primary);
+    }
+    .compare-col.us .compare-list li { color: var(--ink); font-weight: 500; }
+
+    /* Pricing — flat editorial table */
+    .pricing {
+      border-top: 1px solid var(--line);
+    }
+    .pricing-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 1fr 1fr 220px;
+      gap: clamp(16px, 2.5vw, 40px);
+      padding: clamp(28px, 4vh, 44px) 0;
+      border-bottom: 1px solid var(--line);
+      align-items: baseline;
+      transition: background 0.4s var(--ease);
+      position: relative;
+    }
+    .pricing-row::before {
+      content: ''; position: absolute; inset: 0 -24px; background: var(--bg-warm);
+      opacity: 0; transition: opacity 0.4s var(--ease); z-index: -1; border-radius: 2px;
+    }
+    .pricing-row:hover::before { opacity: 0.7; }
+    .pricing-row.featured { background: linear-gradient(90deg, var(--bg-warm) 0%, transparent 100%); border-bottom-color: var(--ink); }
+    .price-tier {
+      font-family: var(--sans); font-weight: 500; font-size: 22px;
+      letter-spacing: -0.01em; color: var(--ink);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .price-tier .tag {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--primary-dark); font-weight: 500;
+    }
+    .price-num {
+      font-family: var(--sans); font-weight: 500;
+      font-size: clamp(32px, 3.5vw, 48px);
+      letter-spacing: -0.03em; line-height: 1; color: var(--ink);
+    }
+    .price-num .per { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--mute); margin-left: 6px; letter-spacing: 0.06em; }
+    .price-blurb { font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+    .price-features-inline {
+      list-style: none; display: flex; flex-direction: column; gap: 6px;
+      font-size: 13px; color: var(--ink-2);
+    }
+    .price-features-inline li::before { content: '· '; color: var(--primary); }
+    .pricing-row .btn-ghost { justify-self: end; }
+
+    /* Quote block — serif moment */
+    .quote-block {
+      padding: clamp(80px, 12vh, 140px) 0;
+      text-align: left;
+    }
+    .quote-block .q {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: clamp(32px, 4.2vw, 64px); line-height: 1.08;
+      letter-spacing: -0.02em; color: var(--ink);
+      max-width: 22ch;
+    }
+    .quote-block .q::first-letter { margin-left: -0.1em; }
+    .quote-block .attribution {
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--mute); margin-top: 32px;
+    }
+
+    /* CTA — big editorial moment */
+    .cta-final {
+      padding: clamp(120px, 18vh, 200px) 0;
+      border-top: 1px solid var(--line);
+      position: relative;
+    }
+    .cta-final .display {
+      max-width: 14ch;
+    }
+    .cta-final-meta {
+      margin-top: clamp(48px, 7vh, 80px);
+      padding-top: 32px;
+      border-top: 1px solid var(--line-soft);
+      display: flex; justify-content: space-between; align-items: flex-end;
+      flex-wrap: wrap; gap: 24px;
+    }
+    .cta-final-meta .lead { max-width: 42ch; }
+
+    /* Footer — editorial */
     footer {
-      padding: 56px 24px 32px; border-top: 1px solid var(--border);
-      background: var(--surface2); color: var(--text-muted); font-size: 13px;
+      background: var(--ink);
+      color: var(--bg);
+      padding: clamp(80px, 10vh, 120px) 0 48px;
     }
-    .footer-inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
-    .footer-lockup { display: flex; align-items: center; gap: 14px; }
-    .footer-lockup img { width: 52px; height: 52px; object-fit: contain; }
-    .footer-brand { display: flex; flex-direction: column; line-height: 1.15; text-align: left; }
-    .footer-brand strong { font-size: 22px; font-weight: 800; letter-spacing: 0.5px; color: var(--text); }
-    .footer-brand span { font-size: 12px; font-weight: 500; color: var(--primary); letter-spacing: 0.8px; text-transform: uppercase; }
-    .footer-tagline { font-size: 14px; color: var(--text); font-style: italic; max-width: 520px; line-height: 1.55; }
-    .footer-links { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
-    .footer-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; }
-    .footer-links a:hover { color: var(--primary); }
-    .footer-copy { font-size: 12px; color: var(--text-muted); padding-top: 8px; border-top: 1px solid var(--border); width: 100%; }
-    footer a { color: var(--primary); text-decoration: none; }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: clamp(16px, 1.6vw, 28px);
+      padding-bottom: 72px;
+      border-bottom: 1px solid rgba(250,247,242,0.08);
+    }
+    .footer-lockup-blk { grid-column: 1 / span 6; }
+    .footer-lockup-blk .lockup {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 32px;
+    }
+    .footer-lockup-blk .lockup img {
+      width: 56px; height: 56px; object-fit: contain;
+    }
+    .footer-lockup-blk .lockup .brand {
+      display: flex; flex-direction: column; line-height: 1.1;
+    }
+    .footer-lockup-blk .lockup .brand strong {
+      font-size: 18px; font-weight: 700; letter-spacing: 0.1em;
+      color: var(--primary); text-transform: uppercase;
+    }
+    .footer-lockup-blk .lockup .brand span {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: rgba(250,247,242,0.55); margin-top: 8px;
+    }
+    .footer-statement {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: clamp(24px, 2.4vw, 34px); line-height: 1.18;
+      color: var(--bg); max-width: 18ch; letter-spacing: -0.01em;
+    }
+    .footer-col { grid-column: span 2; }
+    .footer-col h4 {
+      font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: 0.14em; color: rgba(250,247,242,0.5); margin-bottom: 20px;
+    }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .footer-col a {
+      color: var(--bg); text-decoration: none; font-size: 14px;
+      transition: color 0.25s var(--ease);
+      display: inline-block; position: relative;
+    }
+    .footer-col a::after {
+      content: ''; position: absolute; left: 0; bottom: -2px; height: 1px; width: 0;
+      background: var(--primary); transition: width 0.35s var(--ease);
+    }
+    .footer-col a:hover { color: var(--primary); }
+    .footer-col a:hover::after { width: 100%; }
+
+    .footer-bottom {
+      padding-top: 32px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--mono); font-size: 11px; color: rgba(250,247,242,0.5);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      flex-wrap: wrap; gap: 16px;
+    }
+
+    /* Reveal animation */
+    .rvl { opacity: 0; transform: translateY(18px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
+    .rvl.in { opacity: 1; transform: none; }
 
     /* Responsive */
-    @media (max-width: 768px) {
-      .nav { padding: 12px 20px; }
-      .nav-links a:not(.btn) { display: none; }
-      .hero h1 { font-size: 32px; }
-      .hero-stats { flex-direction: column; gap: 20px; }
-      .features-grid, .pricing-grid, .testimonial-grid, .steps { grid-template-columns: 1fr; flex-direction: column; }
-      #compare table th:nth-child(n+4), #compare table td:nth-child(n+4) { display: none; }
-      #compare > div > div:first-child { grid-template-columns: 1fr; }
+    @media (max-width: 900px) {
+      .grid-12 { grid-template-columns: repeat(6, 1fr); }
+      .section-head { grid-template-columns: 1fr; gap: 20px; }
+      .section-head .label, .section-head .title, .section-head .aside { grid-column: 1 / -1; text-align: left; padding: 0; }
+      .cap-row { grid-template-columns: 48px 1fr; gap: 16px; }
+      .cap-row .cap-body, .cap-row .cap-meta { grid-column: 2; padding-left: 0; }
+      .approach-step, .approach-step:nth-child(even) { grid-column: 1 / -1; padding-left: 0; }
+      .compare-col.them, .compare-col.us { grid-column: 1 / -1; }
+      .pricing-row { grid-template-columns: 1fr 1fr; gap: 12px; padding: 24px 0; }
+      .pricing-row .btn-ghost { grid-column: 1 / -1; justify-self: start; padding: 10px 0; }
+      .pricing-row .price-features-inline { grid-column: 1 / -1; }
+      .hero-index { grid-template-columns: repeat(2, 1fr); }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .footer-lockup-blk { grid-column: 1 / -1; }
+      .footer-col { grid-column: span 1; }
+    }
+    @media (max-width: 640px) {
+      .nav { padding: 14px 20px; }
+      .nav-links a:not(.btn):not(.nav-sign-in) { display: none; }
+      .hero-meta { grid-template-columns: 1fr; }
+      .hero-index { grid-template-columns: 1fr 1fr; }
+      .hero-headline .display .indent { padding-left: 0; }
+      .footer-grid { grid-template-columns: 1fr; }
+      .footer-col { grid-column: 1 / -1; }
     }
   </style>
 </head>
 <body>
 
 <!-- Nav -->
-<nav class="nav">
+<nav class="nav" id="siteNav">
   <a href="/" class="nav-logo">
     <img src="/brand/shield.png" alt="EIAAW Solutions shield">
     <span class="nav-logo-text">
-      <strong>EIAAW</strong>
-      <small>AI Sales Agent</small>
+      <strong>EIAAW SOLUTIONS</strong>
+      <small>AI &middot; Human Partnerships</small>
     </span>
   </a>
   <div class="nav-links">
-    <a href="#features">Features</a>
-    <a href="#how">How It Works</a>
+    <a href="#capabilities">Capabilities</a>
+    <a href="#approach">Approach</a>
     <a href="#pricing">Pricing</a>
-    <a href="/app" class="btn btn-primary">Sign In</a>
+    <a href="/app" class="btn btn-primary">Sign in <span class="arrow">&rarr;</span></a>
   </div>
 </nav>
 
 <!-- Hero -->
 <section class="hero">
-  <div class="hero-content">
-    <div class="hero-badge">Powered by EIAAW Solutions</div>
-    <h1>Your AI Sales Agent That <span>Actually Does The Work</span></h1>
-    <p>AI that generates leads, scores them with reasoning, writes personalized outreach, creates marketing content, and even talks to prospects on your behalf — so you focus on closing, not chasing. Built for Malaysian sales teams.</p>
-    <div class="hero-cta">
-      <button class="btn btn-primary btn-lg" onclick="openSignup('pro')">Start 14-Day Free Trial</button>
-      <a href="#pricing" class="btn btn-outline btn-lg">View Pricing</a>
+  <div class="wrap">
+
+    <div class="hero-eyebrow-row rvl">
+      <div class="eyebrow">A sales system, not a CRM</div>
+      <div class="availability"><span class="dot"></span> Taking on new accounts &mdash; Q2 2026</div>
     </div>
-    <div class="hero-stats">
-      <div><div class="hero-stat-value">0</div><div class="hero-stat-label">Cold Calls You Make</div></div>
-      <div><div class="hero-stat-value">AI</div><div class="hero-stat-label">Writes Every Email</div></div>
-      <div><div class="hero-stat-value">0-100</div><div class="hero-stat-label">Lead Score + Why</div></div>
-      <div><div class="hero-stat-value">24/7</div><div class="hero-stat-label">AI Voice Agent</div></div>
+
+    <div class="grid-12">
+      <div class="hero-headline rvl">
+        <h1 class="display">
+          <span class="line">Your AI sales</span>
+          <span class="line">agent that <em>actually</em></span>
+          <span class="line indent">does the <em>work</em>.</span>
+        </h1>
+      </div>
+    </div>
+
+    <div class="hero-meta rvl">
+      <p class="lead">
+        Generates leads, scores them with reasoning, writes personalised outreach, creates content, and talks to prospects by voice &mdash; so you spend your day closing, not chasing.
+      </p>
+      <div class="hero-cta-row">
+        <button class="btn btn-primary btn-lg" onclick="openSignup('pro')">Start 14-day trial <span class="arrow">&rarr;</span></button>
+        <button class="btn btn-ghost" onclick="bookSession()">Talk to the agent</button>
+      </div>
+    </div>
+
+    <div class="hero-index rvl">
+      <div class="hero-index-item">
+        <span class="hero-index-num">01 &mdash; Outbound</span>
+        <span class="hero-index-label">Zero cold calls. <em>AI does it.</em></span>
+      </div>
+      <div class="hero-index-item">
+        <span class="hero-index-num">02 &mdash; Qualification</span>
+        <span class="hero-index-label">Scored 0-100 with <em>reasoning</em>, not vibes.</span>
+      </div>
+      <div class="hero-index-item">
+        <span class="hero-index-num">03 &mdash; Outreach</span>
+        <span class="hero-index-label">Personalised emails, <em>written for you</em>.</span>
+      </div>
+      <div class="hero-index-item">
+        <span class="hero-index-num">04 &mdash; Voice</span>
+        <span class="hero-index-label">An agent that <em>picks up the phone</em>.</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Capabilities -->
+<section id="capabilities" class="section-pad">
+  <div class="wrap">
+    <header class="section-head rvl">
+      <div class="label eyebrow">Capabilities</div>
+      <h2 class="title section-h">What a salesperson does in a day. <em>In seconds, repeatedly.</em></h2>
+      <div class="aside">06 Surfaces</div>
+    </header>
+
+    <div class="capabilities">
+      <article class="cap-row rvl">
+        <div class="cap-num">001</div>
+        <h3 class="cap-title">Lead <em>generation</em>, on brief.</h3>
+        <p class="cap-body">
+          <span class="crossed">Hours in LinkedIn, directories, Google.</span>
+          Describe your ICP. The agent returns a ranked list of matching prospects &mdash; verified, enriched, exportable.
+        </p>
+        <div class="cap-meta">Search &rarr; Enrich &rarr; Export <span class="cap-arrow">&rarr;</span></div>
+      </article>
+
+      <article class="cap-row rvl">
+        <div class="cap-num">002</div>
+        <h3 class="cap-title">Scoring <em>with reasoning</em>.</h3>
+        <p class="cap-body">
+          <span class="crossed">Gut-feel on who's "ready to buy".</span>
+          Every lead is scored 0&ndash;100 on the BANT framework with a paragraph of reasoning. Read why, not just what.
+        </p>
+        <div class="cap-meta">BANT + Rationale <span class="cap-arrow">&rarr;</span></div>
+      </article>
+
+      <article class="cap-row rvl">
+        <div class="cap-num">003</div>
+        <h3 class="cap-title">Outreach <em>sequences</em>, written for you.</h3>
+        <p class="cap-body">
+          <span class="crossed">Re-writing the same follow-up, forever.</span>
+          Multi-step email sequences, personalised per lead, scheduled and tracked. You review, it sends.
+        </p>
+        <div class="cap-meta">Email + SMS + LinkedIn <span class="cap-arrow">&rarr;</span></div>
+      </article>
+
+      <article class="cap-row rvl">
+        <div class="cap-num">004</div>
+        <h3 class="cap-title">Content <em>for every platform</em>.</h3>
+        <p class="cap-body">
+          <span class="crossed">Staring at a blank LinkedIn post.</span>
+          Ad copy, social posts, newsletters, landing pages &mdash; generated on brand, ready to publish.
+        </p>
+        <div class="cap-meta">Posts &middot; Emails &middot; Ads &middot; GEO <span class="cap-arrow">&rarr;</span></div>
+      </article>
+
+      <article class="cap-row rvl">
+        <div class="cap-num">005</div>
+        <h3 class="cap-title">A voice agent that <em>picks up the phone</em>.</h3>
+        <p class="cap-body">
+          <span class="crossed">Fifty cold calls a day, three answer.</span>
+          Send a link. The prospect clicks. Your AI agent talks to them, qualifies, books the demo. You never dial.
+        </p>
+        <div class="cap-meta">Inbound voice &middot; Retell <span class="cap-arrow">&rarr;</span></div>
+      </article>
+
+      <article class="cap-row rvl">
+        <div class="cap-num">006</div>
+        <h3 class="cap-title">Pipeline + <em>assistant</em>, one surface.</h3>
+        <p class="cap-body">
+          <span class="crossed">Spreadsheets, sticky notes, forgotten follow-ups.</span>
+          Pipeline, deal stages, activity timeline, and an AI assistant that summarises, suggests, and moves deals forward.
+        </p>
+        <div class="cap-meta">Pipeline &middot; Assistant &middot; CRM <span class="cap-arrow">&rarr;</span></div>
+      </article>
     </div>
   </div>
 </section>
 
-<!-- Features -->
-<section id="features">
-  <div class="container">
-    <div class="section-tag">Features</div>
-    <h2 class="section-title">What a Manual Salesperson Does in a Day. <span style="color:var(--primary)">Your AI Does in Seconds.</span></h2>
-    <p class="section-desc">Every feature replaces hours of manual work. Here's what your AI sales agent handles.</p>
+<!-- Quote moment -->
+<section class="quote-block">
+  <div class="wrap">
+    <blockquote class="q rvl">
+      &ldquo;Other tools <em>store</em> data. Ours <em>does</em> the selling.&rdquo;
+    </blockquote>
+    <div class="attribution rvl">A working thesis &mdash; EIAAW Solutions</div>
+  </div>
+</section>
 
-    <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon">&#9679;</div>
-        <h3>AI Lead Generation</h3>
-        <p><strong>Manual:</strong> Hours searching LinkedIn, directories, Google.<br><strong>AI:</strong> Describe your target audience — AI generates matching leads.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#9733;</div>
-        <h3>AI Lead Scoring with Reasoning</h3>
-        <p><strong>Manual:</strong> Gut feeling on who's "ready to buy".<br><strong>AI:</strong> Scores every lead 0-100 using BANT framework. You read the reasoning, not just a number.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#9993;</div>
-        <h3>AI Email Outreach Sequences</h3>
-        <p><strong>Manual:</strong> Writing the same follow-up emails over and over.<br><strong>AI:</strong> Generates personalized multi-step email sequences.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#9998;</div>
-        <h3>AI Content for Every Platform</h3>
-        <p><strong>Manual:</strong> Struggling to write a LinkedIn post or ad copy.<br><strong>AI:</strong> Generates marketing emails, social posts, and ready to publish.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#128172;</div>
-        <h3>AI Voice Agent</h3>
-        <p><strong>Manual:</strong> You make 50 cold calls a day, most don't answer.<br><strong>AI:</strong> Send any lead a link — they click it and your AI agent talks to them. You never pick up the phone.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#10070;</div>
-        <h3>AI Sales Assistant + Pipeline</h3>
-        <p><strong>Manual:</strong> Spreadsheets, sticky notes, forgotten follow-ups.<br><strong>AI:</strong> Full CRM with pipeline tracking, deal stages, and an AI assistant.</p>
-      </div>
+<!-- Approach / How it works -->
+<section id="approach" class="approach section-pad">
+  <div class="wrap">
+    <header class="section-head rvl">
+      <div class="label eyebrow">Approach</div>
+      <h2 class="title section-h">Four moves. <em>Five minutes to live.</em></h2>
+      <div class="aside">The Method</div>
+    </header>
+
+    <div class="approach-grid">
+      <article class="approach-step rvl">
+        <div class="approach-step-num">i.</div>
+        <div>
+          <h3>Describe your market.</h3>
+          <p>A sentence is enough. The agent returns matching leads &mdash; or import a CSV of accounts you already have.</p>
+        </div>
+      </article>
+
+      <article class="approach-step rvl">
+        <div class="approach-step-num">ii.</div>
+        <div>
+          <h3>Score on reasoning.</h3>
+          <p>One click per lead. Budget, Authority, Need, Timeline &mdash; explained in plain English next to the number.</p>
+        </div>
+      </article>
+
+      <article class="approach-step rvl">
+        <div class="approach-step-num">iii.</div>
+        <div>
+          <h3>Outreach writes itself.</h3>
+          <p>Personalised email sequences, ad copy, and content &mdash; drafted, queued, and sent on your schedule.</p>
+        </div>
+      </article>
+
+      <article class="approach-step rvl">
+        <div class="approach-step-num">iv.</div>
+        <div>
+          <h3>The agent takes the call.</h3>
+          <p>Share a voice link with any lead. The agent qualifies, handles objections, and books the demo &mdash; while you sleep.</p>
+        </div>
+      </article>
     </div>
   </div>
 </section>
 
-<!-- How It Works -->
-<section id="how" style="background:var(--surface)">
-  <div class="container">
-    <div class="section-tag">How It Works</div>
-    <h2 class="section-title">Up and Running in 5 Minutes</h2>
-    <p class="section-desc">No complex setup. No training needed. Start closing deals today.</p>
+<!-- Compare -->
+<section id="compare" class="section-pad">
+  <div class="wrap">
+    <header class="section-head rvl">
+      <div class="label eyebrow">The delta</div>
+      <h2 class="title section-h">A <em>CRM</em> remembers. An <em>agent</em> acts.</h2>
+      <div class="aside">Vs. the field</div>
+    </header>
 
-    <div class="steps">
-      <div class="step">
-        <h3>AI Generates Your Leads</h3>
-        <p>Tell the AI your target audience. It generates a list of matching prospects — or import your own via CSV.</p>
-      </div>
-      <div class="step">
-        <h3>AI Scores & Explains Why</h3>
-        <p>One click scores any lead 0-100 with BANT reasoning.</p>
-      </div>
-      <div class="step">
-        <h3>AI Writes & Sends Outreach</h3>
-        <p>AI generates personalized email sequences and marketing content.</p>
-      </div>
-      <div class="step">
-        <h3>AI Talks to Your Leads</h3>
-        <p>Send a voice chat link to any lead. Your AI agent talks to them, while you focus on closing.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Why Us — Condensed comparison -->
-<section id="compare">
-  <div class="container">
-    <div class="section-tag">Why Choose Us</div>
-    <h2 class="section-title">Other Tools Store Data. <span style="color:var(--primary)">Ours Does The Selling.</span></h2>
-    <p class="section-desc">Most CRMs are fancy spreadsheets. We built an AI agent that generates leads, writes emails, creates content, and talks to prospects — so you focus on closing.</p>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:48px">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px">
-        <div style="font-size:24px;margin-bottom:12px">&#10060;</div>
-        <h3 style="font-size:16px;margin-bottom:12px;color:var(--danger)">Other Sales Tools</h3>
-        <ul style="list-style:none;font-size:14px;color:var(--text-muted);line-height:2.2">
-          <li>&#8226; You manually enter every lead</li>
-          <li>&#8226; You write every email yourself</li>
-          <li>&#8226; You decide who to follow up with</li>
-          <li>&#8226; You score leads by gut feeling</li>
-          <li>&#8226; Separate tools for CRM, email, content</li>
-          <li>&#8226; RM 800-3,000+/month for enterprise features</li>
-          <li>&#8226; Weeks of setup and training</li>
+    <div class="compare-split">
+      <div class="compare-col them rvl">
+        <h3>A traditional <em>CRM stack.</em></h3>
+        <ul class="compare-list">
+          <li>You enter every lead by hand.</li>
+          <li>You write every email yourself.</li>
+          <li>You decide who to chase next, on vibes.</li>
+          <li>Separate tools for CRM, email, content, voice.</li>
+          <li>RM 800&ndash;3,000 / month at the enterprise tier.</li>
+          <li>Weeks of setup, consultants, training.</li>
+          <li>Pretty reports. No outbound.</li>
         </ul>
       </div>
-      <div style="background:var(--surface);border:1.5px solid var(--primary);border-radius:14px;padding:28px;box-shadow:0 0 30px rgba(31,168,150,0.08)">
-        <div style="font-size:24px;margin-bottom:12px">&#10004;</div>
-        <h3 style="font-size:16px;margin-bottom:12px;color:var(--primary)">EIAAW SalesAgent AI</h3>
-        <ul style="list-style:none;font-size:14px;color:var(--text);line-height:2.2">
-          <li>&#10003; <strong>AI generates leads for you</strong></li>
-          <li>&#10003; <strong>AI scores with reasoning</strong></li>
-          <li>&#10003; <strong>AI writes & sends outreach</strong></li>
-          <li>&#10003; <strong>AI creates all your content</strong></li>
-          <li>&#10003; <strong>AI voice agent talks to leads</strong></li>
-          <li>&#10003; <strong>All-in-one</strong></li>
-          <li>&#10003; <strong>From RM 99/month</strong></li>
+
+      <div class="compare-col us rvl">
+        <h3>EIAAW &mdash; a <em>sales agent</em>, not a spreadsheet.</h3>
+        <ul class="compare-list">
+          <li>Leads generated on brief, on demand.</li>
+          <li>Outreach written, scheduled, sent.</li>
+          <li>Scored with reasoning &mdash; you read the why.</li>
+          <li>One surface: CRM, content, email, voice.</li>
+          <li>From RM 99 / month. No consulting.</li>
+          <li>Live in five minutes, not five weeks.</li>
+          <li>Built to <em>act</em>, not just remember.</li>
         </ul>
       </div>
     </div>
@@ -352,99 +811,131 @@
 </section>
 
 <!-- Pricing -->
-<section id="pricing">
-  <div class="container">
-    <div class="section-tag">Pricing</div>
-    <h2 class="section-title">Simple, Transparent Pricing</h2>
-    <p class="section-desc">Choose the plan that fits your sales team. Upgrade anytime as you grow.</p>
+<section id="pricing" class="section-pad">
+  <div class="wrap">
+    <header class="section-head rvl">
+      <div class="label eyebrow">Pricing</div>
+      <h2 class="title section-h">Flat monthly. <em>Cancel anytime.</em></h2>
+      <div class="aside">MYR &middot; 14-day trial</div>
+    </header>
 
-    <div class="pricing-grid">
-      <div class="price-card">
-        <div class="price-name">Starter</div>
-        <div class="price-desc">For individual salespeople getting started</div>
-        <div class="price-amount">RM 99<span>/mo</span></div>
-        <div class="price-period">Billed monthly</div>
-        <ul class="price-features">
-          <li>100 leads</li>
-          <li>3 campaigns</li>
-          <li>50 AI actions/month</li>
-          <li>5 voice calls/month</li>
-          <li>AI email & social content</li>
-          <li>Sales pipeline</li>
-          <li>AI chat assistant</li>
-          <li class="disabled">Auto-outreach & lead gen</li>
+    <div class="pricing">
+      <div class="pricing-row rvl">
+        <div class="price-tier">
+          <span class="tag">Tier 01</span>
+          Starter
+        </div>
+        <div class="price-num">RM 99<span class="per">/ mo</span></div>
+        <p class="price-blurb">Individual salespeople getting started.</p>
+        <ul class="price-features-inline">
+          <li>100 leads &middot; 3 campaigns</li>
+          <li>50 AI actions / month</li>
+          <li>5 voice calls / month</li>
+          <li>Email &amp; social content</li>
         </ul>
-        <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="openSignup('starter')">Start 14-Day Free Trial</button>
+        <button class="btn btn-ghost" onclick="openSignup('starter')">Start trial <span class="arrow">&rarr;</span></button>
       </div>
 
-      <div class="price-card featured">
-        <div class="price-name">Pro</div>
-        <div class="price-desc">For serious salespeople who want AI advantage</div>
-        <div class="price-amount">RM 199<span>/mo</span></div>
-        <div class="price-period">14-day free trial, then billed monthly</div>
-        <ul class="price-features">
-          <li>500 leads</li>
-          <li>10 campaigns</li>
-          <li>200 AI actions/month</li>
-          <li>20 voice calls/month</li>
-          <li>AI email, social, ads & GEO</li>
-          <li>Sales pipeline + AI analysis</li>
-          <li>AI chat assistant (full CRM)</li>
+      <div class="pricing-row featured rvl">
+        <div class="price-tier">
+          <span class="tag">Tier 02 &middot; Most chosen</span>
+          Pro
+        </div>
+        <div class="price-num">RM 199<span class="per">/ mo</span></div>
+        <p class="price-blurb">For operators who want real AI leverage.</p>
+        <ul class="price-features-inline">
+          <li>500 leads &middot; 10 campaigns</li>
+          <li>200 AI actions / month</li>
+          <li>20 voice calls / month</li>
           <li>Auto-outreach + AI lead gen</li>
         </ul>
-        <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="openSignup('pro')">Start 14-Day Free Trial</button>
+        <button class="btn btn-primary" onclick="openSignup('pro')">Start trial <span class="arrow">&rarr;</span></button>
       </div>
 
-      <div class="price-card">
-        <div class="price-name">Business</div>
-        <div class="price-desc">For sales teams and agencies</div>
-        <div class="price-amount">RM 399<span>/mo</span></div>
-        <div class="price-period">14-day free trial, then billed monthly</div>
-        <ul class="price-features">
-          <li>Unlimited leads</li>
-          <li>Unlimited campaigns</li>
-          <li>1,000 AI actions/month</li>
-          <li>100 voice calls/month</li>
-          <li>All AI content tools</li>
-          <li>Pipeline + AI analysis</li>
-          <li>Priority AI model (Claude Sonnet)</li>
-          <li>Up to 10 team users</li>
+      <div class="pricing-row rvl">
+        <div class="price-tier">
+          <span class="tag">Tier 03</span>
+          Business
+        </div>
+        <div class="price-num">RM 399<span class="per">/ mo</span></div>
+        <p class="price-blurb">Sales teams and agencies.</p>
+        <ul class="price-features-inline">
+          <li>Unlimited leads &amp; campaigns</li>
+          <li>1,000 AI actions / month</li>
+          <li>100 voice calls / month</li>
+          <li>Priority model (Claude Sonnet) &middot; up to 10 seats</li>
         </ul>
-        <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="openSignup('business')">Start 14-Day Free Trial</button>
+        <button class="btn btn-ghost" onclick="openSignup('business')">Start trial <span class="arrow">&rarr;</span></button>
       </div>
     </div>
   </div>
 </section>
 
-<!-- CTA -->
-<section class="cta-section">
-  <h2>Ready to Let AI Do The Selling?</h2>
-  <p>Generate leads, score them, write outreach, create content, and let your AI voice agent talk to prospects — all from one platform. 14-day free trial.</p>
-  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
-    <button class="btn btn-white btn-lg" onclick="openSignup('pro')">Start 14-Day Free Trial</button>
-    <button class="btn btn-primary btn-lg" onclick="bookSession()">Talk to Our AI Agent</button>
-    <button class="btn btn-outline btn-lg" onclick="openContact()">Talk to Us</button>
+<!-- Final CTA -->
+<section class="cta-final">
+  <div class="wrap">
+    <div class="eyebrow rvl">Take it for a spin</div>
+    <h2 class="display rvl" style="margin-top:20px">
+      Let the agent <em>do the selling</em>.
+    </h2>
+    <div class="cta-final-meta rvl">
+      <p class="lead">Fourteen days free. No card charged until the trial ends. The agent is live the moment you sign in.</p>
+      <div class="hero-cta-row">
+        <button class="btn btn-primary btn-lg" onclick="openSignup('pro')">Start 14-day trial <span class="arrow">&rarr;</span></button>
+        <button class="btn btn-outline btn-lg" onclick="bookSession()">Talk to the agent</button>
+        <button class="btn btn-ghost" onclick="openContact()">Talk to us</button>
+      </div>
+    </div>
   </div>
 </section>
 
 <!-- Footer -->
 <footer>
-  <div class="footer-inner">
-    <div class="footer-lockup">
-      <img src="/brand/shield.png" alt="EIAAW Solutions shield">
-      <div class="footer-brand">
-        <strong>EIAAW SalesAgent AI</strong>
-        <span>AI-Human Partnerships</span>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-lockup-blk">
+        <div class="lockup">
+          <img src="/brand/shield.png" alt="EIAAW Solutions">
+          <div class="brand">
+            <strong>EIAAW SOLUTIONS</strong>
+            <span>AI &middot; Human Partnerships</span>
+          </div>
+        </div>
+        <p class="footer-statement">Sales, written and spoken by an agent that doesn't sleep.</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#capabilities">Capabilities</a></li>
+          <li><a href="#approach">Approach</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="/app">Sign in</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://eiaawsolutions.com" target="_blank">EIAAW Solutions</a></li>
+          <li><a href="#" onclick="openContact();return false">Contact</a></li>
+          <li><a href="#" onclick="bookSession();return false">Voice agent</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">Terms</a></li>
+        </ul>
       </div>
     </div>
-    <p class="footer-tagline">&ldquo;AI that generates leads, writes outreach, creates content, and talks to prospects &mdash; so you focus on closing.&rdquo;</p>
-    <div class="footer-links">
-      <a href="#features">Features</a>
-      <a href="#pricing">Pricing</a>
-      <a href="/app">Sign In</a>
-      <a href="https://eiaawsolutions.com" target="_blank">EIAAW Solutions</a>
+
+    <div class="footer-bottom">
+      <div>&copy; 2026 EIAAW Solutions &mdash; All rights reserved</div>
+      <div>Kuala Lumpur &middot; Built for sales teams that act</div>
     </div>
-    <div class="footer-copy">&copy; 2026 EIAAW Solutions. All rights reserved.</div>
   </div>
 </footer>
 
@@ -558,6 +1049,20 @@
 </div>
 
 <script>
+// Scroll reveal
+(function(){
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.rvl').forEach(el => io.observe(el));
+
+  // Nav scrolled state
+  const nav = document.getElementById('siteNav');
+  const onScroll = () => { if (nav) nav.classList.toggle('scrolled', window.scrollY > 12); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+
 let selectedPlan = 'pro';
 
 async function bookSession() {

@@ -60,18 +60,23 @@
     }
 
     .sidebar-shield { width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
-    .sidebar-logo-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .sidebar-logo-text { display: flex; flex-direction: column; line-height: 1.2; gap: 3px; }
 
     .sidebar-logo h1 {
-      font-size: 18px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      background: var(--teal-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--primary-hover);
+      text-transform: uppercase;
     }
 
-    .sidebar-logo small { color: var(--text-muted); font-size: 11px; }
+    .sidebar-logo small {
+      color: var(--text-muted);
+      font-size: 9.5px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
 
     .nav-item {
       display: flex;
@@ -1029,6 +1034,6 @@
     import { RetellWebClient } from 'https://esm.sh/retell-client-js-sdk@2.0.7';
     window.RetellWebClient = RetellWebClient;
   </script>
-  <script src="/app.js?v=20260418a"></script>
+  <script src="/app.js?v=20260419a"></script>
 </body>
 </html>
