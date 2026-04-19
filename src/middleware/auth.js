@@ -74,9 +74,9 @@ export function requireAuth(req, res, next) {
     return res.status(403).json({ error: 'Account suspended. Contact your administrator.' });
   }
 
-  // Get email verification status (column may not exist on older DBs)
+  // Get email verification + MFA status (columns may not exist on older DBs)
   let userRow;
-  try { userRow = db.prepare('SELECT email_verified FROM users WHERE id = ?').get(session.user_id); } catch (e) { userRow = null; }
+  try { userRow = db.prepare('SELECT email_verified, mfa_enabled FROM users WHERE id = ?').get(session.user_id); } catch (e) { userRow = null; }
 
   req.user = {
     id: session.user_id,
@@ -88,6 +88,7 @@ export function requireAuth(req, res, next) {
     budgetLimit: session.budget_limit,
     monthlySystemCost: session.monthly_system_cost,
     emailVerified: !!(userRow?.email_verified),
+    mfaEnabled: !!(userRow?.mfa_enabled),
   };
 
   next();

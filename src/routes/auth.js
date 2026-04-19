@@ -230,19 +230,39 @@ router.post('/mfa/admin-reset/:userId', requireAuth, (req, res) => {
 // GET /api/auth/sessions — list this user's active sessions
 router.get('/sessions', requireAuth, (req, res) => {
   const currentToken = req.headers['authorization']?.replace('Bearer ', '');
-  const rows = db.prepare(`
-    SELECT token, ip, user_agent, device_label, created_at, last_activity, expires_at
-    FROM sessions
-    WHERE user_id = ? AND (displaced_at IS NULL) AND expires_at > datetime('now')
-    ORDER BY last_activity DESC
-  `).all(req.user.id);
-  res.json(rows.map(r => ({
-    ...r,
-    current: r.token === currentToken,
-    // Expose only first/last 4 chars of the token so the UI can identify rows without leaking it
-    token: r.token.slice(0, 4) + '...' + r.token.slice(-4),
-    full_token: r.token === currentToken ? null : r.token, // still don't expose other tokens
-  })));
+
+  // Check which columns exist — the new security columns may not be present
+  // on production DB if the schema migration hasn't completed yet.
+  const sessionCols = db.prepare("PRAGMA table_info(sessions)").all().map(c => c.name);
+  const has = (c) => sessionCols.includes(c);
+
+  const selectCols = ['token', 'created_at', 'expires_at'];
+  if (has('ip')) selectCols.push('ip');
+  if (has('user_agent')) selectCols.push('user_agent');
+  if (has('device_label')) selectCols.push('device_label');
+  if (has('last_activity')) selectCols.push('last_activity');
+
+  let where = 'user_id = ? AND expires_at > datetime(\'now\')';
+  if (has('displaced_at')) where += ' AND displaced_at IS NULL';
+
+  const orderBy = has('last_activity') ? 'last_activity DESC' : 'created_at DESC';
+
+  const sql = `SELECT ${selectCols.join(', ')} FROM sessions WHERE ${where} ORDER BY ${orderBy}`;
+  const rows = db.prepare(sql).all(req.user.id);
+
+  res.json(rows.map(r => {
+    const isCurrent = r.token === currentToken;
+    return {
+      token: r.token.slice(0, 4) + '...' + r.token.slice(-4),
+      ip: r.ip || null,
+      user_agent: r.user_agent || null,
+      device_label: r.device_label || null,
+      created_at: r.created_at,
+      last_activity: r.last_activity || r.created_at,
+      expires_at: r.expires_at,
+      current: isCurrent,
+    };
+  }));
 });
 
 // POST /api/auth/sessions/revoke — revoke a specific session (not current)
@@ -251,15 +271,16 @@ router.post('/sessions/revoke', requireAuth, (req, res) => {
   if (!token_prefix) return res.status(400).json({ error: 'token_prefix required' });
   const currentToken = req.headers['authorization']?.replace('Bearer ', '');
 
-  // Find all non-current sessions for this user matching the prefix
+  // token_prefix is "xxxx...yyyy" — extract the 4 char prefix + 4 char suffix.
+  // If the client sent the full masked form, take start and end.
+  const prefix = token_prefix.slice(0, 4);
+  const suffix = token_prefix.slice(-4);
+
   const candidates = db.prepare(`
-    SELECT token FROM sessions
-    WHERE user_id = ? AND token != ? AND displaced_at IS NULL
+    SELECT token FROM sessions WHERE user_id = ? AND token != ?
   `).all(req.user.id, currentToken);
 
-  const match = candidates.find(c =>
-    c.token.startsWith(token_prefix.slice(0, 4)) && c.token.endsWith(token_prefix.slice(-4))
-  );
+  const match = candidates.find(c => c.token.startsWith(prefix) && c.token.endsWith(suffix));
   if (!match) return res.status(404).json({ error: 'Session not found' });
 
   db.prepare('DELETE FROM sessions WHERE token = ?').run(match.token);
@@ -269,11 +290,17 @@ router.post('/sessions/revoke', requireAuth, (req, res) => {
 // POST /api/auth/sessions/revoke-all — sign out everywhere except current
 router.post('/sessions/revoke-all', requireAuth, (req, res) => {
   const currentToken = req.headers['authorization']?.replace('Bearer ', '');
-  const result = db.prepare(`
-    UPDATE sessions SET displaced_reason = ?, displaced_at = CURRENT_TIMESTAMP
-    WHERE user_id = ? AND token != ? AND displaced_at IS NULL
-  `).run('You signed out remotely', req.user.id, currentToken);
-  res.json({ success: true, revoked: result.changes });
+  // If displaced_at column doesn't exist yet, fall back to plain delete
+  try {
+    const result = db.prepare(`
+      UPDATE sessions SET displaced_reason = ?, displaced_at = CURRENT_TIMESTAMP
+      WHERE user_id = ? AND token != ?
+    `).run('You signed out remotely', req.user.id, currentToken);
+    return res.json({ success: true, revoked: result.changes });
+  } catch (e) {
+    const result = db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(req.user.id, currentToken);
+    return res.json({ success: true, revoked: result.changes });
+  }
 });
 
 // POST /api/auth/logout
