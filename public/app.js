@@ -482,8 +482,15 @@ async function loadLeads() {
       </div>
       <div class="card">
         <table>
-          <tr><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Performance</th><th>Actions</th></tr>
-          ${leads.map(l => `
+          <tr><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Campaigns</th><th>Performance</th><th>Actions</th></tr>
+          ${leads.map(l => {
+            const camps = Array.isArray(l.campaigns) ? l.campaigns : [];
+            const campsHtml = camps.length
+              ? camps.slice(0, 3).map(c =>
+                  `<span class="badge badge-new" title="In campaign: ${esc(c.name)}" style="cursor:pointer;margin-right:4px;margin-bottom:4px;display:inline-block;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" onclick="navigate('campaigns'); setTimeout(()=>toggleCampaignLeads(${c.id}), 120)">${esc(c.name)}</span>`
+                ).join('') + (camps.length > 3 ? `<span class="text-muted text-sm" title="${esc(camps.slice(3).map(c=>c.name).join(', '))}">+${camps.length - 3}</span>` : '')
+              : '<span class="text-muted text-sm">&mdash;</span>';
+            return `
             <tr>
               <td><strong><span id="lead-name-${l.id}">${esc(l.name)}</span></strong></td>
               <td>
@@ -492,7 +499,7 @@ async function loadLeads() {
               </td>
               <td><span id="lead-phone-${l.id}">${l._masked ? `<span class="text-muted">${l.phone ? esc(l.phone) : '-'}</span>` : esc(l.phone || '-')}</span></td>
               <td>${esc(l.company || '-')}</td>
-              <td>${l.source}</td>
+              <td>${l.source === 'ai_generated' ? '<span class="badge badge-new">AI Found</span>' : esc(l.source)}</td>
               <td>
                 <div style="display:flex;align-items:center;gap:8px">
                   <div class="score-bar" style="width:50px"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
@@ -500,6 +507,7 @@ async function loadLeads() {
                 </div>
               </td>
               <td><span class="badge badge-${l.status}">${l.status}</span></td>
+              <td style="min-width:140px;max-width:260px">${campsHtml}</td>
               <td>
                 <span style="color:${l.open_count > 0 ? 'var(--success)' : 'var(--text-muted)'}">${l.open_count || 0} open${l.open_count !== 1 ? 's' : ''}</span>,
                 <span style="color:${l.click_count > 0 ? 'var(--primary)' : 'var(--text-muted)'}">${l.click_count || 0} click${l.click_count !== 1 ? 's' : ''}</span>
@@ -515,7 +523,7 @@ async function loadLeads() {
                 </div>
               </td>
             </tr>
-          `).join('') || '<tr><td colspan="9" class="empty">No leads yet. Add your first lead!</td></tr>'}
+          `; }).join('') || '<tr><td colspan="10" class="empty">No leads yet. Add your first lead!</td></tr>'}
         </table>
       </div>
     `;

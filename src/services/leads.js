@@ -42,7 +42,13 @@ export const leadsService = {
     let query = `SELECT l.*,
       (SELECT COUNT(*) FROM campaign_leads cl WHERE cl.lead_id = l.id AND cl.status IN ('sent','opened','clicked','replied')) as sent_count,
       (SELECT COUNT(*) FROM campaign_leads cl WHERE cl.lead_id = l.id AND cl.status IN ('opened','clicked','replied')) as open_count,
-      (SELECT COUNT(*) FROM campaign_leads cl WHERE cl.lead_id = l.id AND cl.status IN ('clicked','replied')) as click_count
+      (SELECT COUNT(*) FROM campaign_leads cl WHERE cl.lead_id = l.id AND cl.status IN ('clicked','replied')) as click_count,
+      (
+        SELECT GROUP_CONCAT(c.id || '::' || c.name, '||')
+        FROM campaign_leads cl3
+        JOIN campaigns c ON c.id = cl3.campaign_id
+        WHERE cl3.lead_id = l.id
+      ) as campaigns_raw
       FROM leads l WHERE 1=1`;
     const params = [];
 
@@ -59,7 +65,17 @@ export const leadsService = {
     query += ' ORDER BY l.score DESC, l.created_at DESC';
     if (filters.limit) { query += ' LIMIT ?'; params.push(filters.limit); }
 
-    return db.prepare(query).all(...params);
+    const rows = db.prepare(query).all(...params);
+    return rows.map(r => {
+      const campaigns = r.campaigns_raw
+        ? r.campaigns_raw.split('||').map(pair => {
+            const [id, ...nameParts] = pair.split('::');
+            return { id: parseInt(id, 10), name: nameParts.join('::') };
+          })
+        : [];
+      const { campaigns_raw, ...rest } = r;
+      return { ...rest, campaigns };
+    });
   },
 
   getById(userId, id) {
