@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service — EIAAW SalesAgent</title>
+  <meta name="description" content="Terms governing your use of EIAAW SalesAgent — subscription, acceptable use, AI outputs, anti-spam obligations, and limitations of liability.">
+  <meta name="robots" content="index,follow">
+  <link rel="icon" type="image/png" href="/brand/shield.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #FAF7F2;
+      --bg-warm: #F3EDE0;
+      --surface: #FFFFFF;
+      --ink: #0F1A1D;
+      --ink-2: #2A3438;
+      --mute: #6B7A7F;
+      --line: #D9CFBC;
+      --line-soft: #E8DFCC;
+      --primary: #1FA896;
+      --primary-dark: #11766A;
+      --primary-tint: #E5F4F1;
+      --gradient: linear-gradient(135deg, #22B8A5 0%, #11766A 55%, #0A4D47 100%);
+      --serif: 'Instrument Serif', 'Times New Roman', serif;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: 'JetBrains Mono', Menlo, monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+    }
+
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: radial-gradient(rgba(15,26,29,0.035) 1px, transparent 1px);
+      background-size: 3px 3px;
+      mix-blend-mode: multiply;
+      opacity: 0.5;
+    }
+
+    a { color: var(--primary-dark); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+    a:hover { color: var(--primary); }
+
+    .wrap { max-width: 820px; margin: 0 auto; padding: 0 28px; position: relative; z-index: 1; }
+
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250,247,242,0.88);
+      backdrop-filter: saturate(180%) blur(14px);
+      -webkit-backdrop-filter: saturate(180%) blur(14px);
+      border-bottom: 1px solid var(--line-soft);
+      padding: 14px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
+    .nav-logo img { width: 34px; height: 34px; object-fit: contain; }
+    .nav-logo-text strong { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--primary-dark); }
+    .nav-logo-text small { font-size: 10px; color: var(--mute); letter-spacing: 0.1em; text-transform: uppercase; }
+    .nav-links { display: flex; align-items: center; gap: 22px; }
+    .nav-links a { color: var(--ink-2); text-decoration: none; font-size: 14px; }
+    .nav-links a:hover { color: var(--primary-dark); }
+    .btn-primary { background: var(--gradient); color: #fff !important; padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 13px; }
+    .btn-primary:hover { color: #fff !important; opacity: 0.92; }
+
+    .legal-hero { padding: 72px 0 40px; border-bottom: 1px solid var(--line-soft); }
+    .eyebrow {
+      font-family: var(--mono); font-size: 11px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--primary-dark);
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-bottom: 18px;
+    }
+    .eyebrow::before { content: ''; width: 28px; height: 1px; background: currentColor; opacity: 0.5; }
+    .legal-hero h1 {
+      font-size: clamp(38px, 5vw, 58px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+      margin-bottom: 18px;
+    }
+    .legal-hero h1 em { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--primary-dark); letter-spacing: 0; }
+    .legal-hero .lead { font-size: 19px; color: var(--ink-2); max-width: 680px; }
+    .legal-meta {
+      display: flex; flex-wrap: wrap; gap: 18px; margin-top: 28px;
+      font-family: var(--mono); font-size: 11px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--mute);
+    }
+    .legal-meta span strong { color: var(--ink); }
+
+    .legal-body { padding: 56px 0 80px; }
+    .legal-body h2 {
+      font-size: 26px; font-weight: 700; letter-spacing: -0.025em;
+      margin: 48px 0 12px; padding-top: 28px;
+      border-top: 1px solid var(--line-soft);
+    }
+    .legal-body h2:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+    .legal-body h3 { font-size: 17px; font-weight: 700; margin: 28px 0 8px; color: var(--ink); }
+    .legal-body p { margin: 0 0 14px; color: var(--ink-2); font-size: 16px; }
+    .legal-body ul, .legal-body ol { margin: 0 0 14px 22px; color: var(--ink-2); }
+    .legal-body li { margin-bottom: 6px; }
+    .legal-body strong { color: var(--ink); font-weight: 600; }
+
+    .callout {
+      background: var(--primary-tint);
+      border-left: 3px solid var(--primary);
+      padding: 18px 22px; border-radius: 0 8px 8px 0;
+      margin: 24px 0; font-size: 15px;
+    }
+    .callout strong { color: var(--primary-dark); }
+
+    .warn {
+      background: #FFF4E6;
+      border-left: 3px solid #D97706;
+      padding: 18px 22px; border-radius: 0 8px 8px 0;
+      margin: 24px 0; font-size: 15px;
+    }
+    .warn strong { color: #92400E; }
+
+    .toc {
+      border: 1px solid var(--line-soft); border-radius: 10px;
+      padding: 22px 26px; background: var(--surface);
+      margin-bottom: 40px;
+    }
+    .toc h4 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--mute); font-weight: 500; margin-bottom: 12px; }
+    .toc ol { list-style: none; margin: 0; counter-reset: section; }
+    .toc ol li { counter-increment: section; margin-bottom: 4px; font-size: 14px; }
+    .toc ol li::before { content: counter(section, decimal-leading-zero) " "; font-family: var(--mono); color: var(--mute); margin-right: 8px; }
+    .toc a { color: var(--ink-2); text-decoration: none; }
+    .toc a:hover { color: var(--primary-dark); }
+
+    footer { background: var(--ink); color: #E8DFCC; padding: 60px 0 32px; margin-top: 80px; }
+    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 44px; }
+    .footer-lockup-blk .lockup { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .footer-lockup-blk img { width: 38px; height: 38px; }
+    .footer-lockup-blk .brand strong { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.1em; color: #fff; text-transform: uppercase; }
+    .footer-lockup-blk .brand span { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #B6AE99; }
+    .footer-statement { max-width: 320px; font-size: 14px; color: #B6AE99; }
+    .footer-col h4 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #E8DFCC; font-weight: 500; margin-bottom: 14px; }
+    .footer-col ul { list-style: none; }
+    .footer-col li { margin-bottom: 8px; }
+    .footer-col a { color: #B6AE99; text-decoration: none; font-size: 14px; }
+    .footer-col a:hover { color: #fff; }
+    .footer-bottom { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 24px; display: flex; justify-content: space-between; font-size: 12px; color: #8A8373; letter-spacing: 0.04em; }
+
+    @media (max-width: 720px) {
+      .nav-links a:not(.btn-primary) { display: none; }
+      .legal-hero { padding: 48px 0 32px; }
+      .legal-body { padding: 40px 0 60px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 32px; }
+      .footer-bottom { flex-direction: column; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/brand/shield.png?v=3" alt="EIAAW Solutions shield">
+    <span class="nav-logo-text">
+      <strong>EIAAW SOLUTIONS</strong>
+      <small>AI &middot; Human Partnerships</small>
+    </span>
+  </a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/privacy.html">Privacy</a>
+    <a href="/security.html">Security</a>
+    <a href="/app" class="btn-primary">Sign in</a>
+  </div>
+</nav>
+
+<section class="legal-hero">
+  <div class="wrap">
+    <div class="eyebrow">Terms of service</div>
+    <h1>The rules of <em>the road</em>.</h1>
+    <p class="lead">These Terms govern your subscription to and use of EIAAW SalesAgent. They include important obligations around acceptable use, anti-spam compliance, and the human oversight required for AI-generated outreach.</p>
+    <div class="legal-meta">
+      <span>Effective <strong>19 April 2026</strong></span>
+      <span>Version <strong>1.0</strong></span>
+      <span>Governing law <strong>Malaysia</strong></span>
+    </div>
+  </div>
+</section>
+
+<section class="legal-body">
+  <div class="wrap">
+
+    <nav class="toc" aria-label="Table of contents">
+      <h4>Contents</h4>
+      <ol>
+        <li><a href="#agreement">Agreement</a></li>
+        <li><a href="#accounts">Accounts</a></li>
+        <li><a href="#subscription">Subscription &amp; billing</a></li>
+        <li><a href="#usage-limits">Usage limits &amp; overages</a></li>
+        <li><a href="#acceptable-use">Acceptable use</a></li>
+        <li><a href="#anti-spam">Anti-spam &amp; outreach obligations</a></li>
+        <li><a href="#voice-consent">Voice calling &amp; consent</a></li>
+        <li><a href="#ai-outputs">AI outputs &amp; human oversight</a></li>
+        <li><a href="#customer-data">Your data &amp; ownership</a></li>
+        <li><a href="#ip">Intellectual property</a></li>
+        <li><a href="#confidentiality">Confidentiality</a></li>
+        <li><a href="#availability">Service availability</a></li>
+        <li><a href="#suspension">Suspension &amp; termination</a></li>
+        <li><a href="#warranties">Warranties &amp; disclaimers</a></li>
+        <li><a href="#liability">Limitation of liability</a></li>
+        <li><a href="#indemnity">Indemnity</a></li>
+        <li><a href="#changes">Changes to these terms</a></li>
+        <li><a href="#law">Governing law &amp; disputes</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="agreement">1. Agreement</h2>
+    <p>These Terms of Service ("Terms") form a binding agreement between you ("Customer", "you") and <strong>EIAAW Solutions</strong>, a Malaysia-based company ("EIAAW", "we"), governing your access to and use of the EIAAW SalesAgent platform and related services (together, the "Service"). By creating an account or using the Service you accept these Terms. If you do not accept them, do not use the Service.</p>
+
+    <h2 id="accounts">2. Accounts</h2>
+    <p>You must be at least 18 and have legal capacity to enter contracts. You are responsible for: the accuracy of your registration details, the confidentiality of your credentials, and every action taken under your account. Notify us immediately if you suspect unauthorised access.</p>
+    <p>The Service issues session tokens with a 24-hour absolute expiry and a 30-minute idle timeout; you will be re-authenticated periodically.</p>
+
+    <h2 id="subscription">3. Subscription &amp; billing</h2>
+    <ul>
+      <li>Plans and prices (Starter, Pro, Business) are displayed on our pricing page. Prices are in Malaysian Ringgit (RM) unless stated otherwise and are exclusive of taxes except where required by law.</li>
+      <li>New paid plans include a <strong>14-day free trial</strong>; you will not be charged until the trial ends.</li>
+      <li>Subscriptions renew automatically at the end of each billing cycle. You may cancel at any time in the account area; cancellation takes effect at the end of the current cycle.</li>
+      <li>Payment is processed by Stripe. You authorise us and Stripe to charge your payment method for the subscription and any add-on usage.</li>
+      <li>Except where required by law, fees already charged are non-refundable.</li>
+    </ul>
+
+    <h2 id="usage-limits">4. Usage limits &amp; overages</h2>
+    <p>Each plan carries monthly quotas for leads, campaigns, AI actions, voice call minutes, and contact reveals. When a quota is reached, that capability pauses until the next cycle or until you purchase an add-on pack (voice minutes, AI credits, or contact reveals). We reserve the right to apply reasonable technical rate limits (currently 120 requests/minute general; 10 login attempts/15 minutes; 10 AI requests/minute; 3 outbound emails/minute per user) to preserve service health.</p>
+
+    <h2 id="acceptable-use">5. Acceptable use</h2>
+    <p>You must not, and must not permit any user to:</p>
+    <ul>
+      <li>Use the Service to distribute unsolicited bulk email, misleading content, malware, phishing, or harassment;</li>
+      <li>Target persons under 18, purchased consumer lists, or data obtained in violation of applicable privacy laws;</li>
+      <li>Use the Service to process sensitive personal data (health records, government IDs, financial account credentials) without a prior written data-processing agreement with us;</li>
+      <li>Reverse-engineer, decompile, or circumvent security or rate-limiting mechanisms;</li>
+      <li>Attempt to extract model weights or prompt-injection the AI to exfiltrate other customers' data;</li>
+      <li>Resell the Service, or offer it on a white-label basis, without a written reseller agreement;</li>
+      <li>Use the Service to build a competing product.</li>
+    </ul>
+
+    <h2 id="anti-spam">6. Anti-spam &amp; outreach obligations</h2>
+    <p>You are the <strong>sender</strong> of every email, voice call, or message the Service dispatches on your behalf. You are responsible for complying with the anti-spam and marketing laws of every jurisdiction you contact, including:</p>
+    <ul>
+      <li><strong>Malaysia (PDPA 2010 + CMA 1998):</strong> you must have a lawful basis and honour opt-out requests;</li>
+      <li><strong>United States (CAN-SPAM):</strong> accurate sender identification, clear unsubscribe, physical postal address;</li>
+      <li><strong>European Union (GDPR + ePrivacy):</strong> prior consent or soft opt-in from B2C recipients, and clear unsubscribe for B2B;</li>
+      <li><strong>United Kingdom (PECR), Canada (CASL), Australia (Spam Act 2003):</strong> consent and unsubscribe requirements.</li>
+    </ul>
+    <p>Every outreach email generated by the Service must include: your sender identity, a physical address, and a working unsubscribe mechanism. You may not disable or modify unsubscribe handling.</p>
+    <div class="warn">
+      <strong>Abuse enforcement:</strong> sustained complaint rates above industry thresholds (e.g., &gt;0.1% spam reports), high bounce rates, or blocklist escalations will trigger automatic throttling and may lead to suspension. Repeat offences are grounds for termination.
+    </div>
+
+    <h2 id="voice-consent">7. Voice calling &amp; consent</h2>
+    <p>Outbound voice calls dispatched through the Service use AI-generated speech delivered via our voice provider (Retell). You agree:</p>
+    <ul>
+      <li>To call only numbers you have a <strong>pre-existing business relationship</strong> with or where you have obtained prior consent;</li>
+      <li>To respect Malaysia's Do-Not-Call register and equivalent registries in each jurisdiction (TCPA in the US, OFCOM in the UK);</li>
+      <li>To permit our AI agent to disclose that it is an AI at the start of the call where required by local law;</li>
+      <li>That call audio is recorded and transcribed; you are responsible for obtaining any call-recording consent required in two-party-consent jurisdictions.</li>
+    </ul>
+
+    <h2 id="ai-outputs">8. AI outputs &amp; human oversight</h2>
+    <p>The Service uses Anthropic's Claude models to generate lead scores, qualification summaries, outreach copy, voice scripts, and pipeline suggestions. You agree that:</p>
+    <ul>
+      <li>AI outputs are <strong>suggestions</strong>. You remain responsible for reviewing every message, call script, and status change before it is sent or acted upon.</li>
+      <li>AI outputs may be incorrect, biased, or contain hallucinated facts. You must not rely on them for legal, medical, financial, or safety-critical decisions.</li>
+      <li>You grant us a limited licence to process your data through sub-processors (see Privacy Policy §6) solely to produce the requested AI output.</li>
+      <li>You will not use AI outputs to defame, impersonate, or deceive any person, or to produce sexual content involving minors, or content promoting violence, terrorism, or self-harm.</li>
+    </ul>
+
+    <h2 id="customer-data">9. Your data &amp; ownership</h2>
+    <p>You retain all rights, title, and interest in the data you upload or generate inside the Service ("Customer Data"), subject to a limited licence granted to us to host, process, and back it up so that we can deliver the Service. We do not sell Customer Data. We do not use Customer Data to train foundation AI models.</p>
+    <p>You can export Customer Data at any time via the in-app export tools. On termination you may request a final export within 30 days, after which the data is deleted subject to the retention periods set out in our Privacy Policy.</p>
+
+    <h2 id="ip">10. Intellectual property</h2>
+    <p>The Service, including its codebase, UI, AI prompting framework, and brand, is owned by EIAAW Solutions and its licensors and protected by applicable intellectual-property laws. We grant you a non-exclusive, non-transferable, revocable licence to use the Service during the subscription term. All rights not expressly granted are reserved.</p>
+
+    <h2 id="confidentiality">11. Confidentiality</h2>
+    <p>Each party will protect the other's non-public information with at least the same degree of care as its own confidential information and not less than a reasonable standard. This obligation survives termination for three years.</p>
+
+    <h2 id="availability">12. Service availability</h2>
+    <p>We target <strong>99.5% monthly uptime</strong> on paid plans, excluding scheduled maintenance, force majeure, and downstream provider outages (Anthropic, Retell, Resend, Stripe, Railway). We may issue service credits at our discretion for sustained breaches of this target. The Service is provided on an "as available" basis.</p>
+
+    <h2 id="suspension">13. Suspension &amp; termination</h2>
+    <p>We may suspend or terminate your access if you materially breach these Terms (including §§5–7), if your payment fails and remains unpaid for 14 days, or if continued provision of the Service would expose us or our providers to legal or security risk. We will give reasonable notice where practicable.</p>
+    <p>On termination: your right to use the Service ends immediately; fees already paid are non-refundable except as required by law; data retention follows the Privacy Policy.</p>
+
+    <h2 id="warranties">14. Warranties &amp; disclaimers</h2>
+    <p>We warrant that the Service will perform substantially in accordance with its published documentation. <strong>Except as expressly stated, the Service is provided "as is"</strong>, without warranty of merchantability, fitness for a particular purpose, non-infringement, uninterrupted operation, or that AI outputs will be accurate or suitable.</p>
+
+    <h2 id="liability">15. Limitation of liability</h2>
+    <p>To the maximum extent permitted by law:</p>
+    <ul>
+      <li>Neither party is liable for indirect, incidental, consequential, special, or punitive damages, or for loss of profits, revenue, goodwill, or data;</li>
+      <li>Our aggregate liability for any claim arising out of or related to the Service will not exceed the fees you paid us in the <strong>12 months preceding the claim</strong>.</li>
+    </ul>
+    <p>Nothing in these Terms excludes liability for death, personal injury caused by negligence, fraud, or any other liability that cannot be excluded under applicable law.</p>
+
+    <h2 id="indemnity">16. Indemnity</h2>
+    <p>You will indemnify and hold EIAAW harmless from any claim brought by a third party (including a recipient of your outreach) arising from: your breach of §§5–7; your Customer Data; or your misuse of AI outputs.</p>
+
+    <h2 id="changes">17. Changes to these terms</h2>
+    <p>We may update these Terms to reflect product, legal, or operational changes. Material changes will be notified by email at least 14 days before they take effect. Continued use of the Service after the effective date constitutes acceptance.</p>
+
+    <h2 id="law">18. Governing law &amp; disputes</h2>
+    <p>These Terms are governed by the laws of <strong>Malaysia</strong>. The parties submit to the exclusive jurisdiction of the courts of Kuala Lumpur, except that either party may seek injunctive relief in any court of competent jurisdiction.</p>
+
+    <h2 id="contact">19. Contact</h2>
+    <p>
+      <strong>EIAAW Solutions</strong><br>
+      Kuala Lumpur, Malaysia<br>
+      Email: <a href="mailto:eiaawsolutions@gmail.com">eiaawsolutions@gmail.com</a>
+    </p>
+
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="max-width: 1200px;">
+    <div class="footer-grid">
+      <div class="footer-lockup-blk">
+        <div class="lockup">
+          <img src="/brand/shield.png?v=3" alt="EIAAW Solutions">
+          <div class="brand">
+            <strong>EIAAW SOLUTIONS</strong>
+            <span>AI &middot; Human Partnerships</span>
+          </div>
+        </div>
+        <p class="footer-statement">Sales, written and spoken by an agent that doesn't sleep.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="/#capabilities">Capabilities</a></li>
+          <li><a href="/#approach">Approach</a></li>
+          <li><a href="/#pricing">Pricing</a></li>
+          <li><a href="/app">Sign in</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://eiaawsolutions.com" target="_blank" rel="noopener">EIAAW Solutions</a></li>
+          <li><a href="/#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="/privacy.html">Privacy</a></li>
+          <li><a href="/terms.html">Terms</a></li>
+          <li><a href="/security.html">Security</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div>&copy; 2026 EIAAW Solutions &mdash; All rights reserved</div>
+      <div>Kuala Lumpur &middot; Built for sales teams that act</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

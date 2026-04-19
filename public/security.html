@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security &amp; Compliance — EIAAW SalesAgent</title>
+  <meta name="description" content="The security controls, compliance posture, and trust practices behind EIAAW SalesAgent — encryption, authentication, AI safety, incident response, and responsible disclosure.">
+  <meta name="robots" content="index,follow">
+  <link rel="icon" type="image/png" href="/brand/shield.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #FAF7F2;
+      --bg-warm: #F3EDE0;
+      --surface: #FFFFFF;
+      --ink: #0F1A1D;
+      --ink-2: #2A3438;
+      --mute: #6B7A7F;
+      --line: #D9CFBC;
+      --line-soft: #E8DFCC;
+      --primary: #1FA896;
+      --primary-dark: #11766A;
+      --primary-tint: #E5F4F1;
+      --gradient: linear-gradient(135deg, #22B8A5 0%, #11766A 55%, #0A4D47 100%);
+      --serif: 'Instrument Serif', 'Times New Roman', serif;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: 'JetBrains Mono', Menlo, monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+    }
+
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: radial-gradient(rgba(15,26,29,0.035) 1px, transparent 1px);
+      background-size: 3px 3px;
+      mix-blend-mode: multiply;
+      opacity: 0.5;
+    }
+
+    a { color: var(--primary-dark); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+    a:hover { color: var(--primary); }
+
+    .wrap { max-width: 980px; margin: 0 auto; padding: 0 28px; position: relative; z-index: 1; }
+    .wrap-narrow { max-width: 820px; margin: 0 auto; padding: 0 28px; position: relative; z-index: 1; }
+
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250,247,242,0.88);
+      backdrop-filter: saturate(180%) blur(14px);
+      -webkit-backdrop-filter: saturate(180%) blur(14px);
+      border-bottom: 1px solid var(--line-soft);
+      padding: 14px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
+    .nav-logo img { width: 34px; height: 34px; object-fit: contain; }
+    .nav-logo-text strong { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--primary-dark); }
+    .nav-logo-text small { font-size: 10px; color: var(--mute); letter-spacing: 0.1em; text-transform: uppercase; }
+    .nav-links { display: flex; align-items: center; gap: 22px; }
+    .nav-links a { color: var(--ink-2); text-decoration: none; font-size: 14px; }
+    .nav-links a:hover { color: var(--primary-dark); }
+    .btn-primary { background: var(--gradient); color: #fff !important; padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 13px; }
+    .btn-primary:hover { color: #fff !important; opacity: 0.92; }
+
+    .legal-hero { padding: 72px 0 40px; border-bottom: 1px solid var(--line-soft); }
+    .eyebrow {
+      font-family: var(--mono); font-size: 11px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--primary-dark);
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-bottom: 18px;
+    }
+    .eyebrow::before { content: ''; width: 28px; height: 1px; background: currentColor; opacity: 0.5; }
+    .legal-hero h1 {
+      font-size: clamp(38px, 5vw, 58px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+      margin-bottom: 18px;
+    }
+    .legal-hero h1 em { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--primary-dark); letter-spacing: 0; }
+    .legal-hero .lead { font-size: 19px; color: var(--ink-2); max-width: 680px; }
+
+    /* Pillar grid */
+    .pillars {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin-top: 40px;
+    }
+    .pillar {
+      background: var(--surface);
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      padding: 22px;
+    }
+    .pillar .num {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--primary-dark);
+      letter-spacing: 0.14em;
+      margin-bottom: 8px;
+    }
+    .pillar h3 {
+      font-size: 16px; font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+    .pillar p {
+      font-size: 14px;
+      color: var(--ink-2);
+      line-height: 1.55;
+    }
+
+    .legal-body { padding: 72px 0 80px; }
+    .legal-body h2 {
+      font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+      margin: 56px 0 14px; padding-top: 32px;
+      border-top: 1px solid var(--line-soft);
+    }
+    .legal-body h2:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+    .legal-body h3 { font-size: 17px; font-weight: 700; margin: 28px 0 8px; color: var(--ink); }
+    .legal-body p { margin: 0 0 14px; color: var(--ink-2); font-size: 16px; }
+    .legal-body ul, .legal-body ol { margin: 0 0 14px 22px; color: var(--ink-2); }
+    .legal-body li { margin-bottom: 6px; }
+    .legal-body strong { color: var(--ink); font-weight: 600; }
+    .legal-body code { font-family: var(--mono); font-size: 13px; background: var(--bg-warm); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line-soft); }
+
+    /* Spec table */
+    .spec {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 24px;
+      font-size: 14px;
+    }
+    .spec th, .spec td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line-soft);
+      vertical-align: top;
+    }
+    .spec th {
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mute);
+      font-weight: 500;
+      background: var(--bg-warm);
+    }
+    .spec td:first-child {
+      font-weight: 600;
+      color: var(--ink);
+      width: 30%;
+    }
+    .spec td { color: var(--ink-2); }
+    .spec code { font-size: 12.5px; }
+
+    /* Status */
+    .status-row {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--primary-tint);
+      border: 1px solid #C8E6E0;
+      padding: 14px 18px;
+      border-radius: 10px;
+      font-size: 14px;
+      margin: 18px 0 28px;
+    }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34,197,94,0.18);
+      flex-shrink: 0;
+    }
+    .status-row strong { color: var(--primary-dark); }
+
+    .callout {
+      background: var(--primary-tint);
+      border-left: 3px solid var(--primary);
+      padding: 18px 22px; border-radius: 0 8px 8px 0;
+      margin: 24px 0; font-size: 15px;
+    }
+    .callout strong { color: var(--primary-dark); }
+
+    .disclose-box {
+      background: #FFF8EC;
+      border: 1px solid #F1DEA5;
+      border-radius: 12px;
+      padding: 26px;
+      margin: 28px 0;
+    }
+    .disclose-box h3 { margin-top: 0; }
+    .disclose-box p { font-size: 15px; }
+
+    .toc {
+      border: 1px solid var(--line-soft); border-radius: 10px;
+      padding: 22px 26px; background: var(--surface);
+      margin-bottom: 40px;
+    }
+    .toc h4 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--mute); font-weight: 500; margin-bottom: 12px; }
+    .toc ol { list-style: none; margin: 0; counter-reset: section; columns: 2; column-gap: 32px; }
+    .toc ol li { counter-increment: section; margin-bottom: 4px; font-size: 14px; break-inside: avoid; }
+    .toc ol li::before { content: counter(section, decimal-leading-zero) " "; font-family: var(--mono); color: var(--mute); margin-right: 8px; }
+    .toc a { color: var(--ink-2); text-decoration: none; }
+    .toc a:hover { color: var(--primary-dark); }
+
+    footer { background: var(--ink); color: #E8DFCC; padding: 60px 0 32px; margin-top: 80px; }
+    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 44px; }
+    .footer-lockup-blk .lockup { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .footer-lockup-blk img { width: 38px; height: 38px; }
+    .footer-lockup-blk .brand strong { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.1em; color: #fff; text-transform: uppercase; }
+    .footer-lockup-blk .brand span { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #B6AE99; }
+    .footer-statement { max-width: 320px; font-size: 14px; color: #B6AE99; }
+    .footer-col h4 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #E8DFCC; font-weight: 500; margin-bottom: 14px; }
+    .footer-col ul { list-style: none; }
+    .footer-col li { margin-bottom: 8px; }
+    .footer-col a { color: #B6AE99; text-decoration: none; font-size: 14px; }
+    .footer-col a:hover { color: #fff; }
+    .footer-bottom { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 24px; display: flex; justify-content: space-between; font-size: 12px; color: #8A8373; letter-spacing: 0.04em; }
+
+    @media (max-width: 720px) {
+      .nav-links a:not(.btn-primary) { display: none; }
+      .legal-hero { padding: 48px 0 32px; }
+      .legal-body { padding: 48px 0 60px; }
+      .toc ol { columns: 1; }
+      .footer-grid { grid-template-columns: 1fr; gap: 32px; }
+      .footer-bottom { flex-direction: column; gap: 8px; }
+      .spec { font-size: 13px; }
+      .spec th, .spec td { padding: 8px 10px; }
+      .spec td:first-child { width: auto; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/brand/shield.png?v=3" alt="EIAAW Solutions shield">
+    <span class="nav-logo-text">
+      <strong>EIAAW SOLUTIONS</strong>
+      <small>AI &middot; Human Partnerships</small>
+    </span>
+  </a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/privacy.html">Privacy</a>
+    <a href="/terms.html">Terms</a>
+    <a href="/app" class="btn-primary">Sign in</a>
+  </div>
+</nav>
+
+<section class="legal-hero">
+  <div class="wrap">
+    <div class="eyebrow">Security &amp; compliance</div>
+    <h1>Built with the <em>controls</em> a sales team needs.</h1>
+    <p class="lead">EIAAW SalesAgent handles customer pipelines, prospect records, outbound messaging, and AI reasoning. This page sets out the security controls, compliance alignment, and operational practices that protect it.</p>
+
+    <div class="pillars">
+      <div class="pillar">
+        <div class="num">01 · Encryption</div>
+        <h3>TLS 1.2+ in transit</h3>
+        <p>All traffic between your browser, the application, and our sub-processors is encrypted. Data at rest is protected by the hosting platform's managed encryption.</p>
+      </div>
+      <div class="pillar">
+        <div class="num">02 · Identity</div>
+        <h3>bcrypt + bearer tokens</h3>
+        <p>Passwords are hashed with bcrypt (10 rounds). Sessions use opaque 32-byte tokens with a 24-hour absolute expiry and a 30-minute idle timeout.</p>
+      </div>
+      <div class="pillar">
+        <div class="num">03 · AI safety</div>
+        <h3>Human-in-the-loop</h3>
+        <p>AI outputs are suggestions. Every message, voice script, and stage change requires a human to approve before it is sent, unless you explicitly enable automation.</p>
+      </div>
+      <div class="pillar">
+        <div class="num">04 · Abuse controls</div>
+        <h3>Rate-limiting everywhere</h3>
+        <p>Per-route limits guard login, AI, and outbound email so that a compromised credential or runaway script cannot drain your quotas or damage sender reputation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="legal-body">
+  <div class="wrap-narrow">
+
+    <nav class="toc" aria-label="Table of contents">
+      <h4>Contents</h4>
+      <ol>
+        <li><a href="#status">Service status</a></li>
+        <li><a href="#data-protection">Data protection</a></li>
+        <li><a href="#access-control">Access control</a></li>
+        <li><a href="#app-security">Application security</a></li>
+        <li><a href="#network">Network &amp; headers</a></li>
+        <li><a href="#rate-limits">Rate limiting</a></li>
+        <li><a href="#ai-safety">AI safety &amp; OWASP LLM Top 10</a></li>
+        <li><a href="#email-security">Email security</a></li>
+        <li><a href="#voice-security">Voice security</a></li>
+        <li><a href="#infra">Infrastructure</a></li>
+        <li><a href="#backup">Backup &amp; disaster recovery</a></li>
+        <li><a href="#compliance">Compliance alignment</a></li>
+        <li><a href="#incident">Incident response</a></li>
+        <li><a href="#vdp">Responsible disclosure</a></li>
+        <li><a href="#sub-processors">Sub-processors</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="status">1. Service status</h2>
+    <div class="status-row">
+      <span class="status-dot"></span>
+      <span><strong>All systems operational.</strong> Target monthly uptime 99.5% on paid plans. Material incidents are posted on this page and emailed to account owners within 24 hours.</span>
+    </div>
+
+    <h2 id="data-protection">2. Data protection</h2>
+    <table class="spec">
+      <tbody>
+        <tr><td>Encryption in transit</td><td>TLS 1.2+ on all HTTPS endpoints; HSTS preload-eligible configuration</td></tr>
+        <tr><td>Encryption at rest</td><td>Managed encryption on Railway-provided storage and on sub-processor databases (Stripe, Anthropic, Retell, Resend)</td></tr>
+        <tr><td>Password hashing</td><td><code>bcrypt</code> with cost factor 10; legacy SHA-256 hashes auto-upgraded on next login</td></tr>
+        <tr><td>Secrets at rest</td><td>Credentials (SMTP, Stripe, voice provider keys) stored encrypted in the <code>settings</code> table, decrypted only inside the server process</td></tr>
+        <tr><td>PII minimisation</td><td>Voice call transcripts are truncated to a 500-character preview server-side; full audio remains with the voice provider under their retention policy</td></tr>
+        <tr><td>Session handling</td><td>Opaque 32-byte <code>crypto.randomBytes</code> bearer tokens, expire 24h after issue and 30min idle</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="access-control">3. Access control</h2>
+    <ul>
+      <li><strong>Least privilege by role:</strong> operator / manager / admin roles scoped via middleware on every route.</li>
+      <li><strong>Row-level tenancy:</strong> leads, campaigns, and pipeline rows are joined on <code>user_id</code>; cross-tenant reads are blocked at the query layer.</li>
+      <li><strong>Password reset:</strong> one-hour expiring tokens; all active sessions for the user are revoked on reset.</li>
+      <li><strong>Idle lockout:</strong> 30-minute inactivity invalidates the session.</li>
+      <li><strong>Engineering access to production data</strong> is restricted, logged, and used only to respond to incidents or explicit support requests.</li>
+    </ul>
+
+    <h2 id="app-security">4. Application security</h2>
+    <ul>
+      <li>Parameterised SQL queries throughout — no string-concatenated SQL.</li>
+      <li>Input validation on every API route; output encoding in the UI.</li>
+      <li>OWASP Top 10 threat model applied during design; IDOR tests on every owner-scoped resource.</li>
+      <li>Static files served with <code>maxAge: 0</code> and ETag so security-relevant changes take effect on next request.</li>
+      <li>Dependencies monitored for CVEs; critical advisories patched within <strong>7 days</strong>, high within <strong>30 days</strong>.</li>
+    </ul>
+
+    <h2 id="network">5. Network &amp; headers</h2>
+    <table class="spec">
+      <tbody>
+        <tr><td>HTTPS</td><td>Forced on all public endpoints; HTTP redirects 301 to HTTPS</td></tr>
+        <tr><td>CSP</td><td>Restrictive Content Security Policy via Helmet — script, style, image, and connect sources are explicitly allow-listed</td></tr>
+        <tr><td>CORS</td><td>Origin allow-list: <code>sa.eiaawsolutions.com</code>, the Railway production domain, and local development; <code>credentials: true</code></td></tr>
+        <tr><td>CSRF</td><td>Bearer-token authentication on state-changing endpoints, plus Origin-header check for cookie-bearing calls</td></tr>
+        <tr><td>Clickjacking</td><td><code>X-Frame-Options: DENY</code> via Helmet frameguard</td></tr>
+        <tr><td>MIME sniffing</td><td><code>X-Content-Type-Options: nosniff</code></td></tr>
+        <tr><td>Referrer</td><td><code>Referrer-Policy: strict-origin-when-cross-origin</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="rate-limits">6. Rate limiting</h2>
+    <table class="spec">
+      <tbody>
+        <tr><td>General API</td><td>120 requests / minute / IP</td></tr>
+        <tr><td>Login endpoint</td><td>10 attempts / 15 minutes / IP — defends against credential stuffing</td></tr>
+        <tr><td>AI agent endpoints</td><td>10 requests / minute / authenticated user</td></tr>
+        <tr><td>Outbound email (per user)</td><td>3 / minute — protects sender reputation</td></tr>
+        <tr><td>Monthly quotas</td><td>Enforced per plan for leads, campaigns, AI actions, voice calls, contact reveals</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="ai-safety">7. AI safety &amp; OWASP LLM Top 10</h2>
+    <p>The Service relies on Anthropic's Claude models for lead scoring, qualification, and copy generation. We align to the <strong>OWASP LLM Top 10 (2024)</strong>:</p>
+    <table class="spec">
+      <thead>
+        <tr><th>Risk</th><th>Control</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>LLM01 Prompt injection</td><td>System prompts are fixed server-side; user input is clearly delimited; tool use is whitelisted; outputs are treated as untrusted data</td></tr>
+        <tr><td>LLM02 Insecure output handling</td><td>LLM outputs are sanitised before display; never executed as code; voice tool-callbacks are validated server-side</td></tr>
+        <tr><td>LLM03 Training-data poisoning</td><td>We do not fine-tune; we use Anthropic's hosted models only</td></tr>
+        <tr><td>LLM04 Model DoS</td><td>Per-user rate limits + per-campaign and per-account budget ceilings (USD); requests abort when budget exceeded</td></tr>
+        <tr><td>LLM05 Supply-chain</td><td>Only Anthropic's official SDK; pinned versions; CVE monitoring</td></tr>
+        <tr><td>LLM06 Sensitive info disclosure</td><td>Customer context is scoped per user; no cross-tenant context leakage; AI cost log stores token counts, not message bodies</td></tr>
+        <tr><td>LLM07 Insecure plugin design</td><td>Tool calls (<code>send_overview</code>, <code>schedule_meeting</code>, etc.) validate inputs, check the caller's ownership, and never execute arbitrary code</td></tr>
+        <tr><td>LLM08 Excessive agency</td><td>Human approval required for outbound messages; AI cannot send unapproved email or change billing without explicit user action</td></tr>
+        <tr><td>LLM09 Overreliance</td><td>UI surfaces AI outputs as suggestions, with explicit "review before send" affordances; model rationale is shown alongside scores</td></tr>
+        <tr><td>LLM10 Model theft</td><td>Not applicable — we do not host model weights</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <strong>No training on your data.</strong> Anthropic does not use API inputs to train foundation models. We do not sell, publish, or share Customer Data with any third party beyond the sub-processors needed to deliver the Service.
+    </div>
+
+    <h2 id="email-security">8. Email security</h2>
+    <ul>
+      <li>Primary delivery via <strong>Resend</strong>; DKIM, SPF, and DMARC are configured on sending domains.</li>
+      <li>Bounce and complaint feedback from Resend is ingested at <code>/api/tracking/webhook</code> and used to auto-suppress bad addresses.</li>
+      <li>Optional SMTP fallback uses TLS-only connections.</li>
+      <li>Every outreach template requires a working unsubscribe link (see <a href="/terms.html#anti-spam">Terms §6</a>).</li>
+    </ul>
+
+    <h2 id="voice-security">9. Voice security</h2>
+    <ul>
+      <li>Voice calls are placed and recorded via <strong>Retell AI</strong>. Transport is encrypted end-to-end between Retell's infrastructure and our application.</li>
+      <li>Call links shared with prospects are single-use and expire after 24 hours (prospect-initiated) or 7 days (outbound invite).</li>
+      <li>Transcript previews stored in our database are capped at 500 characters; full audio remains with Retell subject to their retention policy.</li>
+      <li>The AI agent discloses its nature at the start of each call where local law requires.</li>
+    </ul>
+
+    <h2 id="infra">10. Infrastructure</h2>
+    <ul>
+      <li><strong>Hosting:</strong> Railway (US-West region), containerised deployment, managed TLS.</li>
+      <li><strong>Data store:</strong> managed SQLite / Postgres on Railway with encryption at rest.</li>
+      <li><strong>Build isolation:</strong> each deploy is an immutable container image; only the running container has access to production secrets, which are injected at runtime.</li>
+      <li><strong>Source control:</strong> GitHub with protected <code>main</code> branch; deploys require manual trigger (<code>railway up</code>).</li>
+      <li><strong>Logs:</strong> structured application logs retained for 14 days; redaction of sensitive fields (passwords, tokens, payment data) at the logging boundary.</li>
+    </ul>
+
+    <h2 id="backup">11. Backup &amp; disaster recovery</h2>
+    <ul>
+      <li><strong>Database backups:</strong> managed daily snapshots on Railway.</li>
+      <li><strong>Retention:</strong> backups on a 30-day rolling window.</li>
+      <li><strong>Recovery Time Objective (RTO):</strong> 4 hours for full-region outage.</li>
+      <li><strong>Recovery Point Objective (RPO):</strong> 24 hours.</li>
+      <li><strong>Restore tests:</strong> quarterly.</li>
+    </ul>
+
+    <h2 id="compliance">12. Compliance alignment</h2>
+    <p>We design to the following frameworks even where formal certification is not (yet) in place:</p>
+    <ul>
+      <li><strong>Malaysia PDPA 2010</strong> — data-handling principles in the Privacy Policy; data subject rights; notice &amp; choice.</li>
+      <li><strong>EU GDPR</strong> — lawful basis, data subject rights, sub-processor transparency, SCCs for cross-border transfers.</li>
+      <li><strong>UK GDPR &amp; PECR</strong> — equivalent protections for UK residents; cookie consent not required because we do not use tracking cookies on public pages.</li>
+      <li><strong>CAN-SPAM (US), CASL (Canada), Spam Act 2003 (Australia)</strong> — enforced via product behaviour and Terms §6.</li>
+      <li><strong>TCPA (US)</strong> — voice calling obligations delegated to the Customer as the sender; Service assists with compliance but does not replace due diligence.</li>
+      <li><strong>PCI-DSS</strong> — card data is never touched by our servers; Stripe Elements tokenises at source, putting us in SAQ-A scope.</li>
+      <li><strong>OWASP ASVS L2</strong> — guiding application-security baseline.</li>
+      <li><strong>SOC 2 Type I readiness</strong> — roadmap: 2026 Q4.</li>
+      <li><strong>EU AI Act</strong> — classified as a limited-risk AI system (generating content on behalf of the user); disclosure, human oversight, and logging obligations met by product design.</li>
+    </ul>
+
+    <h2 id="incident">13. Incident response</h2>
+    <ul>
+      <li><strong>Detection:</strong> platform alerts on elevated error rates, auth anomalies, and sub-processor webhooks.</li>
+      <li><strong>Triage:</strong> incident commander within 30 minutes of confirmed issue.</li>
+      <li><strong>Notification:</strong> account owners notified within 24 hours where their data is materially affected; regulators notified within 72 hours where required (GDPR Art. 33, PDPA equivalents).</li>
+      <li><strong>Post-mortem:</strong> root-cause analysis published to affected customers within 14 days of resolution.</li>
+    </ul>
+
+    <h2 id="vdp">14. Responsible disclosure</h2>
+    <div class="disclose-box">
+      <h3>Found a vulnerability?</h3>
+      <p>We welcome coordinated disclosure from security researchers. If you believe you have found a security issue in EIAAW SalesAgent, please email <a href="mailto:eiaawsolutions@gmail.com">eiaawsolutions@gmail.com</a> with:</p>
+      <ul>
+        <li>A description of the issue and its impact;</li>
+        <li>Reproduction steps or a proof of concept;</li>
+        <li>Your contact details for follow-up.</li>
+      </ul>
+      <p style="margin-top: 12px;">We commit to: acknowledging your report within <strong>72 hours</strong>, providing a triage decision within <strong>7 days</strong>, and keeping you informed through remediation. We will not pursue legal action against researchers acting in good faith within this policy (no data exfiltration, no disruption of service, no social engineering of our staff or customers).</p>
+    </div>
+
+    <h2 id="sub-processors">15. Sub-processors</h2>
+    <p>See the <a href="/privacy.html#processors">Privacy Policy §6</a> for the full, current list of sub-processors. We notify account owners by email at least 30 days before onboarding a new sub-processor that processes Customer Data.</p>
+
+    <h2 id="contact">16. Contact</h2>
+    <p>Security, compliance, or trust enquiries:</p>
+    <p>
+      <strong>EIAAW Solutions</strong><br>
+      Kuala Lumpur, Malaysia<br>
+      Email: <a href="mailto:eiaawsolutions@gmail.com">eiaawsolutions@gmail.com</a>
+    </p>
+
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="max-width: 1200px;">
+    <div class="footer-grid">
+      <div class="footer-lockup-blk">
+        <div class="lockup">
+          <img src="/brand/shield.png?v=3" alt="EIAAW Solutions">
+          <div class="brand">
+            <strong>EIAAW SOLUTIONS</strong>
+            <span>AI &middot; Human Partnerships</span>
+          </div>
+        </div>
+        <p class="footer-statement">Sales, written and spoken by an agent that doesn't sleep.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="/#capabilities">Capabilities</a></li>
+          <li><a href="/#approach">Approach</a></li>
+          <li><a href="/#pricing">Pricing</a></li>
+          <li><a href="/app">Sign in</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://eiaawsolutions.com" target="_blank" rel="noopener">EIAAW Solutions</a></li>
+          <li><a href="/#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="/privacy.html">Privacy</a></li>
+          <li><a href="/terms.html">Terms</a></li>
+          <li><a href="/security.html">Security</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div>&copy; 2026 EIAAW Solutions &mdash; All rights reserved</div>
+      <div>Kuala Lumpur &middot; Built for sales teams that act</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

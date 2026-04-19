@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — EIAAW SalesAgent</title>
+  <meta name="description" content="How EIAAW SalesAgent collects, processes, and protects personal data — aligned with Malaysia's PDPA 2010, GDPR, and global data-protection principles.">
+  <meta name="robots" content="index,follow">
+  <link rel="icon" type="image/png" href="/brand/shield.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #FAF7F2;
+      --bg-warm: #F3EDE0;
+      --surface: #FFFFFF;
+      --ink: #0F1A1D;
+      --ink-2: #2A3438;
+      --mute: #6B7A7F;
+      --line: #D9CFBC;
+      --line-soft: #E8DFCC;
+      --primary: #1FA896;
+      --primary-dark: #11766A;
+      --primary-tint: #E5F4F1;
+      --gradient: linear-gradient(135deg, #22B8A5 0%, #11766A 55%, #0A4D47 100%);
+      --serif: 'Instrument Serif', 'Times New Roman', serif;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: 'JetBrains Mono', Menlo, monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+    }
+
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: radial-gradient(rgba(15,26,29,0.035) 1px, transparent 1px);
+      background-size: 3px 3px;
+      mix-blend-mode: multiply;
+      opacity: 0.5;
+    }
+
+    a { color: var(--primary-dark); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+    a:hover { color: var(--primary); }
+
+    .wrap { max-width: 820px; margin: 0 auto; padding: 0 28px; position: relative; z-index: 1; }
+
+    /* Nav */
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250,247,242,0.88);
+      backdrop-filter: saturate(180%) blur(14px);
+      -webkit-backdrop-filter: saturate(180%) blur(14px);
+      border-bottom: 1px solid var(--line-soft);
+      padding: 14px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
+    .nav-logo img { width: 34px; height: 34px; object-fit: contain; }
+    .nav-logo-text strong { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--primary-dark); }
+    .nav-logo-text small { font-size: 10px; color: var(--mute); letter-spacing: 0.1em; text-transform: uppercase; }
+    .nav-links { display: flex; align-items: center; gap: 22px; }
+    .nav-links a { color: var(--ink-2); text-decoration: none; font-size: 14px; }
+    .nav-links a:hover { color: var(--primary-dark); }
+    .btn-primary { background: var(--gradient); color: #fff !important; padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 13px; }
+    .btn-primary:hover { color: #fff !important; opacity: 0.92; }
+
+    /* Hero */
+    .legal-hero { padding: 72px 0 40px; border-bottom: 1px solid var(--line-soft); }
+    .eyebrow {
+      font-family: var(--mono); font-size: 11px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--primary-dark);
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-bottom: 18px;
+    }
+    .eyebrow::before { content: ''; width: 28px; height: 1px; background: currentColor; opacity: 0.5; }
+    .legal-hero h1 {
+      font-family: var(--sans);
+      font-size: clamp(38px, 5vw, 58px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+      margin-bottom: 18px;
+    }
+    .legal-hero h1 em { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--primary-dark); letter-spacing: 0; }
+    .legal-hero .lead { font-size: 19px; color: var(--ink-2); max-width: 680px; }
+    .legal-meta {
+      display: flex; flex-wrap: wrap; gap: 18px; margin-top: 28px;
+      font-family: var(--mono); font-size: 11px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--mute);
+    }
+    .legal-meta span strong { color: var(--ink); }
+
+    /* Body */
+    .legal-body { padding: 56px 0 80px; }
+    .legal-body h2 {
+      font-size: 26px; font-weight: 700; letter-spacing: -0.025em;
+      margin: 48px 0 12px; padding-top: 28px;
+      border-top: 1px solid var(--line-soft);
+    }
+    .legal-body h2:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+    .legal-body h3 { font-size: 17px; font-weight: 700; margin: 28px 0 8px; color: var(--ink); }
+    .legal-body p { margin: 0 0 14px; color: var(--ink-2); font-size: 16px; }
+    .legal-body ul, .legal-body ol { margin: 0 0 14px 22px; color: var(--ink-2); }
+    .legal-body li { margin-bottom: 6px; }
+    .legal-body strong { color: var(--ink); font-weight: 600; }
+    .legal-body code { font-family: var(--mono); font-size: 13px; background: var(--bg-warm); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line-soft); }
+
+    .callout {
+      background: var(--primary-tint);
+      border-left: 3px solid var(--primary);
+      padding: 18px 22px; border-radius: 0 8px 8px 0;
+      margin: 24px 0; font-size: 15px;
+    }
+    .callout strong { color: var(--primary-dark); }
+
+    /* Processors table */
+    .proc-table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14px; }
+    .proc-table th, .proc-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+    .proc-table th { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mute); font-weight: 500; background: var(--bg-warm); }
+    .proc-table td { color: var(--ink-2); }
+    .proc-table td:first-child { font-weight: 600; color: var(--ink); }
+
+    /* TOC */
+    .toc {
+      border: 1px solid var(--line-soft); border-radius: 10px;
+      padding: 22px 26px; background: var(--surface);
+      margin-bottom: 40px;
+    }
+    .toc h4 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--mute); font-weight: 500; margin-bottom: 12px; }
+    .toc ol { list-style: none; margin: 0; counter-reset: section; }
+    .toc ol li { counter-increment: section; margin-bottom: 4px; font-size: 14px; }
+    .toc ol li::before { content: counter(section, decimal-leading-zero) " "; font-family: var(--mono); color: var(--mute); margin-right: 8px; }
+    .toc a { color: var(--ink-2); text-decoration: none; }
+    .toc a:hover { color: var(--primary-dark); }
+
+    /* Footer */
+    footer { background: var(--ink); color: #E8DFCC; padding: 60px 0 32px; margin-top: 80px; }
+    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 44px; }
+    .footer-lockup-blk .lockup { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .footer-lockup-blk img { width: 38px; height: 38px; }
+    .footer-lockup-blk .brand strong { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.1em; color: #fff; text-transform: uppercase; }
+    .footer-lockup-blk .brand span { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #B6AE99; }
+    .footer-statement { max-width: 320px; font-size: 14px; color: #B6AE99; }
+    .footer-col h4 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #E8DFCC; font-weight: 500; margin-bottom: 14px; }
+    .footer-col ul { list-style: none; }
+    .footer-col li { margin-bottom: 8px; }
+    .footer-col a { color: #B6AE99; text-decoration: none; font-size: 14px; }
+    .footer-col a:hover { color: #fff; }
+    .footer-bottom { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 24px; display: flex; justify-content: space-between; font-size: 12px; color: #8A8373; letter-spacing: 0.04em; }
+
+    @media (max-width: 720px) {
+      .nav-links a:not(.btn-primary) { display: none; }
+      .legal-hero { padding: 48px 0 32px; }
+      .legal-body { padding: 40px 0 60px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 32px; }
+      .footer-bottom { flex-direction: column; gap: 8px; }
+      .proc-table { font-size: 13px; }
+      .proc-table th, .proc-table td { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/brand/shield.png?v=3" alt="EIAAW Solutions shield">
+    <span class="nav-logo-text">
+      <strong>EIAAW SOLUTIONS</strong>
+      <small>AI &middot; Human Partnerships</small>
+    </span>
+  </a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/terms.html">Terms</a>
+    <a href="/security.html">Security</a>
+    <a href="/app" class="btn-primary">Sign in</a>
+  </div>
+</nav>
+
+<section class="legal-hero">
+  <div class="wrap">
+    <div class="eyebrow">Privacy policy</div>
+    <h1>How we handle <em>your data</em>.</h1>
+    <p class="lead">EIAAW SalesAgent is a sales automation platform. This policy explains what we collect, why, who processes it, how long we keep it, and the rights you have over your data.</p>
+    <div class="legal-meta">
+      <span>Effective <strong>19 April 2026</strong></span>
+      <span>Version <strong>1.0</strong></span>
+      <span>Jurisdiction <strong>Malaysia</strong></span>
+    </div>
+  </div>
+</section>
+
+<section class="legal-body">
+  <div class="wrap">
+
+    <nav class="toc" aria-label="Table of contents">
+      <h4>Contents</h4>
+      <ol>
+        <li><a href="#who-we-are">Who we are</a></li>
+        <li><a href="#data-we-collect">Data we collect</a></li>
+        <li><a href="#how-we-use">How we use your data</a></li>
+        <li><a href="#legal-basis">Legal basis for processing</a></li>
+        <li><a href="#ai-processing">AI &amp; automated processing</a></li>
+        <li><a href="#processors">Sub-processors</a></li>
+        <li><a href="#tracking">Email &amp; voice tracking</a></li>
+        <li><a href="#retention">Data retention</a></li>
+        <li><a href="#international">International transfers</a></li>
+        <li><a href="#your-rights">Your rights</a></li>
+        <li><a href="#security">Security</a></li>
+        <li><a href="#children">Children</a></li>
+        <li><a href="#changes">Changes to this policy</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="who-we-are">1. Who we are</h2>
+    <p>"EIAAW SalesAgent" (the "Service") is operated by <strong>EIAAW Solutions</strong>, a Malaysia-based company ("we", "us", "our"). We are the <strong>data controller</strong> for personal data of account holders and visitors to our public sites, and a <strong>data processor</strong> for personal data of prospects and leads that our customers upload or generate within the Service.</p>
+    <p>Contact for privacy matters: <a href="mailto:eiaawsolutions@gmail.com">eiaawsolutions@gmail.com</a>.</p>
+
+    <h2 id="data-we-collect">2. Data we collect</h2>
+
+    <h3>2.1 Account holders (operators)</h3>
+    <p>When you create an account, we collect: username, email address, a bcrypt hash of your password (never the password itself), display name, role, plan, budget settings, and email verification status.</p>
+
+    <h3>2.2 Session data</h3>
+    <p>We issue opaque bearer tokens (32-byte random hex) with a 24-hour absolute expiry and a 30-minute idle timeout. We record the token, its expiry, and last-activity timestamp. We do <strong>not</strong> use third-party analytics cookies.</p>
+
+    <h3>2.3 Leads and prospects you add to the Service</h3>
+    <p>When you add a lead manually, via import, or via our lead-generation tools, we store: name, email, company, title, phone, source, notes, a lead score, a pipeline status, and activity history.</p>
+
+    <h3>2.4 Outreach artefacts</h3>
+    <p>For every email or voice interaction, we store the message content, delivery status, open/click timestamps, and for voice calls a transcript preview (capped at 500 characters) plus AI-generated sentiment. Full audio recordings are retained by our voice provider subject to their terms (see §6).</p>
+
+    <h3>2.5 Contact-form submissions (public site)</h3>
+    <p>When you submit our public contact form we collect the fields you provide (name, email, phone, company, message) and use them solely to respond to your enquiry.</p>
+
+    <h3>2.6 Billing data</h3>
+    <p>Subscription and payment data is processed by <strong>Stripe</strong>. We store a Stripe customer ID, plan identifier, and invoice history. We do <strong>not</strong> store card numbers, CVVs, or bank credentials.</p>
+
+    <h3>2.7 Usage metrics</h3>
+    <p>We log per-account counters for leads created, campaigns sent, AI actions, voice calls, and token-level AI cost (model, input/output tokens, USD cost). These are used for billing, quota enforcement, and service reliability.</p>
+
+    <h2 id="how-we-use">3. How we use your data</h2>
+    <ul>
+      <li>To provide the Service — lead management, outreach, voice calling, pipeline automation.</li>
+      <li>To authenticate you and keep sessions secure.</li>
+      <li>To generate AI-driven outputs (lead scoring, copy, qualification summaries, call scripts).</li>
+      <li>To bill you, enforce plan limits, and prevent abuse.</li>
+      <li>To send transactional email (password resets, receipts, service notices).</li>
+      <li>To improve the Service through aggregate, de-identified metrics.</li>
+    </ul>
+    <p>We do <strong>not</strong> sell personal data. We do <strong>not</strong> use your content or your leads' data to train third-party AI models.</p>
+
+    <h2 id="legal-basis">4. Legal basis for processing</h2>
+    <p>Where GDPR applies, we rely on:</p>
+    <ul>
+      <li><strong>Contract</strong> (Art. 6(1)(b)) — to deliver the Service you subscribed to.</li>
+      <li><strong>Legitimate interests</strong> (Art. 6(1)(f)) — service security, fraud prevention, product improvement.</li>
+      <li><strong>Consent</strong> (Art. 6(1)(a)) — marketing communications from us, where required.</li>
+      <li><strong>Legal obligation</strong> (Art. 6(1)(c)) — tax, accounting, lawful requests.</li>
+    </ul>
+    <p>Under Malaysia's <strong>Personal Data Protection Act 2010 (PDPA)</strong>, processing is carried out under the Personal Data Notice and Choice Principle as set out in this policy.</p>
+
+    <h2 id="ai-processing">5. AI &amp; automated processing</h2>
+    <p>The Service uses <strong>Anthropic's Claude API</strong> to generate lead scores, qualification summaries, outreach content, and pipeline analysis. When you trigger an AI action, we send relevant context (the lead or campaign record, your instruction, and limited conversation history) to Anthropic. Anthropic processes this under their API terms and does not train foundation models on API data.</p>
+    <p>AI outputs are <strong>suggestions, not decisions</strong>. Every email, sequence, voice script, and status change requires human approval unless you explicitly enable automation for a specific workflow. You can review or override every AI output.</p>
+    <div class="callout">
+      <strong>Right to human review:</strong> where an AI-generated outcome materially affects you, you may request a human review by writing to us. We do not use AI to make solely-automated decisions that produce legal or similarly significant effects on account holders.
+    </div>
+
+    <h2 id="processors">6. Sub-processors</h2>
+    <p>We engage the following sub-processors. Each is contractually bound to process data only on our instructions and maintain appropriate security.</p>
+    <table class="proc-table">
+      <thead>
+        <tr><th>Processor</th><th>Purpose</th><th>Data processed</th><th>Location</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Anthropic (Claude API)</td><td>AI generation &amp; scoring</td><td>Lead/campaign context, prompts, outputs, token counts</td><td>United States</td></tr>
+        <tr><td>Retell AI</td><td>AI voice calling &amp; transcription</td><td>Phone numbers, call audio, transcripts, sentiment</td><td>United States</td></tr>
+        <tr><td>Resend</td><td>Transactional &amp; outreach email delivery</td><td>Sender, recipient, subject, body, delivery events</td><td>United States</td></tr>
+        <tr><td>Gmail SMTP</td><td>Email fallback (opt-in)</td><td>Outbound email envelope &amp; content</td><td>Google infrastructure</td></tr>
+        <tr><td>Stripe</td><td>Payment processing</td><td>Name, email, billing address, card data (tokenised)</td><td>United States / Singapore</td></tr>
+        <tr><td>Railway</td><td>Application hosting</td><td>All application data at rest &amp; in transit</td><td>United States (US-West region)</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="tracking">7. Email &amp; voice tracking</h2>
+    <p>Outreach emails sent through the Service include a <strong>1×1 tracking pixel</strong> and wrapped links so that opens, clicks, and bounces can be attributed to a lead. Open and click events increment the lead's engagement score. Tracking applies to outbound outreach, not to transactional mail (password resets, receipts).</p>
+    <p>Voice calls initiated by you are announced to the recipient (via our AI agent's greeting) as being an AI-assisted call. Call audio is processed by Retell; transcripts are stored in the Service.</p>
+    <p>Our public site does <strong>not</strong> set tracking cookies. Session is held in an <code>Authorization</code> header bearer token rather than a cookie; the token is scoped to the authenticated application at <code>/app</code>.</p>
+
+    <h2 id="retention">8. Data retention</h2>
+    <ul>
+      <li><strong>Sessions:</strong> deleted on expiry, logout, or password reset.</li>
+      <li><strong>Password-reset tokens:</strong> auto-deleted 1 hour after issue.</li>
+      <li><strong>Voice call links:</strong> 24-hour to 7-day expiry depending on type.</li>
+      <li><strong>Leads, campaigns, activities, pipeline:</strong> retained for the life of your account. Deleting a user removes all owned records (leads, campaigns, pipeline, activities, agent tasks, AI cost logs, sessions).</li>
+      <li><strong>Billing records:</strong> retained for 7 years to meet Malaysian tax and accounting requirements.</li>
+      <li><strong>AI cost logs:</strong> retained for operational and billing auditability for the life of your account.</li>
+    </ul>
+    <p>You can request full account deletion at any time (§10). Backups are overwritten on a 30-day rolling cycle.</p>
+
+    <h2 id="international">9. International transfers</h2>
+    <p>Because our sub-processors are primarily in the United States, personal data leaves Malaysia and may leave the EEA. Transfers are made under the sub-processor's Standard Contractual Clauses or equivalent safeguards. By using the Service you acknowledge these transfers.</p>
+
+    <h2 id="your-rights">10. Your rights</h2>
+    <p>Depending on your jurisdiction, you have the right to:</p>
+    <ul>
+      <li>Access a copy of your personal data.</li>
+      <li>Rectify inaccurate data.</li>
+      <li>Erase your data ("right to be forgotten").</li>
+      <li>Restrict or object to processing.</li>
+      <li>Port your data in a machine-readable format.</li>
+      <li>Withdraw consent where processing is based on consent.</li>
+      <li>Lodge a complaint with the Malaysian Personal Data Protection Commissioner or, for EU/EEA residents, your local supervisory authority.</li>
+    </ul>
+    <p>To exercise any right, email <a href="mailto:eiaawsolutions@gmail.com">eiaawsolutions@gmail.com</a>. We respond within 30 days.</p>
+    <div class="callout">
+      <strong>Lead-level requests:</strong> if you are a <em>prospect or lead</em> contacted by one of our customers through the Service, contact that customer directly (they are the controller of your data). If you cannot identify them, we will forward your request on.
+    </div>
+
+    <h2 id="security">11. Security</h2>
+    <p>We protect your data with: TLS 1.2+ in transit; bcrypt (10 rounds) for password hashing; opaque bearer tokens with idle timeout; HTTPS-only cookies where used; Helmet-hardened security headers including CSP; CORS origin allow-list; per-route rate limiting (120 req/min general, 10/15min for login, 10/min for AI, 3/min for outbound email). See our <a href="/security.html">Security &amp; Compliance</a> page for the full posture.</p>
+
+    <h2 id="children">12. Children</h2>
+    <p>The Service is not directed to individuals under 18. We do not knowingly collect data from minors. If you believe we hold data of a minor, contact us and we will delete it.</p>
+
+    <h2 id="changes">13. Changes to this policy</h2>
+    <p>We may update this policy to reflect product, legal, or regulatory changes. Material changes will be notified to account holders by email at least 14 days before they take effect. The "Effective" date at the top of this page always reflects the current version.</p>
+
+    <h2 id="contact">14. Contact</h2>
+    <p>Privacy enquiries, rights requests, and complaints:</p>
+    <p>
+      <strong>EIAAW Solutions</strong><br>
+      Kuala Lumpur, Malaysia<br>
+      Email: <a href="mailto:eiaawsolutions@gmail.com">eiaawsolutions@gmail.com</a>
+    </p>
+
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="max-width: 1200px;">
+    <div class="footer-grid">
+      <div class="footer-lockup-blk">
+        <div class="lockup">
+          <img src="/brand/shield.png?v=3" alt="EIAAW Solutions">
+          <div class="brand">
+            <strong>EIAAW SOLUTIONS</strong>
+            <span>AI &middot; Human Partnerships</span>
+          </div>
+        </div>
+        <p class="footer-statement">Sales, written and spoken by an agent that doesn't sleep.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="/#capabilities">Capabilities</a></li>
+          <li><a href="/#approach">Approach</a></li>
+          <li><a href="/#pricing">Pricing</a></li>
+          <li><a href="/app">Sign in</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://eiaawsolutions.com" target="_blank" rel="noopener">EIAAW Solutions</a></li>
+          <li><a href="/#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="/privacy.html">Privacy</a></li>
+          <li><a href="/terms.html">Terms</a></li>
+          <li><a href="/security.html">Security</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div>&copy; 2026 EIAAW Solutions &mdash; All rights reserved</div>
+      <div>Kuala Lumpur &middot; Built for sales teams that act</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

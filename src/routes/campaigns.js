@@ -54,6 +54,66 @@ router.get('/grouped-by-user', (req, res) => {
   res.json(tree);
 });
 
+// Diagnostic + backfill: find campaign_leads where the lead's user_id doesn't
+// match the campaign's user_id. This is a consequence of the old dedup bug
+// (generator defaulted leads to user_id=1 when _userId wasn't propagated).
+// Superadmin only. Pass ?fix=1 to re-own those leads to the campaign owner.
+router.get('/_diagnose/lead-ownership', (req, res) => {
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
+
+  const mismatches = db.prepare(`
+    SELECT
+      c.id as campaign_id, c.name as campaign_name, c.user_id as campaign_owner_id,
+      cu.username as campaign_owner_username,
+      l.id as lead_id, l.name as lead_name, l.email as lead_email,
+      l.user_id as lead_owner_id, lu.username as lead_owner_username
+    FROM campaign_leads cl
+    JOIN campaigns c ON c.id = cl.campaign_id
+    JOIN leads l ON l.id = cl.lead_id
+    JOIN users cu ON cu.id = c.user_id
+    JOIN users lu ON lu.id = l.user_id
+    WHERE c.user_id != l.user_id
+    ORDER BY c.id, l.id
+  `).all();
+
+  const summary = {};
+  for (const m of mismatches) {
+    const key = `${m.campaign_id}`;
+    if (!summary[key]) {
+      summary[key] = {
+        campaign_id: m.campaign_id,
+        campaign_name: m.campaign_name,
+        campaign_owner: m.campaign_owner_username,
+        campaign_owner_id: m.campaign_owner_id,
+        foreign_leads: 0,
+        owners: {},
+      };
+    }
+    summary[key].foreign_leads++;
+    const ownerKey = `${m.lead_owner_id}:${m.lead_owner_username}`;
+    summary[key].owners[ownerKey] = (summary[key].owners[ownerKey] || 0) + 1;
+  }
+
+  let fixed = 0;
+  if (req.query.fix === '1') {
+    const stmt = db.prepare('UPDATE leads SET user_id = ? WHERE id = ?');
+    const tx = db.transaction((rows) => {
+      for (const m of rows) {
+        stmt.run(m.campaign_owner_id, m.lead_id);
+        fixed++;
+      }
+    });
+    tx(mismatches);
+  }
+
+  res.json({
+    total_mismatches: mismatches.length,
+    fixed,
+    by_campaign: Object.values(summary),
+    sample_mismatches: mismatches.slice(0, 20),
+  });
+});
+
 // Leads attached to a specific campaign (with performance metrics per lead)
 router.get('/:id/leads', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;
