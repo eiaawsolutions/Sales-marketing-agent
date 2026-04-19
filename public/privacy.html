@@ -145,27 +145,79 @@
     .toc a { color: var(--ink-2); text-decoration: none; }
     .toc a:hover { color: var(--primary-dark); }
 
-    /* Footer */
-    footer { background: var(--ink); color: #E8DFCC; padding: 60px 0 32px; margin-top: 80px; }
-    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 44px; }
-    .footer-lockup-blk .lockup { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-    .footer-lockup-blk img { width: 38px; height: 38px; }
-    .footer-lockup-blk .brand strong { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.1em; color: #fff; text-transform: uppercase; }
-    .footer-lockup-blk .brand span { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #B6AE99; }
-    .footer-statement { max-width: 320px; font-size: 14px; color: #B6AE99; }
-    .footer-col h4 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #E8DFCC; font-weight: 500; margin-bottom: 14px; }
-    .footer-col ul { list-style: none; }
-    .footer-col li { margin-bottom: 8px; }
-    .footer-col a { color: #B6AE99; text-decoration: none; font-size: 14px; }
-    .footer-col a:hover { color: #fff; }
-    .footer-bottom { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 24px; display: flex; justify-content: space-between; font-size: 12px; color: #8A8373; letter-spacing: 0.04em; }
+    /* Footer — editorial, flows out of the body cream */
+    footer {
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
+      color: var(--ink);
+      padding: clamp(80px, 10vh, 120px) 0 48px;
+      margin-top: 80px;
+      border-top: 1px solid var(--line-soft);
+      position: relative;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: clamp(16px, 1.6vw, 28px);
+      padding-bottom: 72px;
+      margin-bottom: 0;
+      border-bottom: 1px solid rgba(15,26,29,0.08);
+    }
+    .footer-lockup-blk { grid-column: 1 / span 6; }
+    .footer-lockup-blk .lockup {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 32px;
+    }
+    .footer-lockup-blk .lockup img { width: 56px; height: 56px; object-fit: contain; }
+    .footer-lockup-blk .brand { display: flex; flex-direction: column; line-height: 1.1; }
+    .footer-lockup-blk .brand strong {
+      font-size: 18px; font-weight: 700; letter-spacing: 0.1em;
+      color: var(--primary-dark); text-transform: uppercase;
+    }
+    .footer-lockup-blk .brand span {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--mute); margin-top: 8px;
+    }
+    .footer-statement {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: clamp(24px, 2.4vw, 34px); line-height: 1.18;
+      color: var(--ink); max-width: 18ch; letter-spacing: -0.01em;
+    }
+    .footer-col { grid-column: span 2; }
+    .footer-col h4 {
+      font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: 0.14em; color: var(--mute); margin-bottom: 20px;
+    }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .footer-col li { margin-bottom: 0; }
+    .footer-col a {
+      color: var(--ink-2); text-decoration: none; font-size: 14px;
+      transition: color 0.25s ease;
+      display: inline-block; position: relative;
+    }
+    .footer-col a::after {
+      content: ''; position: absolute; left: 0; bottom: -2px; height: 1px; width: 0;
+      background: var(--primary-dark); transition: width 0.35s ease;
+    }
+    .footer-col a:hover { color: var(--primary-dark); }
+    .footer-col a:hover::after { width: 100%; }
+    .footer-bottom {
+      padding-top: 32px;
+      border-top: none;
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--mono); font-size: 11px; color: var(--mute);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      flex-wrap: wrap; gap: 16px;
+    }
 
     @media (max-width: 720px) {
       .nav-links a:not(.btn-primary) { display: none; }
       .legal-hero { padding: 48px 0 32px; }
       .legal-body { padding: 40px 0 60px; }
-      .footer-grid { grid-template-columns: 1fr; gap: 32px; }
-      .footer-bottom { flex-direction: column; gap: 8px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 32px; padding-bottom: 40px; }
+      .footer-lockup-blk { grid-column: 1 / -1; }
+      .footer-col { grid-column: 1 / -1; }
+      .footer-lockup-blk .lockup img { width: 44px; height: 44px; }
+      .footer-statement { font-size: clamp(20px, 6vw, 26px); max-width: 22ch; }
+      .footer-bottom { flex-direction: column; align-items: flex-start; gap: 10px; font-size: 10px; padding-top: 24px; }
       .proc-table { font-size: 13px; }
       .proc-table th, .proc-table td { padding: 8px; }
     }
@@ -261,7 +313,7 @@
       <li>To send transactional email (password resets, receipts, service notices).</li>
       <li>To improve the Service through aggregate, de-identified metrics.</li>
     </ul>
-    <p>We do <strong>not</strong> sell personal data. We do <strong>not</strong> use your content or your leads' data to train third-party AI models.</p>
+    <p>We do <strong>not</strong> sell personal data. We do <strong>not</strong> ourselves use your content or your leads' data to train AI models. When we send data to our AI sub-processor (Anthropic) to generate an output, the data is processed under Anthropic's API terms — as at the effective date of this policy, those terms state that API inputs are not used to train Anthropic's foundation models. If that policy changes we will update this notice.</p>
 
     <h2 id="legal-basis">4. Legal basis for processing</h2>
     <p>Where GDPR applies, we rely on:</p>
@@ -274,7 +326,7 @@
     <p>Under Malaysia's <strong>Personal Data Protection Act 2010 (PDPA)</strong>, processing is carried out under the Personal Data Notice and Choice Principle as set out in this policy.</p>
 
     <h2 id="ai-processing">5. AI &amp; automated processing</h2>
-    <p>The Service uses <strong>Anthropic's Claude API</strong> to generate lead scores, qualification summaries, outreach content, and pipeline analysis. When you trigger an AI action, we send relevant context (the lead or campaign record, your instruction, and limited conversation history) to Anthropic. Anthropic processes this under their API terms and does not train foundation models on API data.</p>
+    <p>The Service uses <strong>Anthropic's Claude API</strong> to generate lead scores, qualification summaries, outreach content, and pipeline analysis. When you trigger an AI action, we send relevant context (the lead or campaign record, your instruction, and limited conversation history) to Anthropic. Anthropic processes this under their published API terms (see <a href="https://www.anthropic.com/legal" target="_blank" rel="noopener">anthropic.com/legal</a>).</p>
     <p>AI outputs are <strong>suggestions, not decisions</strong>. Every email, sequence, voice script, and status change requires human approval unless you explicitly enable automation for a specific workflow. You can review or override every AI output.</p>
     <div class="callout">
       <strong>Right to human review:</strong> where an AI-generated outcome materially affects you, you may request a human review by writing to us. We do not use AI to make solely-automated decisions that produce legal or similarly significant effects on account holders.

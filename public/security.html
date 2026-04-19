@@ -216,27 +216,80 @@
     .toc a { color: var(--ink-2); text-decoration: none; }
     .toc a:hover { color: var(--primary-dark); }
 
-    footer { background: var(--ink); color: #E8DFCC; padding: 60px 0 32px; margin-top: 80px; }
-    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 44px; }
-    .footer-lockup-blk .lockup { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-    .footer-lockup-blk img { width: 38px; height: 38px; }
-    .footer-lockup-blk .brand strong { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.1em; color: #fff; text-transform: uppercase; }
-    .footer-lockup-blk .brand span { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #B6AE99; }
-    .footer-statement { max-width: 320px; font-size: 14px; color: #B6AE99; }
-    .footer-col h4 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #E8DFCC; font-weight: 500; margin-bottom: 14px; }
-    .footer-col ul { list-style: none; }
-    .footer-col li { margin-bottom: 8px; }
-    .footer-col a { color: #B6AE99; text-decoration: none; font-size: 14px; }
-    .footer-col a:hover { color: #fff; }
-    .footer-bottom { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 24px; display: flex; justify-content: space-between; font-size: 12px; color: #8A8373; letter-spacing: 0.04em; }
+    /* Footer — editorial, flows out of the body cream */
+    footer {
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
+      color: var(--ink);
+      padding: clamp(80px, 10vh, 120px) 0 48px;
+      margin-top: 80px;
+      border-top: 1px solid var(--line-soft);
+      position: relative;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: clamp(16px, 1.6vw, 28px);
+      padding-bottom: 72px;
+      margin-bottom: 0;
+      border-bottom: 1px solid rgba(15,26,29,0.08);
+    }
+    .footer-lockup-blk { grid-column: 1 / span 6; }
+    .footer-lockup-blk .lockup {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 32px;
+    }
+    .footer-lockup-blk .lockup img { width: 56px; height: 56px; object-fit: contain; }
+    .footer-lockup-blk .brand { display: flex; flex-direction: column; line-height: 1.1; }
+    .footer-lockup-blk .brand strong {
+      font-size: 18px; font-weight: 700; letter-spacing: 0.1em;
+      color: var(--primary-dark); text-transform: uppercase;
+    }
+    .footer-lockup-blk .brand span {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--mute); margin-top: 8px;
+    }
+    .footer-statement {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: clamp(24px, 2.4vw, 34px); line-height: 1.18;
+      color: var(--ink); max-width: 18ch; letter-spacing: -0.01em;
+    }
+    .footer-col { grid-column: span 2; }
+    .footer-col h4 {
+      font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: 0.14em; color: var(--mute); margin-bottom: 20px;
+    }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .footer-col li { margin-bottom: 0; }
+    .footer-col a {
+      color: var(--ink-2); text-decoration: none; font-size: 14px;
+      transition: color 0.25s ease;
+      display: inline-block; position: relative;
+    }
+    .footer-col a::after {
+      content: ''; position: absolute; left: 0; bottom: -2px; height: 1px; width: 0;
+      background: var(--primary-dark); transition: width 0.35s ease;
+    }
+    .footer-col a:hover { color: var(--primary-dark); }
+    .footer-col a:hover::after { width: 100%; }
+    .footer-bottom {
+      padding-top: 32px;
+      border-top: none;
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--mono); font-size: 11px; color: var(--mute);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      flex-wrap: wrap; gap: 16px;
+    }
 
     @media (max-width: 720px) {
       .nav-links a:not(.btn-primary) { display: none; }
       .legal-hero { padding: 48px 0 32px; }
       .legal-body { padding: 48px 0 60px; }
       .toc ol { columns: 1; }
-      .footer-grid { grid-template-columns: 1fr; gap: 32px; }
-      .footer-bottom { flex-direction: column; gap: 8px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 32px; padding-bottom: 40px; }
+      .footer-lockup-blk { grid-column: 1 / -1; }
+      .footer-col { grid-column: 1 / -1; }
+      .footer-lockup-blk .lockup img { width: 44px; height: 44px; }
+      .footer-statement { font-size: clamp(20px, 6vw, 26px); max-width: 22ch; }
+      .footer-bottom { flex-direction: column; align-items: flex-start; gap: 10px; font-size: 10px; padding-top: 24px; }
       .spec { font-size: 13px; }
       .spec th, .spec td { padding: 8px 10px; }
       .spec td:first-child { width: auto; }
@@ -320,14 +373,14 @@
     <h2 id="status">1. Service status</h2>
     <div class="status-row">
       <span class="status-dot"></span>
-      <span><strong>All systems operational.</strong> Target monthly uptime 99.5% on paid plans. Material incidents are posted on this page and emailed to account owners within 24 hours.</span>
+      <span><strong>Target monthly uptime: 99.5% on paid plans.</strong> This is an operational target, not a contractual SLA. Material incidents affecting customer data are emailed to account owners within 24 hours. A dedicated status page is on our roadmap.</span>
     </div>
 
     <h2 id="data-protection">2. Data protection</h2>
     <table class="spec">
       <tbody>
         <tr><td>Encryption in transit</td><td>TLS 1.2+ on all HTTPS endpoints; HSTS preload-eligible configuration</td></tr>
-        <tr><td>Encryption at rest</td><td>Managed encryption on Railway-provided storage and on sub-processor databases (Stripe, Anthropic, Retell, Resend)</td></tr>
+        <tr><td>Encryption at rest</td><td>Provided by the hosting platform (Railway) and by each sub-processor (Stripe, Anthropic, Retell, Resend) under their respective security programmes. We do not operate our own storage layer.</td></tr>
         <tr><td>Password hashing</td><td><code>bcrypt</code> with cost factor 10; legacy SHA-256 hashes auto-upgraded on next login</td></tr>
         <tr><td>Secrets at rest</td><td>Credentials (SMTP, Stripe, voice provider keys) stored encrypted in the <code>settings</code> table, decrypted only inside the server process</td></tr>
         <tr><td>PII minimisation</td><td>Voice call transcripts are truncated to a 500-character preview server-side; full audio remains with the voice provider under their retention policy</td></tr>
@@ -350,7 +403,7 @@
       <li>Input validation on every API route; output encoding in the UI.</li>
       <li>OWASP Top 10 threat model applied during design; IDOR tests on every owner-scoped resource.</li>
       <li>Static files served with <code>maxAge: 0</code> and ETag so security-relevant changes take effect on next request.</li>
-      <li>Dependencies monitored for CVEs; critical advisories patched within <strong>7 days</strong>, high within <strong>30 days</strong>.</li>
+      <li>Dependencies are monitored for CVEs. <strong>Target patching windows:</strong> critical advisories within 7 days of a fix being available, high severity within 30 days. Targets, not contractual SLAs.</li>
     </ul>
 
     <h2 id="network">5. Network &amp; headers</h2>
@@ -360,9 +413,7 @@
         <tr><td>CSP</td><td>Restrictive Content Security Policy via Helmet — script, style, image, and connect sources are explicitly allow-listed</td></tr>
         <tr><td>CORS</td><td>Origin allow-list: <code>sa.eiaawsolutions.com</code>, the Railway production domain, and local development; <code>credentials: true</code></td></tr>
         <tr><td>CSRF</td><td>Bearer-token authentication on state-changing endpoints, plus Origin-header check for cookie-bearing calls</td></tr>
-        <tr><td>Clickjacking</td><td><code>X-Frame-Options: DENY</code> via Helmet frameguard</td></tr>
-        <tr><td>MIME sniffing</td><td><code>X-Content-Type-Options: nosniff</code></td></tr>
-        <tr><td>Referrer</td><td><code>Referrer-Policy: strict-origin-when-cross-origin</code></td></tr>
+        <tr><td>Clickjacking, MIME sniffing, Referrer-Policy</td><td>Applied via Helmet's default hardened header set (including <code>X-Frame-Options</code>, <code>X-Content-Type-Options: nosniff</code>, and a restrictive <code>Referrer-Policy</code>). We do not override the defaults.</td></tr>
       </tbody>
     </table>
 
@@ -397,15 +448,15 @@
       </tbody>
     </table>
     <div class="callout">
-      <strong>No training on your data.</strong> Anthropic does not use API inputs to train foundation models. We do not sell, publish, or share Customer Data with any third party beyond the sub-processors needed to deliver the Service.
+      <strong>No training on your data by us.</strong> We do not fine-tune models on Customer Data and we do not sell, publish, or share Customer Data beyond the sub-processors required to deliver the Service. Data sent to Anthropic is processed under their published API terms — see <a href="/privacy.html#ai-processing">Privacy §5</a>.
     </div>
 
     <h2 id="email-security">8. Email security</h2>
     <ul>
-      <li>Primary delivery via <strong>Resend</strong>; DKIM, SPF, and DMARC are configured on sending domains.</li>
-      <li>Bounce and complaint feedback from Resend is ingested at <code>/api/tracking/webhook</code> and used to auto-suppress bad addresses.</li>
-      <li>Optional SMTP fallback uses TLS-only connections.</li>
-      <li>Every outreach template requires a working unsubscribe link (see <a href="/terms.html#anti-spam">Terms §6</a>).</li>
+      <li>Primary delivery via <strong>Resend</strong>; SMTP fallback uses TLS connections.</li>
+      <li>Bounce and complaint feedback from Resend is ingested at <code>/api/tracking/webhook</code> and used to update lead engagement state.</li>
+      <li><strong>Customer commitment:</strong> customers using their own sending domain are responsible for configuring SPF, DKIM, and DMARC records so that outbound mail is authenticated. We publish a setup guide and will not enable a custom domain until the records validate.</li>
+      <li>Every outreach template must include a working unsubscribe link (see <a href="/terms.html#anti-spam">Terms §6</a>).</li>
     </ul>
 
     <h2 id="voice-security">9. Voice security</h2>
@@ -422,38 +473,39 @@
       <li><strong>Data store:</strong> managed SQLite / Postgres on Railway with encryption at rest.</li>
       <li><strong>Build isolation:</strong> each deploy is an immutable container image; only the running container has access to production secrets, which are injected at runtime.</li>
       <li><strong>Source control:</strong> GitHub with protected <code>main</code> branch; deploys require manual trigger (<code>railway up</code>).</li>
-      <li><strong>Logs:</strong> structured application logs retained for 14 days; redaction of sensitive fields (passwords, tokens, payment data) at the logging boundary.</li>
+      <li><strong>Logs:</strong> structured application logs. Retention and redaction follow our hosting provider's defaults; we do not write passwords, session tokens, payment card data, or AI message bodies to application logs.</li>
     </ul>
 
     <h2 id="backup">11. Backup &amp; disaster recovery</h2>
     <ul>
-      <li><strong>Database backups:</strong> managed daily snapshots on Railway.</li>
-      <li><strong>Retention:</strong> backups on a 30-day rolling window.</li>
-      <li><strong>Recovery Time Objective (RTO):</strong> 4 hours for full-region outage.</li>
-      <li><strong>Recovery Point Objective (RPO):</strong> 24 hours.</li>
-      <li><strong>Restore tests:</strong> quarterly.</li>
+      <li><strong>Database backups:</strong> we rely on the backup programme of our hosting provider (Railway). Retention, cadence, and restore procedures follow Railway's operational controls for the plan tier we are on.</li>
+      <li><strong>Our target Recovery Time Objective (RTO):</strong> 4 hours for a full-region outage. This is a target, not a contractual guarantee.</li>
+      <li><strong>Our target Recovery Point Objective (RPO):</strong> 24 hours.</li>
+      <li><strong>Restore-test commitment:</strong> we commit to exercising restore procedures against a staging database at least once per year, and to publishing a summary of the test outcome.</li>
     </ul>
 
     <h2 id="compliance">12. Compliance alignment</h2>
-    <p>We design to the following frameworks even where formal certification is not (yet) in place:</p>
+    <p>We design the Service to align with the frameworks below. <strong>Unless explicitly noted otherwise, these are design-alignment statements, not third-party certifications.</strong></p>
     <ul>
-      <li><strong>Malaysia PDPA 2010</strong> — data-handling principles in the Privacy Policy; data subject rights; notice &amp; choice.</li>
-      <li><strong>EU GDPR</strong> — lawful basis, data subject rights, sub-processor transparency, SCCs for cross-border transfers.</li>
-      <li><strong>UK GDPR &amp; PECR</strong> — equivalent protections for UK residents; cookie consent not required because we do not use tracking cookies on public pages.</li>
-      <li><strong>CAN-SPAM (US), CASL (Canada), Spam Act 2003 (Australia)</strong> — enforced via product behaviour and Terms §6.</li>
-      <li><strong>TCPA (US)</strong> — voice calling obligations delegated to the Customer as the sender; Service assists with compliance but does not replace due diligence.</li>
-      <li><strong>PCI-DSS</strong> — card data is never touched by our servers; Stripe Elements tokenises at source, putting us in SAQ-A scope.</li>
-      <li><strong>OWASP ASVS L2</strong> — guiding application-security baseline.</li>
-      <li><strong>SOC 2 Type I readiness</strong> — roadmap: 2026 Q4.</li>
-      <li><strong>EU AI Act</strong> — classified as a limited-risk AI system (generating content on behalf of the user); disclosure, human oversight, and logging obligations met by product design.</li>
+      <li><strong>Malaysia PDPA 2010</strong> — Notice &amp; Choice, data subject rights, and sub-processor transparency reflected in our Privacy Policy.</li>
+      <li><strong>EU GDPR</strong> — design-aligned: lawful basis, data subject rights, processor transparency, and reliance on sub-processors' Standard Contractual Clauses for cross-border transfers.</li>
+      <li><strong>UK GDPR &amp; PECR</strong> — equivalent treatment for UK residents; we do not set tracking cookies on public pages, so a cookie banner is not required.</li>
+      <li><strong>CAN-SPAM (US), CASL (Canada), Spam Act 2003 (Australia)</strong> — obligations passed through to the customer as the sender, and reinforced by <a href="/terms.html#anti-spam">Terms §6</a>.</li>
+      <li><strong>TCPA (US) &amp; equivalent voice-calling laws</strong> — the customer is the caller of record; the Service assists with compliance but does not replace the customer's due diligence.</li>
+      <li><strong>PCI-DSS</strong> — card data is never handled by our servers. Stripe tokenises at source; our environment is in SAQ-A scope.</li>
+      <li><strong>OWASP ASVS L2 &amp; OWASP Top 10</strong> — guiding baselines for our application security work.</li>
+      <li><strong>EU AI Act</strong> — we classify the Service as a limited-risk generative AI system. We meet the transparency and human-oversight expectations of Art. 50 by (a) disclosing AI origin to recipients where required, (b) requiring human approval for outbound actions by default, and (c) logging AI actions.</li>
+      <li><strong>SOC 2 Type I — roadmap target:</strong> we intend to pursue SOC 2 Type I readiness. A completion date will be published once scoping is finalised. This is an objective, not an achieved certification.</li>
     </ul>
 
     <h2 id="incident">13. Incident response</h2>
+    <p>We follow a published response policy with the commitments below. These are the response targets we operate against; they are not contractual SLAs unless stated in a signed order form.</p>
     <ul>
-      <li><strong>Detection:</strong> platform alerts on elevated error rates, auth anomalies, and sub-processor webhooks.</li>
-      <li><strong>Triage:</strong> incident commander within 30 minutes of confirmed issue.</li>
-      <li><strong>Notification:</strong> account owners notified within 24 hours where their data is materially affected; regulators notified within 72 hours where required (GDPR Art. 33, PDPA equivalents).</li>
-      <li><strong>Post-mortem:</strong> root-cause analysis published to affected customers within 14 days of resolution.</li>
+      <li><strong>Detection:</strong> we monitor platform alerts for elevated error rates, authentication anomalies, and sub-processor webhook failures.</li>
+      <li><strong>Triage target:</strong> an incident owner takes charge within 30 minutes of a confirmed issue during business hours (Kuala Lumpur, UTC+8), within 2 hours outside business hours.</li>
+      <li><strong>Customer notification commitment:</strong> account owners notified within 24 hours where their data is materially affected.</li>
+      <li><strong>Regulator notification:</strong> within 72 hours where required under GDPR Art. 33 or equivalent law.</li>
+      <li><strong>Post-mortem commitment:</strong> a written root-cause analysis is shared with affected customers within 14 days of resolution.</li>
     </ul>
 
     <h2 id="vdp">14. Responsible disclosure</h2>
