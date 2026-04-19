@@ -213,6 +213,20 @@ export function initializeDatabase(db) {
   // Add last_activity column to sessions
   try { db.exec("ALTER TABLE sessions ADD COLUMN last_activity DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (e) { /* exists */ }
 
+  // Session metadata for displacement + new-device notifications
+  try { db.exec("ALTER TABLE sessions ADD COLUMN ip TEXT"); } catch (e) { /* exists */ }
+  try { db.exec("ALTER TABLE sessions ADD COLUMN user_agent TEXT"); } catch (e) { /* exists */ }
+  try { db.exec("ALTER TABLE sessions ADD COLUMN device_label TEXT"); } catch (e) { /* exists */ }
+  try { db.exec("ALTER TABLE sessions ADD COLUMN displaced_reason TEXT"); } catch (e) { /* exists */ }
+  try { db.exec("ALTER TABLE sessions ADD COLUMN displaced_at DATETIME"); } catch (e) { /* exists */ }
+
+  // MFA columns on users
+  try { db.exec("ALTER TABLE users ADD COLUMN mfa_secret TEXT"); } catch (e) { /* exists */ }
+  try { db.exec("ALTER TABLE users ADD COLUMN mfa_enabled INTEGER DEFAULT 0"); } catch (e) { /* exists */ }
+  try { db.exec("ALTER TABLE users ADD COLUMN mfa_recovery_codes TEXT"); } catch (e) { /* exists */ }  // JSON array of bcrypt-hashed codes
+  try { db.exec("ALTER TABLE users ADD COLUMN mfa_enrolled_at DATETIME"); } catch (e) { /* exists */ }
+  try { db.exec("ALTER TABLE users ADD COLUMN known_devices TEXT DEFAULT '[]'"); } catch (e) { /* exists */ }  // JSON array of device_label fingerprints previously notified
+
   // Add budget_limit column to campaigns if missing
   try { db.exec('ALTER TABLE campaigns ADD COLUMN budget_limit REAL DEFAULT 0'); } catch (e) { /* already exists */ }
 

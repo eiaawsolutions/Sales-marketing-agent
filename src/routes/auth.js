@@ -1,8 +1,65 @@
 import { Router } from 'express';
 import db from '../db/index.js';
 import { hashPassword, verifyPassword, generateToken, requireAuth, getPlanLimits } from '../middleware/auth.js';
+import {
+  parseUserAgent,
+  extractClientIp,
+  deviceFingerprint,
+  displaceOtherSessions,
+  isKnownDevice,
+  rememberDevice,
+  notifyNewDeviceLogin,
+  generateMfaSecret,
+  otpauthToQrDataUrl,
+  verifyTotp,
+  generateRecoveryCodes,
+  hashRecoveryCodes,
+  redeemRecoveryCode,
+  createMfaChallenge,
+  consumeMfaChallenge,
+  adminMfaRequired,
+} from '../services/auth-security.js';
 
 const router = Router();
+
+// Shared helper: create a session + fire notifications. Returns response payload.
+function issueSessionPayload(user, req) {
+  const token = generateToken();
+  const ip = extractClientIp(req);
+  const ua = req.headers['user-agent'] || '';
+  const deviceLabel = parseUserAgent(ua);
+
+  db.prepare(`
+    INSERT INTO sessions (token, user_id, expires_at, ip, user_agent, device_label)
+    VALUES (?, ?, datetime('now', '+24 hours'), ?, ?, ?)
+  `).run(token, user.id, ip, ua, deviceLabel);
+
+  displaceOtherSessions(user.id, token, 'Your account was signed in from another device');
+  db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
+
+  const fp = deviceFingerprint(ip, ua);
+  if (!isKnownDevice(user.id, fp)) {
+    notifyNewDeviceLogin(user, { deviceLabel, ip });
+    rememberDevice(user.id, fp);
+  }
+
+  const plan = user.plan || 'starter';
+  return {
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      plan,
+      displayName: user.display_name,
+      budgetLimit: user.budget_limit,
+      monthlySystemCost: user.monthly_system_cost,
+      planLimits: getPlanLimits(plan),
+      mfaEnabled: !!user.mfa_enabled,
+    },
+  };
+}
 
 // POST /api/auth/login
 router.post('/login', (req, res) => {
@@ -22,7 +79,6 @@ router.post('/login', (req, res) => {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
-  // Auto-upgrade legacy SHA256 hash to bcrypt
   if (passResult === 'upgrade') {
     const newHash = hashPassword(password);
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, user.id);
@@ -32,31 +88,192 @@ router.post('/login', (req, res) => {
     return res.status(403).json({ error: 'Account suspended. Contact your administrator.' });
   }
 
-  // Create session (24h expiry)
-  const token = generateToken();
-  db.prepare(
-    "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', '+24 hours'))"
-  ).run(token, user.id);
+  // Path A: MFA already enabled → issue challenge, require TOTP
+  if (user.mfa_enabled) {
+    const challengeToken = createMfaChallenge(user.id);
+    return res.json({
+      mfa_required: true,
+      challenge_token: challengeToken,
+      methods: ['totp', 'recovery_code'],
+    });
+  }
 
-  // Clean expired sessions
-  db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
+  // Path B: No MFA yet → issue session. If superadmin, flag mustEnrolMfa so
+  //   UI forces the enrolment wizard before they can use the app.
+  const payload = issueSessionPayload(user, req);
+  payload.mustEnrolMfa = adminMfaRequired(user) && !user.mfa_enabled;
+  res.json(payload);
+});
 
-  const plan = user.plan || 'starter';
+// POST /api/auth/mfa/verify-login — second step when mfa_required came back
+router.post('/mfa/verify-login', (req, res) => {
+  const { challenge_token, code, recovery_code } = req.body;
+  if (!challenge_token || (!code && !recovery_code)) {
+    return res.status(400).json({ error: 'Missing code' });
+  }
+
+  const challenge = consumeMfaChallenge(challenge_token);
+  if (!challenge) {
+    return res.status(401).json({ error: 'Challenge expired. Please log in again.' });
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(challenge.userId);
+  if (!user || user.status === 'suspended') {
+    return res.status(401).json({ error: 'Account unavailable' });
+  }
+
+  if (recovery_code) {
+    const r = redeemRecoveryCode(user.id, recovery_code);
+    if (!r.ok) return res.status(401).json({ error: 'Invalid recovery code' });
+    const payload = issueSessionPayload(user, req);
+    payload.recoveryCodesRemaining = r.remaining;
+    return res.json(payload);
+  }
+
+  if (!verifyTotp(user.mfa_secret, code)) {
+    return res.status(401).json({ error: 'Invalid authentication code' });
+  }
+  return res.json(issueSessionPayload(user, req));
+});
+
+// POST /api/auth/mfa/setup — begin enrolment; returns QR + secret
+router.post('/mfa/setup', requireAuth, async (req, res) => {
+  const user = db.prepare('SELECT id, username, email, mfa_enabled FROM users WHERE id = ?').get(req.user.id);
+  if (user.mfa_enabled) {
+    return res.status(400).json({ error: 'MFA already enabled. Disable it first to re-enrol.' });
+  }
+
+  const secret = generateMfaSecret(user.username);
+  // Store secret provisionally — not yet enabled until they verify a code
+  db.prepare('UPDATE users SET mfa_secret = ?, mfa_enabled = 0 WHERE id = ?')
+    .run(secret.base32, user.id);
+
+  const qrDataUrl = await otpauthToQrDataUrl(secret.otpauth_url);
+  res.json({
+    qr: qrDataUrl,
+    secret: secret.base32, // show once so user can type it manually if camera fails
+    otpauth_url: secret.otpauth_url,
+  });
+});
+
+// POST /api/auth/mfa/verify-setup — confirm enrolment with a live code; returns recovery codes
+router.post('/mfa/verify-setup', requireAuth, (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Code required' });
+
+  const user = db.prepare('SELECT mfa_secret, mfa_enabled FROM users WHERE id = ?').get(req.user.id);
+  if (!user.mfa_secret) return res.status(400).json({ error: 'No pending enrolment. Start setup first.' });
+  if (user.mfa_enabled) return res.status(400).json({ error: 'MFA already enabled.' });
+
+  if (!verifyTotp(user.mfa_secret, code)) {
+    return res.status(401).json({ error: 'Code did not match. Check your authenticator app clock.' });
+  }
+
+  const codes = generateRecoveryCodes(10);
+  const hashed = hashRecoveryCodes(codes);
+  db.prepare(`
+    UPDATE users SET mfa_enabled = 1, mfa_recovery_codes = ?, mfa_enrolled_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(JSON.stringify(hashed), req.user.id);
 
   res.json({
-    token,
-    user: {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      plan,
-      displayName: user.display_name,
-      budgetLimit: user.budget_limit,
-      monthlySystemCost: user.monthly_system_cost,
-      planLimits: getPlanLimits(plan),
-    },
+    success: true,
+    recovery_codes: codes, // one-time display — user MUST save these
   });
+});
+
+// POST /api/auth/mfa/regenerate-recovery-codes
+router.post('/mfa/regenerate-recovery-codes', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT mfa_enabled FROM users WHERE id = ?').get(req.user.id);
+  if (!user.mfa_enabled) return res.status(400).json({ error: 'MFA not enabled' });
+
+  const codes = generateRecoveryCodes(10);
+  const hashed = hashRecoveryCodes(codes);
+  db.prepare('UPDATE users SET mfa_recovery_codes = ? WHERE id = ?')
+    .run(JSON.stringify(hashed), req.user.id);
+
+  res.json({ recovery_codes: codes });
+});
+
+// POST /api/auth/mfa/disable — requires current TOTP code to disable
+router.post('/mfa/disable', requireAuth, (req, res) => {
+  if (req.user.role === 'superadmin') {
+    return res.status(403).json({ error: 'Superadmins cannot disable MFA. Contact another superadmin.' });
+  }
+  const { code } = req.body;
+  const user = db.prepare('SELECT mfa_secret, mfa_enabled FROM users WHERE id = ?').get(req.user.id);
+  if (!user.mfa_enabled) return res.status(400).json({ error: 'MFA not enabled' });
+  if (!verifyTotp(user.mfa_secret, code || '')) {
+    return res.status(401).json({ error: 'Invalid code' });
+  }
+  db.prepare(`
+    UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_recovery_codes = NULL, mfa_enrolled_at = NULL
+    WHERE id = ?
+  `).run(req.user.id);
+  res.json({ success: true });
+});
+
+// POST /api/auth/mfa/admin-reset/:userId — superadmin resets another user's MFA
+router.post('/mfa/admin-reset/:userId', requireAuth, (req, res) => {
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
+  const targetId = parseInt(req.params.userId, 10);
+  if (targetId === req.user.id) {
+    return res.status(400).json({ error: 'Use the normal disable flow for your own account (requires TOTP).' });
+  }
+  db.prepare(`
+    UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_recovery_codes = NULL, mfa_enrolled_at = NULL
+    WHERE id = ?
+  `).run(targetId);
+  res.json({ success: true });
+});
+
+// GET /api/auth/sessions — list this user's active sessions
+router.get('/sessions', requireAuth, (req, res) => {
+  const currentToken = req.headers['authorization']?.replace('Bearer ', '');
+  const rows = db.prepare(`
+    SELECT token, ip, user_agent, device_label, created_at, last_activity, expires_at
+    FROM sessions
+    WHERE user_id = ? AND (displaced_at IS NULL) AND expires_at > datetime('now')
+    ORDER BY last_activity DESC
+  `).all(req.user.id);
+  res.json(rows.map(r => ({
+    ...r,
+    current: r.token === currentToken,
+    // Expose only first/last 4 chars of the token so the UI can identify rows without leaking it
+    token: r.token.slice(0, 4) + '...' + r.token.slice(-4),
+    full_token: r.token === currentToken ? null : r.token, // still don't expose other tokens
+  })));
+});
+
+// POST /api/auth/sessions/revoke — revoke a specific session (not current)
+router.post('/sessions/revoke', requireAuth, (req, res) => {
+  const { token_prefix } = req.body;
+  if (!token_prefix) return res.status(400).json({ error: 'token_prefix required' });
+  const currentToken = req.headers['authorization']?.replace('Bearer ', '');
+
+  // Find all non-current sessions for this user matching the prefix
+  const candidates = db.prepare(`
+    SELECT token FROM sessions
+    WHERE user_id = ? AND token != ? AND displaced_at IS NULL
+  `).all(req.user.id, currentToken);
+
+  const match = candidates.find(c =>
+    c.token.startsWith(token_prefix.slice(0, 4)) && c.token.endsWith(token_prefix.slice(-4))
+  );
+  if (!match) return res.status(404).json({ error: 'Session not found' });
+
+  db.prepare('DELETE FROM sessions WHERE token = ?').run(match.token);
+  res.json({ success: true });
+});
+
+// POST /api/auth/sessions/revoke-all — sign out everywhere except current
+router.post('/sessions/revoke-all', requireAuth, (req, res) => {
+  const currentToken = req.headers['authorization']?.replace('Bearer ', '');
+  const result = db.prepare(`
+    UPDATE sessions SET displaced_reason = ?, displaced_at = CURRENT_TIMESTAMP
+    WHERE user_id = ? AND token != ? AND displaced_at IS NULL
+  `).run('You signed out remotely', req.user.id, currentToken);
+  res.json({ success: true, revoked: result.changes });
 });
 
 // POST /api/auth/logout

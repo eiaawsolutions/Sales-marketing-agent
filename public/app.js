@@ -14,10 +14,15 @@ async function apiRequest(url, options = {}) {
   if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
   const r = await fetch(`/api${url}`, { ...options, headers });
   if (r.status === 401) {
+    let errPayload = null;
+    try { errPayload = await r.clone().json(); } catch {}
     authToken = null; currentUser = null;
     sessionStorage.removeItem('auth_token');
+    if (errPayload?.code === 'session_displaced') {
+      sessionStorage.setItem('displaced_notice', errPayload.error || 'You were signed out because your account was used on another device.');
+    }
     render();
-    throw new Error('Session expired. Please log in again.');
+    throw new Error(errPayload?.error || 'Session expired. Please log in again.');
   }
   const data = await r.json();
   if (data.error) throw new Error(data.error);
@@ -44,13 +49,21 @@ function navigate(page) {
 
 // ========== Login ==========
 function renderLoginPage() {
+  const displacedNotice = sessionStorage.getItem('displaced_notice');
+  if (displacedNotice) sessionStorage.removeItem('displaced_notice');
   return `
     <div style="max-width:400px;margin:100px auto;text-align:center">
       <h1 style="background:linear-gradient(135deg,#2ec4b6,#0e8b7d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;font-size:28px">EIAAW SalesAgent</h1>
       <p class="text-muted" style="font-size:12px;margin-bottom:16px">AI-Human Sales Partnerships</p>
       <p class="text-muted mb-4">Sign in to your account</p>
+      ${displacedNotice ? `
+        <div style="background:rgba(180,65,43,0.08);border:1px solid rgba(180,65,43,0.25);border-radius:12px;padding:14px 16px;margin-bottom:18px;text-align:left;font-size:13px;color:var(--danger);line-height:1.5">
+          <strong style="display:block;margin-bottom:4px">Signed out</strong>
+          ${esc(displacedNotice)}
+        </div>
+      ` : ''}
       <p style="margin-bottom:16px"><a href="/landing.html" style="display:inline-flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-size:13px;padding:7px 16px;border-radius:999px;background:linear-gradient(135deg,#2ec4b6,#0e8b7d);box-shadow:0 2px 6px rgba(46,196,182,0.25)">&#8592; Home</a></p>
-      <div class="card" id="login-card">
+      <div class="card login-card" id="login-card">
         <div class="form-group"><label>Username</label><input id="login-user" placeholder="Username" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()"></div>
         <div class="form-group"><label>Password</label><input id="login-pass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"></div>
         <div id="login-error" style="color:var(--danger);font-size:13px;margin-bottom:12px;display:none"></div>
@@ -205,14 +218,93 @@ async function doLogin() {
       return;
     }
 
-    // Success
+    // MFA required — show code-entry step
+    if (result.mfa_required) {
+      renderMfaChallenge(result.challenge_token);
+      return;
+    }
+
     if (errEl) { errEl.style.display = 'block'; errEl.style.color = 'var(--success)'; errEl.textContent = `Login successful! Welcome ${result.user?.displayName || result.user?.username}. Redirecting...`; }
     authToken = result.token;
     currentUser = result.user;
     sessionStorage.setItem('auth_token', authToken);
-    setTimeout(() => navigate('dashboard'), 800);
+    if (result.mustEnrolMfa) {
+      sessionStorage.setItem('must_enrol_mfa', '1');
+      setTimeout(() => navigate('settings'), 500);
+    } else {
+      setTimeout(() => navigate('dashboard'), 800);
+    }
   } catch (e) {
     if (errEl) { errEl.style.display = 'block'; errEl.style.color = 'var(--danger)'; errEl.textContent = `Connection error: ${e.message}`; }
+  }
+}
+
+// MFA step during login — replaces the login form with a code-entry form
+function renderMfaChallenge(challengeToken) {
+  window.__mfaChallengeToken = challengeToken;
+  const loginCard = document.querySelector('.login-card') || document.body;
+  loginCard.innerHTML = `
+    <div style="max-width:420px;margin:0 auto;padding:24px">
+      <h2 style="font-size:20px;margin-bottom:6px">Two-factor authentication</h2>
+      <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Open your authenticator app and enter the 6-digit code for EIAAW Solutions.</p>
+      <div class="form-group">
+        <label>Authentication code</label>
+        <input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" style="letter-spacing:6px;font-family:monospace;font-size:18px;text-align:center" onkeydown="if(event.key==='Enter')verifyMfaLogin()">
+      </div>
+      <div id="mfa-error" style="display:none;color:var(--danger);font-size:13px;margin-bottom:12px"></div>
+      <button class="btn btn-primary" onclick="verifyMfaLogin()" style="width:100%;justify-content:center;padding:12px;font-size:15px">Verify &amp; sign in</button>
+      <div style="text-align:center;margin-top:14px">
+        <a href="#" onclick="toggleRecoveryCode();return false" style="color:var(--primary);font-size:13px;text-decoration:none" id="rc-toggle">Use a recovery code instead</a>
+      </div>
+      <div id="recovery-code-box" style="display:none;margin-top:16px">
+        <div class="form-group">
+          <label>Recovery code</label>
+          <input id="mfa-recovery" placeholder="XXXX-XXXX" style="font-family:monospace;letter-spacing:2px;text-transform:uppercase" onkeydown="if(event.key==='Enter')verifyMfaLogin(true)">
+        </div>
+        <button class="btn btn-outline" onclick="verifyMfaLogin(true)" style="width:100%;justify-content:center">Use recovery code</button>
+      </div>
+    </div>
+  `;
+  setTimeout(() => document.getElementById('mfa-code')?.focus(), 50);
+}
+
+function toggleRecoveryCode() {
+  const box = document.getElementById('recovery-code-box');
+  const toggle = document.getElementById('rc-toggle');
+  if (!box) return;
+  const show = box.style.display === 'none';
+  box.style.display = show ? 'block' : 'none';
+  if (toggle) toggle.textContent = show ? 'Use authenticator code instead' : 'Use a recovery code instead';
+}
+
+async function verifyMfaLogin(useRecovery) {
+  const errEl = document.getElementById('mfa-error');
+  const code = document.getElementById('mfa-code')?.value?.trim();
+  const rc = document.getElementById('mfa-recovery')?.value?.trim();
+  const body = { challenge_token: window.__mfaChallengeToken };
+  if (useRecovery) {
+    if (!rc) { errEl.style.display = 'block'; errEl.textContent = 'Enter a recovery code.'; return; }
+    body.recovery_code = rc;
+  } else {
+    if (!code || !/^\d{6}$/.test(code)) { errEl.style.display = 'block'; errEl.textContent = 'Enter the 6-digit code.'; return; }
+    body.code = code;
+  }
+  try {
+    const r = await fetch('/api/auth/mfa/verify-login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const result = await r.json();
+    if (result.error) { errEl.style.display = 'block'; errEl.textContent = result.error; return; }
+
+    authToken = result.token;
+    currentUser = result.user;
+    sessionStorage.setItem('auth_token', authToken);
+    if (result.recoveryCodesRemaining !== undefined && result.recoveryCodesRemaining < 3) {
+      showNotification(`Heads up: only ${result.recoveryCodesRemaining} recovery codes left. Regenerate in Settings.`, 'warning');
+    }
+    navigate('dashboard');
+  } catch (e) {
+    if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Connection error: ' + e.message; }
   }
 }
 
@@ -4288,8 +4380,21 @@ async function loadSystemOverview() {
 async function loadSettings() {
   try {
     const settings = await api.get('/settings');
+    const mustEnrolMfa = sessionStorage.getItem('must_enrol_mfa') === '1' && !currentUser?.mfaEnabled;
     document.getElementById('page').innerHTML = `
       <div class="toolbar"><h2>Settings</h2></div>
+
+      ${mustEnrolMfa ? `
+        <div class="card" style="border:2px solid var(--danger);background:rgba(180,65,43,0.04)">
+          <h3 style="color:var(--danger);text-transform:none;letter-spacing:0">&#9888; 2FA required</h3>
+          <p class="text-muted text-sm mb-4">As a superadmin, you must enable two-factor authentication before continuing.</p>
+        </div>
+      ` : ''}
+
+      <div class="card" id="security-card">
+        <h3>Security</h3>
+        <div id="security-body" class="text-sm text-muted" style="padding:8px 0">Loading&hellip;</div>
+      </div>
 
       <div class="card">
         <h3>AI Configuration</h3>
@@ -4447,9 +4552,183 @@ async function loadSettings() {
         <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:12px">Save Settings</button>
       </div>
     `;
+    loadSecuritySection();
   } catch (e) {
     document.getElementById('page').innerHTML = `<div class="empty">Error loading settings: ${e.message}</div>`;
   }
+}
+
+async function loadSecuritySection() {
+  const host = document.getElementById('security-body');
+  if (!host) return;
+  host.innerHTML = '<div class="text-sm text-muted">Loading&hellip;</div>';
+  try {
+    const [me, sessions] = await Promise.all([
+      api.get('/auth/me'),
+      api.get('/auth/sessions'),
+    ]);
+    const mfaEnabled = !!me.mfaEnabled;
+
+    host.innerHTML = `
+      <!-- MFA block -->
+      <div style="padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">
+              Two-factor authentication
+              <span class="badge ${mfaEnabled ? 'badge-active' : 'badge-draft'}" style="margin-left:8px">${mfaEnabled ? 'Enabled' : 'Not set up'}</span>
+            </div>
+            <div class="text-sm text-muted">Use an authenticator app (Google Authenticator, 1Password, Authy) to generate sign-in codes.</div>
+          </div>
+          <div>
+            ${mfaEnabled
+              ? `<button class="btn btn-outline btn-sm" onclick="mfaRegenerateCodes()">Regenerate recovery codes</button>
+                 ${currentUser?.role !== 'superadmin' ? `<button class="btn btn-sm btn-danger" onclick="mfaDisable()" style="margin-left:6px">Disable</button>` : ''}`
+              : `<button class="btn btn-primary btn-sm" onclick="mfaStartSetup()">Enable 2FA</button>`
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Active sessions block -->
+      <div style="padding:12px 0">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
+          <div>
+            <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">Active sessions</div>
+            <div class="text-sm text-muted">One session per account. Signing in elsewhere will sign you out here.</div>
+          </div>
+          ${sessions.length > 1 ? `<button class="btn btn-outline btn-sm" onclick="revokeAllOtherSessions()">Sign out other sessions</button>` : ''}
+        </div>
+        <table style="font-size:13px">
+          <tr><th>Device</th><th>IP</th><th>Last active</th><th>Expires</th><th>Actions</th></tr>
+          ${sessions.map(s => `
+            <tr>
+              <td><strong>${esc(s.device_label || 'Unknown')}</strong>${s.current ? ' <span class="badge badge-active" style="font-size:9px">This device</span>' : ''}</td>
+              <td>${esc(s.ip || '-')}</td>
+              <td>${s.last_activity ? esc(new Date(s.last_activity + 'Z').toLocaleString()) : '-'}</td>
+              <td>${s.expires_at ? esc(new Date(s.expires_at + 'Z').toLocaleString()) : '-'}</td>
+              <td>${s.current ? '<span class="text-muted text-sm">&mdash;</span>' : `<button class="btn btn-sm btn-danger" onclick="revokeSession('${esc(s.token)}')">Revoke</button>`}</td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    host.innerHTML = `<div class="empty text-sm">Error loading security: ${esc(e.message)}</div>`;
+  }
+}
+
+async function mfaStartSetup() {
+  try {
+    const r = await api.post('/auth/mfa/setup', {});
+    showMfaSetupModal(r.qr, r.secret);
+  } catch (e) { showNotification(e.message, 'error'); }
+}
+
+function showMfaSetupModal(qrDataUrl, secret) {
+  modal = {
+    title: 'Enable 2-factor authentication',
+    body: `
+      <p class="text-muted text-sm mb-4">Scan the QR code with your authenticator app (Google Authenticator, 1Password, Authy), then enter the 6-digit code it shows.</p>
+      <div style="text-align:center;margin-bottom:16px">
+        <img src="${qrDataUrl}" alt="QR code" style="width:220px;height:220px;border:1px solid var(--border);border-radius:12px;background:#fff;padding:8px">
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:14px;text-align:center;font-family:monospace;font-size:12px;letter-spacing:1px;word-break:break-all">
+        ${esc(secret)}
+      </div>
+      <p class="text-muted text-sm mb-4" style="text-align:center">Can't scan? Paste this secret manually.</p>
+      <div class="form-group">
+        <label>6-digit code from app</label>
+        <input id="mfa-setup-code" inputmode="numeric" placeholder="123456" style="letter-spacing:6px;font-family:monospace;font-size:18px;text-align:center" onkeydown="if(event.key==='Enter')mfaVerifySetup()">
+      </div>
+      <div id="mfa-setup-err" style="display:none;color:var(--danger);font-size:13px;margin-bottom:8px"></div>
+    `,
+    onSave: mfaVerifySetup,
+    saveLabel: 'Verify & enable',
+  };
+  renderModal();
+  setTimeout(() => document.getElementById('mfa-setup-code')?.focus(), 50);
+}
+
+async function mfaVerifySetup() {
+  const code = document.getElementById('mfa-setup-code')?.value?.trim();
+  const err = document.getElementById('mfa-setup-err');
+  if (!code || !/^\d{6}$/.test(code)) { if (err) { err.style.display='block'; err.textContent='Enter the 6-digit code.'; } return; }
+  try {
+    const r = await api.post('/auth/mfa/verify-setup', { code });
+    modal = null; renderModal();
+    sessionStorage.removeItem('must_enrol_mfa');
+    if (currentUser) currentUser.mfaEnabled = true;
+    showRecoveryCodesModal(r.recovery_codes);
+    loadSecuritySection();
+  } catch (e) {
+    if (err) { err.style.display='block'; err.textContent=e.message; }
+  }
+}
+
+function showRecoveryCodesModal(codes) {
+  const text = codes.join('\n');
+  modal = {
+    title: 'Save your recovery codes',
+    body: `
+      <p class="text-muted text-sm mb-4" style="color:var(--danger)"><strong>These codes are shown once.</strong> Each code can be used one time to sign in if you lose access to your authenticator. Save them somewhere safe.</p>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;font-family:monospace;font-size:14px;line-height:2;letter-spacing:1px;text-align:center;margin-bottom:14px">
+        ${codes.map(c => esc(c)).join('<br>')}
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(${JSON.stringify(text)}).then(()=>showNotification('Copied to clipboard', 'success'))">Copy</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadText(${JSON.stringify(text)}, 'eiaaw-recovery-codes.txt')">Download</button>
+      </div>
+    `,
+    onSave: () => { modal = null; renderModal(); },
+    saveLabel: 'I\u2019ve saved them',
+  };
+  renderModal();
+}
+
+function downloadText(text, filename) {
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function mfaRegenerateCodes() {
+  if (!confirm('Generate new recovery codes? Your old codes will stop working immediately.')) return;
+  try {
+    const r = await api.post('/auth/mfa/regenerate-recovery-codes', {});
+    showRecoveryCodesModal(r.recovery_codes);
+  } catch (e) { showNotification(e.message, 'error'); }
+}
+
+async function mfaDisable() {
+  const code = prompt('Enter your current 6-digit authenticator code to disable 2FA:');
+  if (!code) return;
+  try {
+    await api.post('/auth/mfa/disable', { code });
+    if (currentUser) currentUser.mfaEnabled = false;
+    showNotification('2FA disabled.', 'success');
+    loadSecuritySection();
+  } catch (e) { showNotification(e.message, 'error'); }
+}
+
+async function revokeSession(tokenPrefix) {
+  if (!confirm('Revoke this session? The other device will be signed out.')) return;
+  try {
+    await api.post('/auth/sessions/revoke', { token_prefix: tokenPrefix });
+    showNotification('Session revoked.', 'success');
+    loadSecuritySection();
+  } catch (e) { showNotification(e.message, 'error'); }
+}
+
+async function revokeAllOtherSessions() {
+  if (!confirm('Sign out all other sessions?')) return;
+  try {
+    const r = await api.post('/auth/sessions/revoke-all', {});
+    showNotification(`${r.revoked} session(s) signed out.`, 'success');
+    loadSecuritySection();
+  } catch (e) { showNotification(e.message, 'error'); }
 }
 
 async function saveSettings() {

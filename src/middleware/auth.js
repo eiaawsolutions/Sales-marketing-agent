@@ -45,6 +45,14 @@ export function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired session' });
   }
 
+  // Session displacement — kicked by a newer login elsewhere
+  if (session.displaced_at) {
+    const reason = session.displaced_reason || 'Your account was signed in from another device';
+    // Clean up the displaced session so it can't linger
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    return res.status(401).json({ error: reason, code: 'session_displaced' });
+  }
+
   // Idle timeout — 30 minutes of inactivity
   try {
     if (session.last_activity) {
