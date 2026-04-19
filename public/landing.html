@@ -545,6 +545,180 @@
     .rvl { opacity: 0; transform: translateY(18px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
     .rvl.in { opacity: 1; transform: none; }
 
+    /* Kinetic word-by-word reveal */
+    .kinetic .word {
+      display: inline-block;
+      opacity: 0;
+      filter: blur(10px);
+      transform: translateY(20px);
+      transition: opacity 0.85s var(--ease), filter 0.85s var(--ease), transform 0.85s var(--ease);
+      will-change: opacity, filter, transform;
+    }
+    .kinetic .word.in { opacity: 1; filter: blur(0); transform: none; }
+
+    /* Hero scene — editorial photo */
+    .hero-scene {
+      position: relative;
+      margin-top: clamp(72px, 12vh, 130px);
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: clamp(16px, 1.6vw, 28px);
+      align-items: end;
+    }
+    .hero-scene-figure {
+      grid-column: 2 / span 9;
+      position: relative;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border-radius: 2px;
+      background: var(--bg-warm);
+      box-shadow: 0 40px 80px -30px rgba(15,26,29,0.35), 0 0 0 1px var(--line-soft);
+      will-change: transform;
+    }
+    .hero-scene-figure img {
+      width: 100%; height: 100%; object-fit: cover;
+      filter: saturate(0.88) contrast(1.02);
+      transition: transform 1.8s var(--ease);
+      will-change: transform;
+    }
+    .hero-scene-figure:hover img { transform: scale(1.03); }
+    .hero-scene-figure::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 55%, rgba(15,26,29,0.18) 100%);
+      pointer-events: none;
+    }
+    .hero-scene-caption {
+      grid-column: 11 / span 2;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--mute);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      line-height: 1.8;
+      padding-bottom: 8px;
+      text-align: right;
+    }
+    .hero-scene-caption .fig { color: var(--primary-dark); margin-bottom: 6px; display: block; }
+    @media (max-width: 900px) {
+      .hero-scene-figure { grid-column: 1 / -1; }
+      .hero-scene-caption { grid-column: 1 / -1; text-align: left; padding: 12px 0 0; }
+    }
+
+    /* Grain overlay on hero photo */
+    .hero-scene-figure::before {
+      content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/></svg>");
+      mix-blend-mode: overlay; opacity: 0.5;
+    }
+
+    /* Capability row — add thumbnail */
+    .cap-thumb {
+      grid-column: 1 / span 1;
+      width: 96px; height: 96px;
+      border-radius: 2px;
+      overflow: hidden;
+      background: var(--bg-warm);
+      filter: saturate(0.85) contrast(1.02);
+      transition: transform 0.8s var(--ease), filter 0.8s var(--ease);
+    }
+    .cap-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .cap-row:hover .cap-thumb { transform: scale(1.04); filter: saturate(1) contrast(1.05); }
+    .cap-row { grid-template-columns: 40px 112px 1fr 1fr 200px; }
+    @media (max-width: 900px) {
+      .cap-row { grid-template-columns: 36px 72px 1fr; }
+      .cap-thumb { width: 72px; height: 72px; grid-column: 2; }
+      .cap-row .cap-title, .cap-row .cap-body, .cap-row .cap-meta { grid-column: 3; }
+    }
+
+    /* Atmospheric break */
+    .atmos-break {
+      margin: clamp(60px, 10vh, 120px) 0;
+      overflow: hidden;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      position: relative;
+      height: clamp(260px, 38vh, 440px);
+    }
+    .atmos-break img {
+      width: 100%; height: 100%; object-fit: cover;
+      filter: saturate(0.7) contrast(0.95) brightness(0.96);
+      will-change: transform;
+    }
+    .atmos-break .overlay-text {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: clamp(28px, 4.5vw, 72px);
+      letter-spacing: -0.02em; line-height: 1.1; text-align: center;
+      text-shadow: 0 2px 40px rgba(0,0,0,0.45);
+      padding: 0 24px;
+      max-width: 20ch;
+      margin: 0 auto;
+    }
+    .atmos-break::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(15,26,29,0.35) 0%, rgba(15,26,29,0.55) 100%);
+      pointer-events: none;
+    }
+    .atmos-break .overlay-text { z-index: 2; }
+
+    /* Magnetic button */
+    .magnetic { will-change: transform; transition: transform 0.3s var(--ease); }
+
+    /* Fixed scroll section counter — top-right, mono */
+    .scroll-meter {
+      position: fixed;
+      top: 50%;
+      right: clamp(16px, 3vw, 40px);
+      transform: translateY(-50%);
+      z-index: 80;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--mute);
+      display: flex; flex-direction: column; gap: 14px; align-items: flex-end;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.6s var(--ease);
+    }
+    .scroll-meter.show { opacity: 1; }
+    .scroll-meter .sm-row { display: flex; align-items: center; gap: 10px; }
+    .scroll-meter .sm-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: transparent; border: 1px solid var(--mute);
+      transition: all 0.4s var(--ease);
+    }
+    .scroll-meter .sm-row.active .sm-dot { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 0 4px rgba(31,168,150,0.18); }
+    .scroll-meter .sm-row.active { color: var(--ink); }
+    .scroll-meter .sm-num { font-variant-numeric: tabular-nums; }
+    @media (max-width: 900px) { .scroll-meter { display: none; } }
+
+    /* Count-up number styling */
+    .count {
+      font-variant-numeric: tabular-nums;
+      font-family: var(--sans);
+      font-weight: 500;
+    }
+
+    /* Hero-index labels — bigger numerics */
+    .hero-index-item .big-num {
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: clamp(28px, 2.8vw, 40px);
+      letter-spacing: -0.02em;
+      line-height: 1;
+      color: var(--ink);
+      margin-top: 4px;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .hero-index-item .big-num em {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      color: var(--primary-dark);
+    }
+
     /* Responsive */
     @media (max-width: 900px) {
       .grid-12 { grid-template-columns: repeat(6, 1fr); }
@@ -602,8 +776,8 @@
     </div>
 
     <div class="grid-12">
-      <div class="hero-headline rvl">
-        <h1 class="display">
+      <div class="hero-headline">
+        <h1 class="display kinetic">
           <span class="line">Your AI sales</span>
           <span class="line">agent that <em>actually</em></span>
           <span class="line indent">does the <em>work</em>.</span>
@@ -616,27 +790,43 @@
         Generates leads, scores them with reasoning, writes personalised outreach, creates content, and talks to prospects by voice &mdash; so you spend your day closing, not chasing.
       </p>
       <div class="hero-cta-row">
-        <button class="btn btn-primary btn-lg" onclick="openSignup('pro')">Start 14-day trial <span class="arrow">&rarr;</span></button>
+        <button class="btn btn-primary btn-lg magnetic" onclick="openSignup('pro')">Start 14-day trial <span class="arrow">&rarr;</span></button>
         <button class="btn btn-ghost" onclick="bookSession()">Talk to the agent</button>
       </div>
     </div>
 
+    <!-- Hero editorial photo scene -->
+    <div class="hero-scene rvl">
+      <figure class="hero-scene-figure" data-parallax>
+        <img src="/media/hero.jpg" alt="A sales team at work" loading="eager">
+      </figure>
+      <div class="hero-scene-caption">
+        <span class="fig">Fig. 001</span>
+        The last team that still makes<br>the calls themselves.<br><br>&mdash; Before EIAAW
+      </div>
+    </div>
+
+    <!-- Hero index with count-ups -->
     <div class="hero-index rvl">
       <div class="hero-index-item">
         <span class="hero-index-num">01 &mdash; Outbound</span>
-        <span class="hero-index-label">Zero cold calls. <em>AI does it.</em></span>
+        <span class="big-num"><span class="count" data-to="0">0</span></span>
+        <span class="hero-index-label">Cold calls you make. <em>Zero.</em></span>
       </div>
       <div class="hero-index-item">
         <span class="hero-index-num">02 &mdash; Qualification</span>
-        <span class="hero-index-label">Scored 0-100 with <em>reasoning</em>, not vibes.</span>
+        <span class="big-num"><span class="count" data-to="100">0</span><em>&thinsp;/&thinsp;100</em></span>
+        <span class="hero-index-label">Scored with <em>reasoning</em>, not vibes.</span>
       </div>
       <div class="hero-index-item">
         <span class="hero-index-num">03 &mdash; Outreach</span>
-        <span class="hero-index-label">Personalised emails, <em>written for you</em>.</span>
+        <span class="big-num"><span class="count" data-to="24">0</span><em>&thinsp;/&thinsp;7</em></span>
+        <span class="hero-index-label">Written, sent, <em>tracked</em>.</span>
       </div>
       <div class="hero-index-item">
         <span class="hero-index-num">04 &mdash; Voice</span>
-        <span class="hero-index-label">An agent that <em>picks up the phone</em>.</span>
+        <span class="big-num">&infin;</span>
+        <span class="hero-index-label">An agent that <em>picks up</em>.</span>
       </div>
     </div>
 
@@ -655,6 +845,7 @@
     <div class="capabilities">
       <article class="cap-row rvl">
         <div class="cap-num">001</div>
+        <div class="cap-thumb"><img src="/media/leadgen.jpg" alt="" loading="lazy"></div>
         <h3 class="cap-title">Lead <em>generation</em>, on brief.</h3>
         <p class="cap-body">
           <span class="crossed">Hours in LinkedIn, directories, Google.</span>
@@ -665,6 +856,7 @@
 
       <article class="cap-row rvl">
         <div class="cap-num">002</div>
+        <div class="cap-thumb"><img src="/media/scoring.jpg" alt="" loading="lazy"></div>
         <h3 class="cap-title">Scoring <em>with reasoning</em>.</h3>
         <p class="cap-body">
           <span class="crossed">Gut-feel on who's "ready to buy".</span>
@@ -675,6 +867,7 @@
 
       <article class="cap-row rvl">
         <div class="cap-num">003</div>
+        <div class="cap-thumb"><img src="/media/outreach.jpg" alt="" loading="lazy"></div>
         <h3 class="cap-title">Outreach <em>sequences</em>, written for you.</h3>
         <p class="cap-body">
           <span class="crossed">Re-writing the same follow-up, forever.</span>
@@ -685,6 +878,7 @@
 
       <article class="cap-row rvl">
         <div class="cap-num">004</div>
+        <div class="cap-thumb"><img src="/media/content.jpg" alt="" loading="lazy"></div>
         <h3 class="cap-title">Content <em>for every platform</em>.</h3>
         <p class="cap-body">
           <span class="crossed">Staring at a blank LinkedIn post.</span>
@@ -695,6 +889,7 @@
 
       <article class="cap-row rvl">
         <div class="cap-num">005</div>
+        <div class="cap-thumb"><img src="/media/voice.jpg" alt="" loading="lazy"></div>
         <h3 class="cap-title">A voice agent that <em>picks up the phone</em>.</h3>
         <p class="cap-body">
           <span class="crossed">Fifty cold calls a day, three answer.</span>
@@ -705,6 +900,7 @@
 
       <article class="cap-row rvl">
         <div class="cap-num">006</div>
+        <div class="cap-thumb"><img src="/media/pipeline.jpg" alt="" loading="lazy"></div>
         <h3 class="cap-title">Pipeline + <em>assistant</em>, one surface.</h3>
         <p class="cap-body">
           <span class="crossed">Spreadsheets, sticky notes, forgotten follow-ups.</span>
@@ -725,6 +921,12 @@
     <div class="attribution rvl">A working thesis &mdash; EIAAW Solutions</div>
   </div>
 </section>
+
+<!-- Atmospheric break -->
+<div class="atmos-break rvl">
+  <img src="/media/atmosphere.jpg" alt="" data-parallax loading="lazy">
+  <div class="overlay-text">While the rest of the floor is <em>still dialling</em>.</div>
+</div>
 
 <!-- Approach / How it works -->
 <section id="approach" class="approach section-pad">
@@ -889,6 +1091,14 @@
   </div>
 </section>
 
+<!-- Scroll meter -->
+<aside class="scroll-meter" id="scrollMeter" aria-hidden="true">
+  <div class="sm-row" data-target="capabilities"><span class="sm-num">01</span> Capabilities <span class="sm-dot"></span></div>
+  <div class="sm-row" data-target="approach"><span class="sm-num">02</span> Approach <span class="sm-dot"></span></div>
+  <div class="sm-row" data-target="compare"><span class="sm-num">03</span> Delta <span class="sm-dot"></span></div>
+  <div class="sm-row" data-target="pricing"><span class="sm-num">04</span> Pricing <span class="sm-dot"></span></div>
+</aside>
+
 <!-- Footer -->
 <footer>
   <div class="wrap">
@@ -1049,18 +1259,152 @@
 </div>
 
 <script>
-// Scroll reveal
+/* ============================================================
+   MOTION LAYER
+   Respects prefers-reduced-motion
+   ============================================================ */
 (function(){
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // --- Kinetic type: split hero display into word spans ---
+  document.querySelectorAll('.kinetic').forEach((el) => {
+    const lines = el.querySelectorAll('.line');
+    lines.forEach((line) => {
+      // Walk child nodes, splitting text nodes into .word spans while preserving <em>
+      const frag = document.createDocumentFragment();
+      line.childNodes.forEach((node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const parts = node.textContent.split(/(\s+)/);
+          parts.forEach(p => {
+            if (!p) return;
+            if (/^\s+$/.test(p)) { frag.appendChild(document.createTextNode(p)); return; }
+            const s = document.createElement('span'); s.className = 'word'; s.textContent = p;
+            frag.appendChild(s);
+          });
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          const wrap = document.createElement('span');
+          wrap.className = 'word';
+          wrap.appendChild(node.cloneNode(true));
+          frag.appendChild(wrap);
+        }
+      });
+      line.innerHTML = '';
+      line.appendChild(frag);
+    });
+  });
+
+  // Reveal kinetic words on load, staggered
+  window.addEventListener('load', () => {
+    const words = document.querySelectorAll('.kinetic .word');
+    if (reduce) { words.forEach(w => w.classList.add('in')); return; }
+    words.forEach((w, i) => {
+      setTimeout(() => w.classList.add('in'), 120 + i * 70);
+    });
+  });
+
+  // --- Scroll reveal ---
   const io = new IntersectionObserver((entries) => {
     entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
   }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
   document.querySelectorAll('.rvl').forEach(el => io.observe(el));
 
-  // Nav scrolled state
+  // --- Nav scrolled state ---
   const nav = document.getElementById('siteNav');
-  const onScroll = () => { if (nav) nav.classList.toggle('scrolled', window.scrollY > 12); };
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
+  const onNavScroll = () => { if (nav) nav.classList.toggle('scrolled', window.scrollY > 12); };
+  window.addEventListener('scroll', onNavScroll, { passive: true });
+  onNavScroll();
+
+  // --- Count-up numbers ---
+  const countEls = document.querySelectorAll('.count');
+  const countIO = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      const target = parseInt(el.dataset.to || '0', 10);
+      if (reduce) { el.textContent = target; countIO.unobserve(el); return; }
+      const dur = 1400; const start = performance.now();
+      const tick = (t) => {
+        const p = Math.min(1, (t - start) / dur);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(target * eased);
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      countIO.unobserve(el);
+    });
+  }, { threshold: 0.4 });
+  countEls.forEach(el => countIO.observe(el));
+
+  // --- Magnetic buttons ---
+  if (!reduce) {
+    document.querySelectorAll('.magnetic').forEach((btn) => {
+      let raf = null;
+      const strength = 0.28;
+      btn.addEventListener('mousemove', (e) => {
+        const r = btn.getBoundingClientRect();
+        const x = e.clientX - (r.left + r.width / 2);
+        const y = e.clientY - (r.top + r.height / 2);
+        if (raf) cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+          btn.style.transform = `translate(${x * strength}px, ${y * strength}px)`;
+        });
+      });
+      btn.addEventListener('mouseleave', () => {
+        if (raf) cancelAnimationFrame(raf);
+        btn.style.transform = '';
+      });
+    });
+  }
+
+  // --- Parallax on [data-parallax] images ---
+  if (!reduce) {
+    const pxEls = document.querySelectorAll('[data-parallax]');
+    let ticking = false;
+    const onScrollPx = () => {
+      if (ticking) return; ticking = true;
+      requestAnimationFrame(() => {
+        pxEls.forEach((el) => {
+          const r = el.getBoundingClientRect();
+          const vh = window.innerHeight;
+          const center = r.top + r.height / 2;
+          const delta = (center - vh / 2) / vh;
+          const y = Math.max(-40, Math.min(40, -delta * 28));
+          const img = el.matches('img') ? el : el.querySelector('img');
+          if (img) img.style.transform = `translateY(${y}px) scale(1.05)`;
+        });
+        ticking = false;
+      });
+    };
+    window.addEventListener('scroll', onScrollPx, { passive: true });
+    onScrollPx();
+  }
+
+  // --- Scroll meter: activate section on view ---
+  const meter = document.getElementById('scrollMeter');
+  if (meter) {
+    const rows = Array.from(meter.querySelectorAll('.sm-row'));
+    const sectionMap = rows.map(r => ({ row: r, section: document.getElementById(r.dataset.target) })).filter(x => x.section);
+
+    const meterIO = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        const match = sectionMap.find(x => x.section === e.target);
+        if (!match) return;
+        if (e.isIntersecting) match.row.classList.add('active');
+        else match.row.classList.remove('active');
+      });
+    }, { threshold: 0.28 });
+    sectionMap.forEach(x => meterIO.observe(x.section));
+
+    // Show meter after scrolling past hero
+    const heroEl = document.querySelector('.hero');
+    const toggleMeter = () => {
+      if (!heroEl) return;
+      const r = heroEl.getBoundingClientRect();
+      meter.classList.toggle('show', r.bottom < window.innerHeight * 0.5 && r.bottom > -window.innerHeight * 3);
+    };
+    window.addEventListener('scroll', toggleMeter, { passive: true });
+    toggleMeter();
+  }
 })();
 
 let selectedPlan = 'pro';
