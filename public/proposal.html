@@ -6,23 +6,21 @@
   <title>EIAAW AI Sales Agent — AI That Generates Leads, Writes Outreach & Talks to Prospects</title>
   <meta name="description" content="AI sales agent that generates leads, scores them with reasoning, writes personalized email outreach, creates marketing content, and talks to prospects via voice — on your behalf. From RM 99/month.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/brand/eiaaw.css?v=1">
   <style>
+    /* Proposal-local overrides — admin-only proposal deck.
+       Uses EIAAW design system tokens from eiaaw.css */
     :root {
-      --bg: #FAF7F2;
-      --surface: #FFFFFF;
-      --surface2: #F3EEE4;
-      --border: #E6DDCC;
-      --text: #1A2A2E;
-      --text-muted: #6B7A7F;
-      --primary: #1FA896;
-      --primary-dark: #167A6D;
-      --primary-light: rgba(31,168,150,0.10);
+      --surface2: var(--bg-warm);
+      --border: var(--line-soft);
+      --text: var(--ink);
+      --text-muted: var(--mute);
+      --primary-light: var(--primary-tint);
       --success: #22c55e;
       --warning: #d97706;
-      --danger: #dc2626;
-      --gradient: linear-gradient(135deg, #1FA896, #167A6D);
-      --gradient-bg: linear-gradient(180deg, #FAF7F2 0%, #F7F1E6 55%, #F3EEE4 100%);
+      --gradient-bg: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }

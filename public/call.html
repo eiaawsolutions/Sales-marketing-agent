@@ -3,204 +3,274 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EIAAW AI Sales Agent — Voice Call</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>EIAAW Solutions — Voice Call</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/brand/eiaaw.css?v=1">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Inter', sans-serif;
-      background: #FAF7F2;
-      color: #1A2A2E;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; flex-direction: column; min-height: 100vh;
+      align-items: stretch; justify-content: stretch;
     }
-    .call-container {
-      width: 100%;
-      max-width: 420px;
-      padding: 24px;
+
+    .call-shell {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: clamp(100px, 14vh, 160px) clamp(20px, 4vw, 56px) clamp(60px, 10vh, 120px);
+      position: relative;
+    }
+
+    .call-card {
+      position: relative;
+      width: 100%; max-width: 520px;
+      background: var(--surface);
+      border-radius: 24px;
+      padding: clamp(36px, 5vw, 56px) clamp(28px, 4vw, 48px);
       text-align: center;
+      box-shadow:
+        0 2px 4px rgba(15,26,29,0.05),
+        0 16px 40px -12px rgba(15,26,29,0.18),
+        0 48px 96px -24px rgba(15,26,29,0.26);
+      border: 1px solid var(--line-soft);
     }
-    .brand {
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: #1FA896;
-      margin-bottom: 32px;
+    .call-card::before {
+      content: ''; position: absolute; inset: 0; border-radius: 24px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);
+      pointer-events: none;
     }
+
+    .call-lockup {
+      display: inline-flex; align-items: center; gap: 12px;
+      margin-bottom: clamp(28px, 4vh, 40px);
+      text-align: left;
+    }
+    .call-lockup img { width: 38px; height: 38px; object-fit: contain; }
+    .call-lockup .words { display: flex; flex-direction: column; line-height: 1.1; }
+    .call-lockup strong {
+      font-family: var(--sans); font-size: 14px; font-weight: 700;
+      letter-spacing: 0.08em; color: var(--primary-dark); text-transform: uppercase;
+    }
+    .call-lockup small {
+      font-family: var(--mono); font-size: 10px; font-weight: 400;
+      color: var(--mute); text-transform: uppercase; letter-spacing: 0.12em; margin-top: 3px;
+    }
+
+    .call-eyebrow {
+      font-family: var(--mono); font-size: 10px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.18em; color: var(--primary-dark);
+      margin-bottom: 16px; display: inline-block;
+    }
+
     .avatar {
-      width: 80px; height: 80px;
+      position: relative;
+      width: 112px; height: 112px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #1FA896, #167A6D);
+      background: var(--gradient);
       display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 20px;
-      font-size: 32px;
-      box-shadow: 0 0 30px rgba(31,168,150,0.3);
+      margin: 0 auto 28px;
+      font-size: 44px; color: #fff;
+      box-shadow:
+        0 2px 4px rgba(17,118,106,0.2),
+        0 16px 40px -8px rgba(17,118,106,0.4),
+        0 40px 72px -16px rgba(15,26,29,0.32);
     }
-    .avatar.active {
-      animation: pulse-glow 2s ease-in-out infinite;
+    .avatar::before {
+      content: ''; position: absolute; inset: 0; border-radius: 50%;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22);
     }
-    @keyframes pulse-glow {
-      0%, 100% { box-shadow: 0 0 30px rgba(31,168,150,0.3); }
-      50% { box-shadow: 0 0 50px rgba(31,168,150,0.5); }
+    .avatar.active::after {
+      content: ''; position: absolute; inset: -12px; border-radius: 50%;
+      border: 2px solid rgba(31,168,150,0.45);
+      animation: call-ring 2s var(--ease) infinite;
     }
+    @keyframes call-ring {
+      0% { transform: scale(0.9); opacity: 0.65; }
+      80% { transform: scale(1.45); opacity: 0; }
+      100% { transform: scale(1.45); opacity: 0; }
+    }
+
     h1 {
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 8px;
+      font-family: var(--sans); font-weight: 500;
+      font-size: clamp(28px, 3.2vw, 38px); line-height: 1.1;
+      letter-spacing: var(--tracking-display);
+      margin-bottom: 12px; color: var(--ink);
     }
+    h1 em { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--primary-dark); }
+
     .subtitle {
-      color: #6B7A7F;
-      font-size: 14px;
+      color: var(--ink-2);
+      font-size: 15px; line-height: 1.55;
       margin-bottom: 32px;
-      line-height: 1.5;
+      max-width: 38ch; margin-left: auto; margin-right: auto;
     }
+
     .status {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 16px;
+      font-family: var(--mono); font-size: 11px; font-weight: 500;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      margin-bottom: 14px;
+      display: inline-flex; align-items: center; gap: 8px;
     }
-    .status.waiting { color: #f59e0b; }
-    .status.connecting { color: #f59e0b; }
-    .status.active { color: #22c55e; }
-    .status.ended { color: #6B7A7F; }
-    .status.error { color: #ef4444; }
+    .status::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: currentColor;
+    }
+    .status.waiting { color: var(--mute); }
+    .status.connecting { color: #d97706; }
+    .status.active { color: var(--primary-dark); }
+    .status.ended { color: var(--mute); }
+    .status.error { color: var(--danger); }
 
     .timer {
-      font-size: 48px;
-      font-weight: 300;
+      font-family: var(--mono); font-size: 48px; font-weight: 400;
       font-variant-numeric: tabular-nums;
+      color: var(--ink);
       margin-bottom: 24px;
-      display: none;
+      display: none; letter-spacing: -0.01em;
     }
     .timer.visible { display: block; }
 
     .wave {
-      display: none;
-      align-items: center; justify-content: center;
-      gap: 4px; height: 32px; margin-bottom: 24px;
+      display: none; align-items: center; justify-content: center;
+      gap: 5px; height: 34px; margin-bottom: 24px;
     }
     .wave.visible { display: flex; }
     .wave span {
-      width: 4px; border-radius: 2px;
-      background: #1FA896;
+      width: 3px; border-radius: 2px; background: var(--primary);
       animation: wave 1.2s ease-in-out infinite;
     }
     .wave span:nth-child(2) { animation-delay: 0.1s; }
     .wave span:nth-child(3) { animation-delay: 0.2s; }
     .wave span:nth-child(4) { animation-delay: 0.3s; }
     .wave span:nth-child(5) { animation-delay: 0.4s; }
-    @keyframes wave { 0%,100% { height: 6px; } 50% { height: 28px; } }
+    @keyframes wave { 0%,100% { height: 6px; } 50% { height: 30px; } }
 
     .transcript {
-      background: rgba(31,168,150,0.06);
-      border-radius: 12px;
-      padding: 16px;
+      background: var(--bg);
+      border: 1px solid var(--line-soft);
+      border-radius: 14px;
+      padding: 16px 18px;
       margin-bottom: 24px;
-      max-height: 120px;
-      overflow-y: auto;
-      font-size: 13px;
-      line-height: 1.6;
-      color: #6B7A7F;
-      text-align: left;
+      max-height: 140px; overflow-y: auto;
+      font-size: 13px; line-height: 1.6;
+      color: var(--ink-2); text-align: left;
       display: none;
     }
     .transcript.visible { display: block; }
-    .transcript b { color: #1A2A2E; }
+    .transcript b { color: var(--primary-dark); font-weight: 700; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-right: 6px; }
 
-    .btn-start {
-      width: 100%;
-      padding: 16px 32px;
-      border-radius: 12px;
-      border: none;
-      font-size: 16px;
-      font-weight: 700;
+    .call-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 17px 32px;
+      border-radius: 999px; border: none;
+      font-family: var(--sans); font-size: 15px; font-weight: 500;
+      letter-spacing: -0.005em;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.35s var(--ease);
     }
-    .btn-start.green {
-      background: linear-gradient(135deg, #22c55e, #16a34a);
-      color: #fff;
-      box-shadow: 0 4px 16px rgba(34,197,94,0.3);
+    .call-btn.go {
+      background: var(--ink); color: var(--bg);
+      box-shadow: 0 2px 4px rgba(15,26,29,0.12), 0 12px 28px -8px rgba(15,26,29,0.28);
     }
-    .btn-start.green:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(34,197,94,0.4); }
-    .btn-start.red {
-      background: #ef4444;
-      color: #fff;
+    .call-btn.go:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .call-btn.stop {
+      background: var(--danger); color: #fff;
     }
-    .btn-start.red:hover { background: #dc2626; }
-    .btn-start:disabled {
-      opacity: 0.5; cursor: not-allowed; transform: none !important;
-    }
+    .call-btn.stop:hover { background: #8e2f1e; }
+    .call-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
 
     .permissions-note {
       margin-top: 16px;
-      font-size: 12px;
-      color: #6B7A7F;
+      font-family: var(--mono); font-size: 10px;
+      color: var(--mute); letter-spacing: 0.1em; text-transform: uppercase;
     }
 
     .error-msg {
-      background: rgba(239,68,68,0.1);
-      border: 1px solid rgba(239,68,68,0.3);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 16px;
-      font-size: 13px;
-      color: #ef4444;
-      display: none;
+      background: rgba(180,65,43,0.08);
+      border: 1px solid rgba(180,65,43,0.25);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      font-size: 13px; color: var(--danger);
+      display: none; text-align: left;
     }
     .error-msg.visible { display: block; }
 
-    .powered-by {
-      margin-top: 40px;
-      font-size: 11px;
-      color: #6B7A7F;
+    .powered {
+      margin-top: 40px; padding-top: 28px;
+      border-top: 1px solid var(--line-soft);
+      font-family: var(--mono); font-size: 10px; font-weight: 500;
+      color: var(--mute); letter-spacing: 0.14em; text-transform: uppercase;
     }
-    .powered-by a { color: #1FA896; text-decoration: none; }
+    .powered a { color: var(--primary-dark); text-decoration: none; border-bottom: 1px solid currentColor; padding-bottom: 1px; }
+    .powered a:hover { color: var(--ink); }
+
+    .call-footer {
+      padding: 32px clamp(20px, 4vw, 56px);
+      border-top: 1px solid var(--line-soft);
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      flex-wrap: wrap;
+      font-family: var(--mono); font-size: 10px; color: var(--mute);
+      letter-spacing: 0.1em; text-transform: uppercase;
+    }
+    .call-footer .lockup-mini {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .call-footer .lockup-mini img { width: 28px; height: 28px; object-fit: contain; }
+    .call-footer .lockup-mini strong {
+      font-family: var(--sans); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; color: var(--primary-dark); text-transform: uppercase;
+    }
   </style>
 </head>
 <body>
-  <div class="call-container">
-    <div class="brand" style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:32px">
-      <img src="/brand/shield.png?v=3" alt="EIAAW Solutions" style="width:40px;height:40px;object-fit:contain">
-      <div style="text-align:left;line-height:1.2">
-        <div style="font-size:14px;font-weight:700;color:#11766A;letter-spacing:0.1em;text-transform:uppercase">EIAAW SOLUTIONS</div>
-        <div style="font-size:10px;color:#6B7A7F;text-transform:uppercase;letter-spacing:0.14em;margin-top:3px;font-family:'JetBrains Mono',monospace">AI &middot; Human Partnerships</div>
-      </div>
-    </div>
-    <div class="avatar" id="avatar">&#129302;</div>
-    <h1 id="heading">AI Sales Assistant</h1>
-    <p class="subtitle" id="subtitle">Hi! I'm ready to tell you about how we can help automate your sales and marketing. Click below to start a voice conversation.</p>
 
-    <div class="status waiting" id="status">Ready to connect</div>
-    <div class="timer" id="timer">00:00</div>
-    <div class="wave" id="wave">
-      <span></span><span></span><span></span><span></span><span></span>
-    </div>
-    <div class="transcript" id="transcript"></div>
-    <div class="error-msg" id="error"></div>
+  <main class="call-shell">
+    <div class="call-card rvl">
 
-    <button class="btn-start green" id="call-btn" onclick="startCall()">
-      Start Voice Call
-    </button>
-
-    <p class="permissions-note" id="permissions-note">Your browser will ask for microphone access. This is required for the voice call.</p>
-
-    <div class="powered-by" style="margin-top:40px;padding-top:24px;border-top:1px solid #E6DDCC">
-      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px">
-        <img src="/brand/shield.png?v=3" alt="EIAAW Solutions" style="width:32px;height:32px;object-fit:contain">
-        <div style="text-align:left;line-height:1.2">
-          <div style="font-size:12px;font-weight:700;color:#11766A;letter-spacing:0.1em;text-transform:uppercase">EIAAW SOLUTIONS</div>
-          <div style="font-size:9px;color:#6B7A7F;text-transform:uppercase;letter-spacing:0.14em;margin-top:3px;font-family:'JetBrains Mono',monospace">AI &middot; Human Partnerships</div>
+      <div class="call-lockup">
+        <img src="/brand/shield.png?v=3" alt="EIAAW Solutions">
+        <div class="words">
+          <strong>EIAAW SOLUTIONS</strong>
+          <small>AI &middot; Human Partnerships</small>
         </div>
       </div>
-      <div style="font-size:11px;color:#6B7A7F">Powered by <a href="https://eiaawsolutions.com">EIAAW Solutions</a></div>
+
+      <div class="call-eyebrow">&mdash; Live voice session</div>
+
+      <div class="avatar" id="avatar">&#129302;</div>
+
+      <h1 id="heading">Meet your <em>AI sales agent</em>.</h1>
+      <p class="subtitle" id="subtitle">Tap below to start a live voice conversation. The agent will walk you through how EIAAW can automate your sales &amp; marketing.</p>
+
+      <div class="status waiting" id="status">Ready to connect</div>
+      <div class="timer" id="timer">00:00</div>
+
+      <div class="wave" id="wave">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+
+      <div class="transcript" id="transcript"></div>
+      <div class="error-msg" id="error"></div>
+
+      <button class="call-btn go" id="call-btn" onclick="startCall()">
+        Start voice call <span aria-hidden="true">&rarr;</span>
+      </button>
+
+      <p class="permissions-note" id="permissions-note">Your browser will request microphone access</p>
+
+      <div class="powered">Powered by <a href="https://eiaawsolutions.com" target="_blank">EIAAW Solutions</a></div>
+
     </div>
-  </div>
+  </main>
+
+  <footer class="call-footer">
+    <div class="lockup-mini">
+      <img src="/brand/shield.png?v=3" alt="EIAAW">
+      <strong>EIAAW SOLUTIONS</strong>
+    </div>
+    <div>&copy; 2026 &mdash; Kuala Lumpur</div>
+  </footer>
 
   <script type="module">
     import { RetellWebClient } from 'https://esm.sh/retell-client-js-sdk@2.0.7';
@@ -211,7 +281,6 @@
     let timerInterval = null;
     let seconds = 0;
 
-    // Get the call token from URL
     const params = new URLSearchParams(window.location.search);
     const token = params.get('t');
 
@@ -232,25 +301,21 @@
       errorEl.className = 'error-msg';
 
       btn.disabled = true;
-      btn.textContent = 'Connecting...';
+      btn.innerHTML = 'Connecting&hellip;';
       status.textContent = 'Connecting';
       status.className = 'status connecting';
 
       try {
-        // Request the access token from the server
         const res = await fetch(`/api/voice/call-link-token?t=${token}`);
         const data = await res.json();
         if (!res.ok || !data.accessToken) throw new Error(data.error || 'Failed to connect. This link may have expired.');
 
-        // Update heading with lead context if available
         if (data.leadName) {
-          document.getElementById('heading').textContent = `Hi ${data.leadName}!`;
-          document.getElementById('subtitle').textContent = data.greeting || 'Thanks for connecting. Let me tell you about how we can help.';
+          document.getElementById('heading').innerHTML = `Hi <em>${data.leadName}</em>.`;
+          document.getElementById('subtitle').textContent = data.greeting || 'Thanks for connecting. Let me walk you through how we can help.';
         }
 
-        // Start the Retell web call
         if (!window.RetellWebClient) {
-          // Wait a moment for SDK to load
           await new Promise(r => setTimeout(r, 1500));
           if (!window.RetellWebClient) throw new Error('Voice system loading. Please refresh and try again.');
         }
@@ -265,8 +330,8 @@
           document.getElementById('timer').classList.add('visible');
           document.getElementById('permissions-note').style.display = 'none';
           btn.disabled = false;
-          btn.textContent = 'End Call';
-          btn.className = 'btn-start red';
+          btn.innerHTML = 'End call';
+          btn.className = 'call-btn stop';
 
           timerInterval = setInterval(() => {
             seconds++;
@@ -276,25 +341,15 @@
           }, 1000);
         });
 
-        client.on('call_ended', () => {
-          endCallUI('Call ended. Thank you!');
-        });
-
-        client.on('agent_start_talking', () => {
-          document.getElementById('wave').classList.add('visible');
-        });
-
-        client.on('agent_stop_talking', () => {
-          document.getElementById('wave').classList.remove('visible');
-        });
+        client.on('call_ended', () => { endCallUI('Call ended — thank you'); });
+        client.on('agent_start_talking', () => { document.getElementById('wave').classList.add('visible'); });
+        client.on('agent_stop_talking', () => { document.getElementById('wave').classList.remove('visible'); });
 
         client.on('update', (update) => {
           if (update.transcript) {
             const el = document.getElementById('transcript');
             el.classList.add('visible');
-            const lines = update.transcript.map(t =>
-              `<b>${t.role === 'agent' ? 'AI' : 'You'}:</b> ${t.content}`
-            );
+            const lines = update.transcript.map(t => `<b>${t.role === 'agent' ? 'AI' : 'You'}</b>${t.content}`);
             el.innerHTML = lines.slice(-4).join('<br>');
             el.scrollTop = el.scrollHeight;
           }
@@ -313,8 +368,8 @@
         errorEl.textContent = e.message;
         errorEl.className = 'error-msg visible';
         btn.disabled = false;
-        btn.textContent = 'Try Again';
-        btn.className = 'btn-start green';
+        btn.innerHTML = 'Try again <span aria-hidden="true">&rarr;</span>';
+        btn.className = 'call-btn go';
         status.textContent = 'Failed to connect';
         status.className = 'status error';
       }
@@ -333,14 +388,16 @@
       document.getElementById('avatar').classList.remove('active');
       document.getElementById('wave').classList.remove('visible');
       const btn = document.getElementById('call-btn');
-      btn.textContent = 'Call Again';
-      btn.className = 'btn-start green';
+      btn.innerHTML = 'Call again <span aria-hidden="true">&rarr;</span>';
+      btn.className = 'call-btn go';
       btn.disabled = false;
       btn.onclick = () => { seconds = 0; startCall(); };
     }
 
-    // Expose for button onclick
     window.startCall = startCall;
+
+    // reveal
+    document.querySelectorAll('.rvl').forEach(el => setTimeout(() => el.classList.add('in'), 60));
   </script>
 </body>
 </html>
