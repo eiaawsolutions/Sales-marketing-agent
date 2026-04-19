@@ -574,23 +574,37 @@
       position: relative;
       aspect-ratio: 16 / 9;
       overflow: hidden;
-      border-radius: 2px;
+      border-radius: 20px;
       background: var(--bg-warm);
-      box-shadow: 0 40px 80px -30px rgba(15,26,29,0.35), 0 0 0 1px var(--line-soft);
-      will-change: transform;
+      box-shadow:
+        0 2px 4px rgba(15,26,29,0.05),
+        0 16px 40px -12px rgba(15,26,29,0.18),
+        0 48px 96px -24px rgba(15,26,29,0.28),
+        0 80px 140px -40px rgba(15,26,29,0.22);
+      transition: transform 0.9s var(--ease), box-shadow 0.9s var(--ease);
+      will-change: transform, box-shadow;
+    }
+    .hero-scene-figure::after {
+      content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+      border-radius: 20px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3);
+      background: linear-gradient(180deg, transparent 55%, rgba(15,26,29,0.18) 100%);
     }
     .hero-scene-figure img {
       width: 100%; height: 100%; object-fit: cover;
       filter: saturate(0.88) contrast(1.02);
-      transition: transform 1.8s var(--ease);
+      transition: transform 1.8s var(--ease), filter 0.9s var(--ease);
       will-change: transform;
     }
-    .hero-scene-figure:hover img { transform: scale(1.03); }
-    .hero-scene-figure::after {
-      content: ''; position: absolute; inset: 0;
-      background: linear-gradient(180deg, transparent 55%, rgba(15,26,29,0.18) 100%);
-      pointer-events: none;
+    .hero-scene-figure:hover {
+      transform: translateY(-6px);
+      box-shadow:
+        0 4px 8px rgba(15,26,29,0.06),
+        0 24px 56px -12px rgba(15,26,29,0.22),
+        0 64px 120px -24px rgba(15,26,29,0.32),
+        0 110px 180px -40px rgba(15,26,29,0.26);
     }
+    .hero-scene-figure:hover img { transform: scale(1.035); filter: saturate(0.95) contrast(1.04); }
     .hero-scene-caption {
       grid-column: 11 / span 2;
       font-family: var(--mono);
@@ -611,6 +625,7 @@
     /* Grain overlay on hero photo */
     .hero-scene-figure::before {
       content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+      border-radius: 20px;
       background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/></svg>");
       mix-blend-mode: overlay; opacity: 0.5;
     }
