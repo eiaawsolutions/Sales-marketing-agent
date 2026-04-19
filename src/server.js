@@ -79,7 +79,8 @@ app.use((req, res, next) => {
 
   // For unauthenticated POST requests (checkout, etc.), check origin
   const origin = req.headers['origin'] || req.headers['referer'] || '';
-  const allowed = ['https://sa.eiaawsolutions.com', 'https://sales-marketing-agent-production.up.railway.app', 'http://localhost:3000'];
+  const envAllowed = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const allowed = envAllowed.length ? envAllowed : ['https://sa.eiaawsolutions.com', 'https://sales-marketing-agent-production.up.railway.app', 'http://localhost:3000'];
   if (allowed.some(a => origin.startsWith(a))) return next();
 
   return res.status(403).json({ error: 'Request blocked — invalid origin.' });
