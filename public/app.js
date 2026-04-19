@@ -4542,14 +4542,9 @@ async function loadSettings() {
       ${mustEnrolMfa ? `
         <div class="card" style="border:2px solid var(--danger);background:rgba(180,65,43,0.04)">
           <h3 style="color:var(--danger);text-transform:none;letter-spacing:0">&#9888; 2FA required</h3>
-          <p class="text-muted text-sm mb-4">As a superadmin, you must enable two-factor authentication before continuing.</p>
+          <p class="text-muted text-sm mb-4">As a superadmin, you must enable two-factor authentication before continuing. Open <a href="#" onclick="navigate('account');return false" style="color:var(--primary)">Account &amp; Security</a> to set it up.</p>
         </div>
       ` : ''}
-
-      <div class="card" id="security-card">
-        <h3>Security</h3>
-        <div id="security-body" class="text-sm text-muted" style="padding:8px 0">Loading&hellip;</div>
-      </div>
 
       <div class="card">
         <h3>AI Configuration</h3>
@@ -4707,7 +4702,6 @@ async function loadSettings() {
         <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:12px">Save Settings</button>
       </div>
     `;
-    loadSecuritySection();
   } catch (e) {
     document.getElementById('page').innerHTML = `<div class="empty">Error loading settings: ${e.message}</div>`;
   }
