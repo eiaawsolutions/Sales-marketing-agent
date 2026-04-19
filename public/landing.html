@@ -615,22 +615,40 @@
       mix-blend-mode: overlay; opacity: 0.5;
     }
 
-    /* Capability row — add thumbnail */
+    /* Capability row — repositioned thumb, elegant float */
+    .cap-row { grid-template-columns: 56px 120px 1.2fr 1fr 200px; gap: clamp(20px, 2.4vw, 40px); align-items: center; }
+    .cap-row .cap-num { align-self: start; padding-top: 14px; }
     .cap-thumb {
-      grid-column: 1 / span 1;
-      width: 96px; height: 96px;
-      border-radius: 2px;
+      width: 120px; height: 120px;
+      border-radius: 14px;
       overflow: hidden;
       background: var(--bg-warm);
-      filter: saturate(0.85) contrast(1.02);
-      transition: transform 0.8s var(--ease), filter 0.8s var(--ease);
+      filter: saturate(0.9) contrast(1.02);
+      box-shadow:
+        0 1px 2px rgba(15,26,29,0.06),
+        0 8px 20px -6px rgba(15,26,29,0.18),
+        0 24px 48px -12px rgba(15,26,29,0.22);
+      transition: transform 0.7s var(--ease), box-shadow 0.7s var(--ease), filter 0.7s var(--ease);
+      will-change: transform, box-shadow;
+      position: relative;
+    }
+    .cap-thumb::after {
+      content: ''; position: absolute; inset: 0; border-radius: 14px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+      pointer-events: none;
     }
     .cap-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .cap-row:hover .cap-thumb { transform: scale(1.04); filter: saturate(1) contrast(1.05); }
-    .cap-row { grid-template-columns: 40px 112px 1fr 1fr 200px; }
+    .cap-row:hover .cap-thumb {
+      transform: translateY(-4px) scale(1.02);
+      filter: saturate(1.05) contrast(1.04);
+      box-shadow:
+        0 2px 4px rgba(15,26,29,0.08),
+        0 16px 32px -8px rgba(15,26,29,0.22),
+        0 40px 72px -16px rgba(15,26,29,0.28);
+    }
     @media (max-width: 900px) {
-      .cap-row { grid-template-columns: 36px 72px 1fr; }
-      .cap-thumb { width: 72px; height: 72px; grid-column: 2; }
+      .cap-row { grid-template-columns: 44px 96px 1fr; align-items: start; }
+      .cap-thumb { width: 96px; height: 96px; grid-column: 2; }
       .cap-row .cap-title, .cap-row .cap-body, .cap-row .cap-meta { grid-column: 3; }
     }
 
