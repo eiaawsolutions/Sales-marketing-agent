@@ -186,10 +186,30 @@
       .demo-hero-head .lockup, .demo-hero-head .meta { grid-column: 1 / -1; text-align: left; }
       .demo-intro { grid-template-columns: 1fr; }
       .demo-intro .eyebrow-col, .demo-intro h1, .demo-intro .sub { grid-column: 1 / -1; }
-      .demo-body-inner { grid-template-columns: 1fr; }
+      .demo-body-inner { grid-template-columns: 1fr; gap: 12px; }
       .demo-body-inner .spacer { display: none; }
       .demo-cta h2, .demo-cta .actions { grid-column: 1 / -1; justify-content: flex-start; }
       .demo-cta .pricing { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .demo-hero { padding: clamp(80px, 12vh, 120px) 0 clamp(40px, 6vh, 70px); }
+      .demo-hero-head .lockup img { width: 38px; height: 38px; }
+      .demo-hero-head .lockup strong { font-size: 13px; }
+      .demo-intro h1 { font-size: clamp(30px, 10vw, 48px); line-height: 1.02; }
+      .demo-intro .sub { font-size: 15px; }
+      .demo-section { padding: 20px 0; }
+      .demo-row { grid-template-columns: 40px 1fr 28px; gap: 12px; }
+      .demo-title h3 { font-size: 18px; line-height: 1.15; }
+      .demo-title small { font-size: 10px; letter-spacing: 0.08em; }
+      .demo-toggle { width: 28px; height: 28px; font-size: 14px; }
+      .demo-step { padding: 16px 18px; }
+      .demo-step h4 { font-size: 9px; }
+      .demo-step p { font-size: 13px; }
+      .demo-cta h2 { font-size: clamp(26px, 8vw, 40px); }
+      .demo-cta .actions { flex-direction: column; align-items: stretch; }
+      .demo-cta .actions a, .demo-cta .actions .btn { width: 100%; justify-content: center; }
+      .price-pill { padding: 22px; }
+      .price-pill .amount { font-size: clamp(24px, 7vw, 32px); }
     }
   </style>
 </head>

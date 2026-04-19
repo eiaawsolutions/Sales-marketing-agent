@@ -384,12 +384,66 @@ footer {
   .footer-grid { grid-template-columns: 1fr 1fr; }
   .footer-lockup-blk { grid-column: 1 / -1; }
   .footer-col { grid-column: span 1; }
+  .section-pad { padding: clamp(72px, 10vh, 120px) 0; }
 }
 @media (max-width: 640px) {
-  .nav { padding: 14px 20px; }
+  .nav { padding: 12px 16px; }
+  .nav-logo img { width: 30px; height: 30px; }
+  .nav-logo-text strong { font-size: 13px; letter-spacing: 0.06em; }
+  .nav-logo-text small { font-size: 9px; }
+  .nav-links { gap: 14px; }
   .nav-links a:not(.btn) { display: none; }
-  .footer-grid { grid-template-columns: 1fr; }
-  .footer-col { grid-column: 1 / -1; }
-  .chat-panel { right: 12px; left: 12px; width: auto; bottom: 92px; }
-  .chat-toggle { bottom: 20px; right: 20px; }
+  .nav-links .btn { padding: 10px 16px; font-size: 13px; }
+
+  /* Buttons tap-target min 44px per Apple HIG */
+  .btn { min-height: 44px; padding: 12px 20px; }
+  .btn-lg { padding: 14px 22px; font-size: 14px; }
+  .btn-ghost { padding: 12px 2px; }
+
+  /* Footer stacks */
+  .footer-grid { grid-template-columns: 1fr; gap: 40px; padding-bottom: 40px; }
+  .footer-lockup-blk, .footer-col { grid-column: 1 / -1; }
+  .footer-lockup-blk .lockup { gap: 12px; margin-bottom: 20px; }
+  .footer-lockup-blk .lockup img { width: 44px; height: 44px; }
+  .footer-lockup-blk .lockup .brand strong { font-size: 14px; }
+  .footer-statement { font-size: clamp(20px, 6vw, 26px); }
+  .footer-bottom { flex-direction: column; align-items: flex-start; gap: 10px; font-size: 10px; padding-top: 24px; }
+
+  /* Chatbot tighter */
+  .chat-panel { right: 10px; left: 10px; width: auto; bottom: 84px; max-height: calc(100vh - 120px); }
+  .chat-toggle { bottom: 16px; right: 16px; width: 54px; height: 54px; font-size: 20px; }
+
+  /* Type scale softens */
+  .display { font-size: clamp(36px, 12vw, 72px); line-height: 1.0; letter-spacing: -0.025em; }
+  .section-h { font-size: clamp(28px, 9vw, 48px); }
+  .lead { font-size: 16px; }
+  .eyebrow { font-size: 10px; letter-spacing: 0.12em; }
+  .eyebrow::before { width: 20px; }
+
+  /* Section spacing tighter */
+  .section-pad { padding: clamp(56px, 8vh, 90px) 0; }
+  .section-head { margin-bottom: clamp(36px, 6vh, 64px); }
+
+  /* Floating shadow tones down on mobile (less expensive to composite) */
+  .elegant-figure, .elegant-thumb {
+    box-shadow:
+      0 1px 2px rgba(15,26,29,0.06),
+      0 8px 20px -6px rgba(15,26,29,0.18);
+  }
+  .elegant-figure:hover, .elegant-thumb-parent:hover .elegant-thumb {
+    box-shadow:
+      0 2px 4px rgba(15,26,29,0.08),
+      0 12px 28px -8px rgba(15,26,29,0.24);
+  }
+
+  /* Modal full-screen on mobile */
+  .modal-backdrop { padding: 0; align-items: flex-end; }
+  .modal-card { border-radius: 20px 20px 0 0; max-height: 92vh; }
+}
+
+/* Very narrow */
+@media (max-width: 380px) {
+  .nav-logo-text small { display: none; }
+  .display { font-size: clamp(30px, 11vw, 56px); }
+  .wrap { padding: 0 16px; }
 }

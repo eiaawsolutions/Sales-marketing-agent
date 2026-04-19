@@ -221,6 +221,18 @@
       font-family: var(--sans); font-size: 12px; font-weight: 700;
       letter-spacing: 0.08em; color: var(--primary-dark); text-transform: uppercase;
     }
+
+    @media (max-width: 640px) {
+      .call-shell { padding: clamp(60px, 10vh, 100px) 16px clamp(40px, 8vh, 80px); }
+      .call-card { padding: 32px 24px; border-radius: 20px; }
+      .call-lockup img { width: 34px; height: 34px; }
+      .call-lockup strong { font-size: 12px; }
+      .avatar { width: 92px; height: 92px; font-size: 36px; margin-bottom: 22px; }
+      h1 { font-size: clamp(24px, 8vw, 32px); }
+      .subtitle { font-size: 14px; }
+      .timer { font-size: 40px; }
+      .call-footer { flex-direction: column; align-items: flex-start; gap: 12px; padding: 24px 16px; font-size: 9px; }
+    }
   </style>
 </head>
 <body>

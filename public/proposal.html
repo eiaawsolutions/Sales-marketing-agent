@@ -3,645 +3,699 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EIAAW AI Sales Agent — AI That Generates Leads, Writes Outreach & Talks to Prospects</title>
-  <meta name="description" content="AI sales agent that generates leads, scores them with reasoning, writes personalized email outreach, creates marketing content, and talks to prospects via voice — on your behalf. From RM 99/month.">
+  <title>EIAAW Solutions &mdash; A Proposal for Your Sales Team</title>
+  <meta name="description" content="A proposal from EIAAW Solutions: an AI sales agent that generates leads, scores them with reasoning, writes outreach, and talks to prospects by voice. From RM 99 / month.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/brand/eiaaw.css?v=1">
   <style>
-    /* Proposal-local overrides — admin-only proposal deck.
-       Uses EIAAW design system tokens from eiaaw.css */
-    :root {
-      --surface2: var(--bg-warm);
-      --border: var(--line-soft);
-      --text: var(--ink);
-      --text-muted: var(--mute);
-      --primary-light: var(--primary-tint);
-      --success: #22c55e;
-      --warning: #d97706;
-      --gradient-bg: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
-    }
+    /* Proposal-specific additions on top of eiaaw.css */
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: 'Inter', -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
-
-    /* Nav */
-    .nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      padding: 16px 40px;
+    /* Hero — proposal framing */
+    .hero { padding: clamp(140px, 18vh, 200px) 0 clamp(80px, 12vh, 140px); }
+    .hero-eyebrow-row {
       display: flex; justify-content: space-between; align-items: center;
-      background: rgba(250,247,242,0.88);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(31,168,150,0.18);
+      padding-bottom: clamp(48px, 8vh, 80px);
+      border-bottom: 1px solid var(--line-soft);
+      margin-bottom: clamp(48px, 8vh, 80px);
+      flex-wrap: wrap; gap: 16px;
     }
-    .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-    .nav-logo img { width: 36px; height: 36px; object-fit: contain; display: block; }
-    .nav-logo-text { display: flex; flex-direction: column; line-height: 1.15; gap: 2px; }
-    .nav-logo-text strong {
-      font-size: 15px; font-weight: 700; letter-spacing: 0.08em;
-      color: var(--primary-dark); text-transform: uppercase;
+    .hero-eyebrow-row .availability {
+      font-family: var(--mono); font-size: 11px; color: var(--mute);
+      letter-spacing: 0.12em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px;
     }
-    .nav-logo-text small { font-size: 10px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; }
-    /* Footer */
-    .footer-inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
-    .footer-lockup { display: flex; align-items: center; gap: 14px; }
-    .footer-lockup img { width: 52px; height: 52px; object-fit: contain; }
-    .footer-brand { display: flex; flex-direction: column; line-height: 1.15; text-align: left; }
-    .footer-brand strong { font-size: 18px; font-weight: 700; letter-spacing: 0.1em; color: var(--primary-dark); text-transform: uppercase; }
-    .footer-brand span { font-size: 11px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.14em; text-transform: uppercase; margin-top: 4px; }
-    .footer-tagline { font-size: 14px; color: var(--text); font-style: italic; max-width: 520px; line-height: 1.55; }
-    .footer-links { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
-    .footer-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; }
-    .footer-links a:hover { color: var(--primary); }
-    .footer-copy { font-size: 12px; color: var(--text-muted); padding-top: 8px; border-top: 1px solid var(--border); width: 100%; }
-    .nav-links { display: flex; gap: 28px; align-items: center; }
-    .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
-    .nav-links a:hover { color: var(--primary); }
-    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.25s; border: none; text-decoration: none; }
-    .btn-primary { background: var(--gradient); color: #fff; box-shadow: 0 4px 20px rgba(31,168,150,0.3); }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(31,168,150,0.4); }
-    .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
-    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
-    .btn-lg { padding: 14px 32px; font-size: 16px; border-radius: 10px; }
-    .btn-white { background: var(--text); color: #fff; font-weight: 700; }
-    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(26,42,46,0.25); }
+    .hero-eyebrow-row .availability .dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--primary);
+      box-shadow: 0 0 0 4px rgba(31,168,150,0.15);
+      animation: pulse-dot 2.4s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(31,168,150,0.15); }
+      50% { box-shadow: 0 0 0 9px rgba(31,168,150,0); }
+    }
+    .hero-headline .display { text-wrap: balance; }
+    .hero-headline .display .line { display: block; }
+    .hero-headline .display .indent { padding-left: clamp(30px, 8vw, 180px); }
 
-    /* Hero */
-    .hero {
-      min-height: 100vh;
-      display: flex; align-items: center; justify-content: center;
-      text-align: center;
-      padding: 120px 24px 80px;
+    .hero-meta {
+      margin-top: clamp(48px, 7vh, 80px);
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: end; gap: 32px;
+      padding-top: 32px; border-top: 1px solid var(--line-soft);
+    }
+    .hero-meta .lead { max-width: 50ch; }
+    .hero-cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    /* The ask — summary numbers */
+    .ask-grid {
+      margin-top: clamp(80px, 12vh, 140px);
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: clamp(16px, 2vw, 32px);
+      padding-top: 24px; border-top: 1px solid var(--line-soft);
+    }
+    .ask-cell { display: flex; flex-direction: column; gap: 8px; }
+    .ask-cell .tag {
+      font-family: var(--mono); font-size: 11px; color: var(--mute);
+      letter-spacing: 0.14em; text-transform: uppercase;
+    }
+    .ask-cell .val {
+      font-family: var(--sans); font-weight: 500;
+      font-size: clamp(26px, 2.6vw, 38px); line-height: 1;
+      letter-spacing: -0.02em; color: var(--ink);
+    }
+    .ask-cell .val em { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--primary-dark); }
+    .ask-cell .sub { font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+
+    /* Capability rows — inherits elegant-thumb look */
+    .cap-list { border-top: 1px solid var(--line); }
+    .cap-row {
+      display: grid;
+      grid-template-columns: 56px 120px 1.2fr 1fr 180px;
+      gap: clamp(20px, 2.4vw, 40px);
+      padding: clamp(28px, 4.5vh, 52px) 0;
+      border-bottom: 1px solid var(--line);
+      align-items: center;
       position: relative;
-      background: var(--gradient-bg);
     }
-    .hero::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: radial-gradient(ellipse at 50% 30%, rgba(31,168,150,0.08) 0%, transparent 60%);
+    .cap-row::before {
+      content: ''; position: absolute; inset: 0 -24px; z-index: -1;
+      background: var(--bg-warm); opacity: 0; border-radius: 2px;
+      transition: opacity 0.5s var(--ease);
     }
-    .hero-content { position: relative; max-width: 800px; }
-    .hero-badge {
-      display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
-      background: var(--primary-light); color: var(--primary); border: 1px solid rgba(31,168,150,0.2);
-      margin-bottom: 24px; letter-spacing: 0.5px;
+    .cap-row:hover::before { opacity: 0.55; }
+    .cap-num { font-family: var(--mono); font-size: 12px; color: var(--mute); letter-spacing: 0.1em; align-self: start; padding-top: 14px; }
+    .cap-title {
+      font-family: var(--sans); font-weight: 500;
+      font-size: clamp(22px, 2.2vw, 30px); line-height: 1.1;
+      letter-spacing: -0.02em; color: var(--ink);
     }
-    .hero h1 { font-size: 56px; font-weight: 900; line-height: 1.1; margin-bottom: 20px; letter-spacing: -1px; }
-    .hero h1 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .hero p { font-size: 18px; color: var(--text-muted); max-width: 600px; margin: 0 auto 36px; line-height: 1.7; }
-    .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-    .hero-stats {
-      display: flex; gap: 48px; justify-content: center; margin-top: 60px;
-      padding-top: 40px; border-top: 1px solid rgba(31,168,150,0.1);
+    .cap-title em { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--primary-dark); }
+    .cap-body { font-size: 15px; line-height: 1.55; color: var(--ink-2); max-width: 42ch; }
+    .cap-body .crossed {
+      display: block; color: var(--mute); font-size: 13px;
+      text-decoration: line-through; text-decoration-thickness: 1px;
+      margin-bottom: 6px; font-style: italic;
     }
-    .hero-stat-value { font-size: 32px; font-weight: 800; color: var(--primary); }
-    .hero-stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .cap-meta {
+      font-family: var(--mono); font-size: 10px; color: var(--mute);
+      letter-spacing: 0.1em; text-transform: uppercase; text-align: right;
+    }
 
-    /* Sections */
-    section { padding: 100px 24px; }
-    .container { max-width: 1100px; margin: 0 auto; }
-    .section-tag {
-      display: inline-block; padding: 5px 14px; border-radius: 16px; font-size: 11px; font-weight: 600;
-      background: var(--primary-light); color: var(--primary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;
+    /* Approach steps */
+    .approach { background: var(--bg-warm); }
+    .approach-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: clamp(16px, 1.6vw, 28px); }
+    .approach-step {
+      grid-column: span 6;
+      padding: clamp(40px, 6vh, 72px) 0;
+      border-top: 1px solid var(--line);
+      display: grid; grid-template-columns: 60px 1fr; gap: 24px;
+      align-items: start;
     }
-    .section-title { font-size: 38px; font-weight: 800; margin-bottom: 16px; letter-spacing: -0.5px; }
-    .section-desc { font-size: 16px; color: var(--text-muted); max-width: 600px; margin-bottom: 48px; }
+    .approach-step:nth-child(even) { grid-column: 7 / span 6; padding-left: clamp(24px, 4vw, 64px); }
+    .approach-step:nth-child(1), .approach-step:nth-child(2) { border-top: none; }
+    .approach-step-num {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: clamp(32px, 4vw, 52px); line-height: 0.9; color: var(--primary-dark);
+    }
+    .approach-step h3 {
+      font-family: var(--sans); font-weight: 500; font-size: clamp(20px, 1.8vw, 26px);
+      letter-spacing: -0.015em; line-height: 1.15; margin-bottom: 10px; color: var(--ink);
+    }
+    .approach-step p { font-size: 15px; line-height: 1.55; color: var(--ink-2); max-width: 36ch; }
 
-    /* Features */
-    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .feature-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-      padding: 28px; transition: all 0.3s;
+    /* Compare split */
+    .compare-split { display: grid; grid-template-columns: repeat(12, 1fr); gap: clamp(16px, 1.6vw, 28px); }
+    .compare-col { padding: clamp(32px, 5vh, 56px) 0; display: flex; flex-direction: column; gap: 24px; }
+    .compare-col.them { grid-column: 1 / span 5; border-top: 1px solid var(--line); }
+    .compare-col.us { grid-column: 7 / span 6; border-top: 2px solid var(--ink); }
+    .compare-col h3 {
+      font-family: var(--sans); font-weight: 500;
+      font-size: clamp(22px, 2vw, 28px); letter-spacing: -0.015em; line-height: 1.15;
+      color: var(--ink);
     }
-    .feature-card:hover { border-color: var(--primary); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(31,168,150,0.08); }
-    .feature-icon {
-      width: 44px; height: 44px; border-radius: 10px; background: var(--primary-light);
-      display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 16px;
+    .compare-col.them h3 em { color: var(--mute); font-family: var(--serif); font-style: italic; font-weight: 400; }
+    .compare-col.us h3 em { color: var(--primary-dark); font-family: var(--serif); font-style: italic; font-weight: 400; }
+    .compare-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+    .compare-list li {
+      font-size: 15px; color: var(--ink-2); line-height: 1.45;
+      padding-left: 22px; position: relative;
     }
-    .feature-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
-    .feature-card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+    .compare-col.them .compare-list li::before {
+      content: '–'; position: absolute; left: 0; top: 0; color: var(--mute);
+      font-family: var(--serif); font-size: 18px; line-height: 1;
+    }
+    .compare-col.us .compare-list li::before {
+      content: ''; position: absolute; left: 0; top: 9px; width: 10px; height: 1px;
+      background: var(--primary);
+    }
+    .compare-col.us .compare-list li { color: var(--ink); font-weight: 500; }
 
-    /* How it Works */
-    .steps { display: flex; gap: 32px; counter-reset: step; }
-    .step {
-      flex: 1; position: relative; padding: 28px; background: var(--surface);
-      border: 1px solid var(--border); border-radius: 14px;
+    /* Pricing editorial */
+    .pricing { border-top: 1px solid var(--line); }
+    .pricing-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 1fr 1fr 200px;
+      gap: clamp(16px, 2.5vw, 40px);
+      padding: clamp(26px, 4vh, 42px) 0;
+      border-bottom: 1px solid var(--line);
+      align-items: baseline;
+      position: relative;
     }
-    .step::before {
-      counter-increment: step; content: counter(step);
-      width: 32px; height: 32px; border-radius: 50%; background: var(--gradient);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 800; color: #fff; margin-bottom: 14px;
+    .pricing-row::before {
+      content: ''; position: absolute; inset: 0 -24px; background: var(--bg-warm);
+      opacity: 0; transition: opacity 0.4s var(--ease); z-index: -1;
     }
-    .step h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
-    .step p { font-size: 13px; color: var(--text-muted); }
+    .pricing-row:hover::before { opacity: 0.7; }
+    .pricing-row.featured { background: linear-gradient(90deg, var(--bg-warm) 0%, transparent 100%); border-bottom-color: var(--ink); }
+    .price-tier { font-family: var(--sans); font-weight: 500; font-size: 22px; letter-spacing: -0.01em; color: var(--ink); display: flex; flex-direction: column; gap: 6px; }
+    .price-tier .tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--primary-dark); font-weight: 500; }
+    .price-num { font-family: var(--sans); font-weight: 500; font-size: clamp(32px, 3.5vw, 48px); letter-spacing: -0.03em; line-height: 1; color: var(--ink); }
+    .price-num .per { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--mute); margin-left: 6px; letter-spacing: 0.06em; }
+    .price-blurb { font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+    .price-features-inline { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink-2); }
+    .price-features-inline li::before { content: '· '; color: var(--primary); }
+    .pricing-row .btn-ghost { justify-self: end; }
 
-    /* Pricing */
-    #pricing { background: var(--surface); }
-    .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .price-card {
-      background: var(--bg); border: 1.5px solid var(--border); border-radius: 16px;
-      padding: 32px; position: relative; transition: all 0.3s;
+    /* Quote moment */
+    .quote-block { padding: clamp(80px, 12vh, 140px) 0; text-align: left; }
+    .quote-block .q {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: clamp(30px, 4.2vw, 60px); line-height: 1.08;
+      letter-spacing: -0.02em; color: var(--ink); max-width: 22ch;
     }
-    .price-card.featured { border-color: var(--primary); box-shadow: 0 0 40px rgba(31,168,150,0.12); }
-    .price-card.featured::before {
-      content: 'MOST POPULAR'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-      background: var(--gradient); color: #fff; padding: 4px 16px; border-radius: 12px;
-      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    .quote-block .attribution {
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--mute); margin-top: 32px;
     }
-    .price-card:hover { transform: translateY(-4px); }
-    .price-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-    .price-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
-    .price-amount { font-size: 42px; font-weight: 900; margin-bottom: 4px; }
-    .price-amount span { font-size: 16px; font-weight: 500; color: var(--text-muted); }
-    .price-period { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
-    .price-features { list-style: none; margin-bottom: 28px; }
-    .price-features li { padding: 8px 0; font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; }
-    .price-features li::before { content: '\2713'; color: var(--primary); font-weight: 700; font-size: 14px; }
-    .price-features li.disabled { opacity: 0.4; }
-    .price-features li.disabled::before { content: '\2717'; color: var(--text-muted); }
 
-    /* Testimonial */
-    .testimonial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .testimonial {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px;
-    }
-    .testimonial-text { font-size: 14px; line-height: 1.7; margin-bottom: 16px; font-style: italic; color: var(--text-muted); }
-    .testimonial-author { font-size: 13px; font-weight: 600; }
-    .testimonial-role { font-size: 12px; color: var(--text-muted); }
+    /* Final CTA */
+    .cta-final { padding: clamp(120px, 18vh, 200px) 0; border-top: 1px solid var(--line); position: relative; }
+    .cta-final .display { max-width: 14ch; }
+    .cta-final-meta { margin-top: clamp(48px, 7vh, 80px); padding-top: 32px; border-top: 1px solid var(--line-soft); display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 24px; }
+    .cta-final-meta .lead { max-width: 42ch; }
 
-    /* CTA */
-    .cta-section {
-      text-align: center; padding: 100px 24px;
-      background: radial-gradient(ellipse at 50% 50%, rgba(31,168,150,0.1) 0%, transparent 60%);
+    /* Modal shared */
+    .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(15,26,29,0.45); backdrop-filter: blur(4px); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--line-soft);
+      border-radius: 20px;
+      padding: clamp(28px, 4vw, 40px);
+      width: 100%; max-width: 480px; position: relative;
+      box-shadow: 0 2px 4px rgba(15,26,29,0.05), 0 16px 40px -12px rgba(15,26,29,0.2), 0 48px 96px -24px rgba(15,26,29,0.28);
+      max-height: calc(100vh - 40px); overflow-y: auto;
     }
-    .cta-section h2 { font-size: 38px; font-weight: 800; margin-bottom: 16px; }
-    .cta-section p { color: var(--text-muted); font-size: 16px; margin-bottom: 32px; }
-
-    /* Footer */
-    footer {
-      padding: 40px 24px; text-align: center;
-      border-top: 1px solid var(--border); color: var(--text-muted); font-size: 13px;
+    .modal-close { position: absolute; top: 14px; right: 16px; background: none; border: none; color: var(--mute); font-size: 22px; cursor: pointer; line-height: 1; }
+    .modal-close:hover { color: var(--ink); }
+    .modal-head { margin-bottom: 24px; }
+    .modal-head h2 { font-family: var(--sans); font-weight: 500; font-size: 24px; letter-spacing: -0.02em; color: var(--ink); margin-bottom: 6px; }
+    .modal-head p { color: var(--mute); font-size: 13px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-family: var(--mono); font-size: 10px; color: var(--mute); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.12em; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 12px 14px; background: var(--bg);
+      border: 1px solid var(--line-soft); border-radius: 10px;
+      color: var(--ink); font-size: 14px; font-family: var(--sans); outline: none;
+      transition: border-color 0.2s;
     }
-    footer a { color: var(--primary); text-decoration: none; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); }
+    .form-group textarea { resize: vertical; min-height: 90px; }
+    .plan-badge { text-align: center; margin-bottom: 20px; }
+    .plan-badge span {
+      display: inline-block; background: var(--primary-tint); color: var(--primary-dark);
+      padding: 6px 14px; border-radius: 999px; font-family: var(--mono); font-size: 11px;
+      font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .modal-err { color: var(--danger); font-size: 13px; margin-bottom: 12px; display: none; }
+    .modal-btn {
+      width: 100%; padding: 14px 22px; border-radius: 999px; border: none;
+      background: var(--ink); color: var(--bg);
+      font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer;
+      transition: all 0.3s var(--ease);
+    }
+    .modal-btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .modal-foot { text-align: center; margin-top: 16px; font-size: 13px; color: var(--mute); }
+    .modal-foot a { color: var(--primary-dark); text-decoration: none; border-bottom: 1px solid currentColor; }
 
     /* Responsive */
-    @media (max-width: 768px) {
-      .nav { padding: 12px 20px; }
-      .nav-links a:not(.btn) { display: none; }
-      .hero h1 { font-size: 32px; }
-      .hero-stats { flex-direction: column; gap: 20px; }
-      .features-grid, .pricing-grid, .testimonial-grid, .steps { grid-template-columns: 1fr; flex-direction: column; }
-      #compare table th:nth-child(n+4), #compare table td:nth-child(n+4) { display: none; }
-      #compare > div > div:first-child { grid-template-columns: 1fr; }
+    @media (max-width: 900px) {
+      .ask-grid { grid-template-columns: repeat(2, 1fr); }
+      .cap-row { grid-template-columns: 44px 96px 1fr; align-items: start; }
+      .cap-row .elegant-thumb { width: 96px; height: 96px; grid-column: 2; }
+      .cap-row .cap-title, .cap-row .cap-body, .cap-row .cap-meta { grid-column: 3; }
+      .approach-step, .approach-step:nth-child(even) { grid-column: 1 / -1; padding-left: 0; }
+      .compare-col.them, .compare-col.us { grid-column: 1 / -1; }
+      .pricing-row { grid-template-columns: 1fr 1fr; gap: 12px; padding: 24px 0; }
+      .pricing-row .btn-ghost { grid-column: 1 / -1; justify-self: start; padding: 10px 0; }
+      .pricing-row .price-features-inline { grid-column: 1 / -1; }
+    }
+    @media (max-width: 640px) {
+      .hero-meta { grid-template-columns: 1fr; }
+      .hero-eyebrow-row { padding-bottom: 32px; margin-bottom: 32px; }
+      .hero-headline .display .indent { padding-left: 0; }
+      .ask-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
 <body>
 
 <!-- Nav -->
-<nav class="nav">
+<nav class="nav" id="siteNav">
   <a href="/" class="nav-logo">
-    <img src="/brand/shield.png?v=3" alt="EIAAW Solutions shield">
+    <img src="/brand/shield.png?v=3" alt="EIAAW Solutions">
     <span class="nav-logo-text">
       <strong>EIAAW SOLUTIONS</strong>
       <small>AI &middot; Human Partnerships</small>
     </span>
   </a>
   <div class="nav-links">
-    <a href="#features">Features</a>
-    <a href="#how">How It Works</a>
-    <a href="#compare">Why Us</a>
+    <a href="#capabilities">Capabilities</a>
+    <a href="#approach">Approach</a>
     <a href="#pricing">Pricing</a>
-    <a href="/app" class="btn btn-primary">Sign In</a>
+    <a href="/app" class="btn btn-primary">Sign in <span class="arrow">&rarr;</span></a>
   </div>
 </nav>
 
 <!-- Hero -->
 <section class="hero">
-  <div class="hero-content">
-    <div class="hero-badge">Powered by EIAAW Solutions</div>
-    <h1>Your AI Sales Agent That <span>Actually Does The Work</span></h1>
-    <p>AI that generates leads, scores them with reasoning, writes personalized outreach, creates marketing content, and even talks to prospects on your behalf — so you focus on closing, not chasing. Built for Malaysian sales teams.</p>
-    <div class="hero-cta">
-      <button class="btn btn-primary btn-lg" onclick="openSignup('pro')">Start 14-Day Free Trial</button>
-      <a href="#pricing" class="btn btn-outline btn-lg">View Pricing</a>
+  <div class="wrap">
+
+    <div class="hero-eyebrow-row rvl">
+      <div class="eyebrow">A proposal</div>
+      <div class="availability"><span class="dot"></span> Valid for 14 days</div>
     </div>
-    <div class="hero-stats">
-      <div><div class="hero-stat-value">0</div><div class="hero-stat-label">Cold Calls You Make</div></div>
-      <div><div class="hero-stat-value">AI</div><div class="hero-stat-label">Writes Every Email</div></div>
-      <div><div class="hero-stat-value">0-100</div><div class="hero-stat-label">Lead Score + Why</div></div>
-      <div><div class="hero-stat-value">24/7</div><div class="hero-stat-label">AI Voice Agent</div></div>
+
+    <div class="grid-12">
+      <div class="hero-headline rvl" style="grid-column: 1 / span 10">
+        <h1 class="display kinetic">
+          <span class="line">A sales system</span>
+          <span class="line">built to <em>act</em>,</span>
+          <span class="line indent">not just <em>remember</em>.</span>
+        </h1>
+      </div>
+    </div>
+
+    <div class="hero-meta rvl">
+      <p class="lead">
+        This is a proposal for a single agent that generates leads, qualifies them with reasoning, writes outreach, and talks to prospects by voice &mdash; in place of hours of manual work, every day.
+      </p>
+      <div class="hero-cta-row">
+        <button class="btn btn-primary btn-lg magnetic" onclick="openSignup('pro')">Start 14-day trial <span class="arrow">&rarr;</span></button>
+        <button class="btn btn-ghost" onclick="openContact()">Talk to us</button>
+      </div>
+    </div>
+
+    <div class="ask-grid rvl">
+      <div class="ask-cell">
+        <span class="tag">01 &mdash; Outbound</span>
+        <span class="val"><em>0</em></span>
+        <span class="sub">Cold calls you make. Ever.</span>
+      </div>
+      <div class="ask-cell">
+        <span class="tag">02 &mdash; Qualification</span>
+        <span class="val"><em>0</em>&ndash;<em>100</em></span>
+        <span class="sub">Reasoned BANT score per lead.</span>
+      </div>
+      <div class="ask-cell">
+        <span class="tag">03 &mdash; Time to live</span>
+        <span class="val"><em>5</em></span>
+        <span class="sub">Minutes from signup to first lead.</span>
+      </div>
+      <div class="ask-cell">
+        <span class="tag">04 &mdash; Investment</span>
+        <span class="val">RM <em>99</em></span>
+        <span class="sub">Starting. Monthly. Cancel anytime.</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Capabilities -->
+<section id="capabilities" class="section-pad">
+  <div class="wrap">
+    <header class="section-head rvl">
+      <div class="label eyebrow">Capabilities</div>
+      <h2 class="title section-h">Six surfaces. <em>One agent.</em></h2>
+      <div class="aside">The scope</div>
+    </header>
+
+    <div class="cap-list">
+      <article class="cap-row rvl elegant-thumb-parent">
+        <div class="cap-num">001</div>
+        <div class="elegant-thumb" style="width:120px;height:120px"><img src="/media/leadgen.jpg" alt="" loading="lazy"></div>
+        <h3 class="cap-title">Lead <em>generation</em>.</h3>
+        <p class="cap-body">
+          <span class="crossed">Hours in LinkedIn, directories, Google.</span>
+          Describe your ICP. The agent returns a ranked list of matching prospects &mdash; verified, enriched, exportable.
+        </p>
+        <div class="cap-meta">Search &rarr; Enrich &rarr; Export</div>
+      </article>
+
+      <article class="cap-row rvl elegant-thumb-parent">
+        <div class="cap-num">002</div>
+        <div class="elegant-thumb" style="width:120px;height:120px"><img src="/media/scoring.jpg" alt="" loading="lazy"></div>
+        <h3 class="cap-title">Scoring <em>with reasoning</em>.</h3>
+        <p class="cap-body">
+          <span class="crossed">Gut-feel on who's "ready to buy".</span>
+          Every lead scored 0&ndash;100 on BANT with a paragraph of reasoning. Read why, not just what.
+        </p>
+        <div class="cap-meta">BANT + Rationale</div>
+      </article>
+
+      <article class="cap-row rvl elegant-thumb-parent">
+        <div class="cap-num">003</div>
+        <div class="elegant-thumb" style="width:120px;height:120px"><img src="/media/outreach.jpg" alt="" loading="lazy"></div>
+        <h3 class="cap-title">Outreach <em>sequences</em>.</h3>
+        <p class="cap-body">
+          <span class="crossed">Re-writing the same follow-up, forever.</span>
+          Multi-step email sequences, personalised per lead, scheduled and tracked. You review, it sends.
+        </p>
+        <div class="cap-meta">Email + SMS + LinkedIn</div>
+      </article>
+
+      <article class="cap-row rvl elegant-thumb-parent">
+        <div class="cap-num">004</div>
+        <div class="elegant-thumb" style="width:120px;height:120px"><img src="/media/content.jpg" alt="" loading="lazy"></div>
+        <h3 class="cap-title">Content for <em>every platform</em>.</h3>
+        <p class="cap-body">
+          <span class="crossed">Staring at a blank LinkedIn post.</span>
+          Ad copy, social posts, newsletters, landing pages &mdash; generated on brand, ready to publish.
+        </p>
+        <div class="cap-meta">Posts &middot; Emails &middot; Ads &middot; GEO</div>
+      </article>
+
+      <article class="cap-row rvl elegant-thumb-parent">
+        <div class="cap-num">005</div>
+        <div class="elegant-thumb" style="width:120px;height:120px"><img src="/media/voice.jpg" alt="" loading="lazy"></div>
+        <h3 class="cap-title">A voice agent that <em>picks up</em>.</h3>
+        <p class="cap-body">
+          <span class="crossed">Fifty cold calls a day, three answer.</span>
+          Send a link. The prospect clicks. Your AI agent talks to them, qualifies, books the demo. You never dial.
+        </p>
+        <div class="cap-meta">Inbound voice &middot; Retell</div>
+      </article>
+
+      <article class="cap-row rvl elegant-thumb-parent">
+        <div class="cap-num">006</div>
+        <div class="elegant-thumb" style="width:120px;height:120px"><img src="/media/pipeline.jpg" alt="" loading="lazy"></div>
+        <h3 class="cap-title">Pipeline + <em>assistant</em>.</h3>
+        <p class="cap-body">
+          <span class="crossed">Spreadsheets, sticky notes, forgotten follow-ups.</span>
+          Pipeline, deal stages, activity timeline, and an AI assistant that summarises, suggests, moves deals forward.
+        </p>
+        <div class="cap-meta">Pipeline &middot; Assistant &middot; CRM</div>
+      </article>
     </div>
   </div>
 </section>
 
-<!-- Features -->
-<section id="features">
-  <div class="container">
-    <div class="section-tag">Features</div>
-    <h2 class="section-title">What a Manual Salesperson Does in a Day. <span style="color:var(--primary)">Your AI Does in Seconds.</span></h2>
-    <p class="section-desc">Every feature replaces hours of manual work with one click. Here's what your AI sales agent handles for you.</p>
+<!-- Quote moment -->
+<section class="quote-block">
+  <div class="wrap">
+    <blockquote class="q rvl">
+      &ldquo;A <em>CRM</em> remembers. <br>An <em>agent</em> acts.&rdquo;
+    </blockquote>
+    <div class="attribution rvl">The working thesis &mdash; EIAAW Solutions</div>
+  </div>
+</section>
 
-    <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon">&#9679;</div>
-        <h3>AI Lead Generation</h3>
-        <p><strong>Manual:</strong> Hours searching LinkedIn, directories, Google.<br><strong>AI:</strong> Describe your target audience — AI generates matching leads with names, companies, titles, emails, and phone numbers. One click.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#9733;</div>
-        <h3>AI Lead Scoring with Reasoning</h3>
-        <p><strong>Manual:</strong> Gut feeling on who's "ready to buy".<br><strong>AI:</strong> Scores every lead 0-100 using BANT framework and tells you exactly WHY — budget fit, authority level, need urgency, timeline. You read the reasoning, not just a number.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#9993;</div>
-        <h3>AI Email Outreach Sequences</h3>
-        <p><strong>Manual:</strong> Writing the same follow-up emails over and over.<br><strong>AI:</strong> Generates personalized multi-step email sequences per lead — intro, value add, case study, follow-up. Set it up and the system sends on schedule.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#9998;</div>
-        <h3>AI Content for Every Platform</h3>
-        <p><strong>Manual:</strong> Struggling to write a LinkedIn post or ad copy.<br><strong>AI:</strong> Generates marketing emails, social posts (LinkedIn, IG, FB, X), ad copy, and SEO/GEO strategies — with color palettes, design briefs, and copy ready to publish.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#128172;</div>
-        <h3>AI Voice Agent</h3>
-        <p><strong>Manual:</strong> You make 50 cold calls a day, most don't answer.<br><strong>AI:</strong> Send any lead a link — they click it and your AI agent talks to them live in their browser. It introduces your product, qualifies interest, and reports back. You never pick up the phone.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">&#10070;</div>
-        <h3>AI Sales Assistant + Pipeline</h3>
-        <p><strong>Manual:</strong> Spreadsheets, sticky notes, forgotten follow-ups.<br><strong>AI:</strong> Full CRM with pipeline tracking, deal stages, and an AI assistant that knows your entire lead database. Ask it anything — it gives specific, actionable answers.</p>
-      </div>
+<!-- Approach -->
+<section id="approach" class="approach section-pad">
+  <div class="wrap">
+    <header class="section-head rvl">
+      <div class="label eyebrow">Approach</div>
+      <h2 class="title section-h">Four moves. <em>Five minutes to live.</em></h2>
+      <div class="aside">The method</div>
+    </header>
+
+    <div class="approach-grid">
+      <article class="approach-step rvl">
+        <div class="approach-step-num">i.</div>
+        <div>
+          <h3>Describe your market.</h3>
+          <p>A sentence is enough. The agent returns matching leads &mdash; or import a CSV of accounts you already have.</p>
+        </div>
+      </article>
+
+      <article class="approach-step rvl">
+        <div class="approach-step-num">ii.</div>
+        <div>
+          <h3>Score on reasoning.</h3>
+          <p>One click per lead. Budget, Authority, Need, Timeline &mdash; explained in plain English next to the number.</p>
+        </div>
+      </article>
+
+      <article class="approach-step rvl">
+        <div class="approach-step-num">iii.</div>
+        <div>
+          <h3>Outreach writes itself.</h3>
+          <p>Personalised email sequences, ad copy, and content &mdash; drafted, queued, and sent on your schedule.</p>
+        </div>
+      </article>
+
+      <article class="approach-step rvl">
+        <div class="approach-step-num">iv.</div>
+        <div>
+          <h3>The agent takes the call.</h3>
+          <p>Share a voice link with any lead. The agent qualifies, handles objections, books the demo &mdash; while you sleep.</p>
+        </div>
+      </article>
     </div>
   </div>
 </section>
 
-<!-- How It Works -->
-<section id="how" style="background:var(--surface)">
-  <div class="container">
-    <div class="section-tag">How It Works</div>
-    <h2 class="section-title">Up and Running in 5 Minutes</h2>
-    <p class="section-desc">No complex setup. No training needed. Start closing deals today.</p>
+<!-- Compare -->
+<section id="compare" class="section-pad">
+  <div class="wrap">
+    <header class="section-head rvl">
+      <div class="label eyebrow">The delta</div>
+      <h2 class="title section-h">Other tools <em>store</em>. Ours <em>acts</em>.</h2>
+      <div class="aside">Vs. the field</div>
+    </header>
 
-    <div class="steps">
-      <div class="step">
-        <h3>AI Generates Your Leads</h3>
-        <p>Tell the AI your target audience. It generates a list of matching prospects with contact details — or import your own via CSV.</p>
-      </div>
-      <div class="step">
-        <h3>AI Scores & Explains Why</h3>
-        <p>One click scores any lead 0-100 with BANT reasoning. AI tells you "this lead is hot because..." — not just a number.</p>
-      </div>
-      <div class="step">
-        <h3>AI Writes & Sends Outreach</h3>
-        <p>AI generates personalized email sequences and marketing content for each lead. Set up the campaign — emails send on schedule.</p>
-      </div>
-      <div class="step">
-        <h3>AI Talks to Your Leads</h3>
-        <p>Send a voice chat link to any lead. Your AI agent introduces your product, qualifies them, and reports back — while you focus on closing.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Why Us -->
-<section id="compare">
-  <div class="container">
-    <div class="section-tag">Why Choose Us</div>
-    <h2 class="section-title">Other Tools Store Data. <span style="color:var(--primary)">Ours Does The Selling.</span></h2>
-    <p class="section-desc">Most CRMs are fancy spreadsheets. We built an AI agent that generates leads, writes emails, creates content, and talks to prospects — so you focus on closing.</p>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:48px">
-      <!-- Problem -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px">
-        <div style="font-size:24px;margin-bottom:12px">&#10060;</div>
-        <h3 style="font-size:16px;margin-bottom:12px;color:var(--danger)">Other Sales Tools</h3>
-        <ul style="list-style:none;font-size:14px;color:var(--text-muted);line-height:2.2">
-          <li>&#8226; You manually enter every lead</li>
-          <li>&#8226; You write every email yourself</li>
-          <li>&#8226; You decide who to follow up with</li>
-          <li>&#8226; You score leads by gut feeling</li>
-          <li>&#8226; Separate tools for CRM, email, content</li>
-          <li>&#8226; RM 800-3,000+/month for enterprise features</li>
-          <li>&#8226; Weeks of setup and training</li>
+    <div class="compare-split">
+      <div class="compare-col them rvl">
+        <h3>A traditional <em>CRM stack.</em></h3>
+        <ul class="compare-list">
+          <li>You enter every lead by hand.</li>
+          <li>You write every email yourself.</li>
+          <li>You decide who to chase next, on vibes.</li>
+          <li>Separate tools for CRM, email, content, voice.</li>
+          <li>RM 800&ndash;3,000 / month at the enterprise tier.</li>
+          <li>Weeks of setup, consultants, training.</li>
+          <li>Pretty reports. No outbound.</li>
         </ul>
       </div>
-      <!-- Solution -->
-      <div style="background:var(--surface);border:1.5px solid var(--primary);border-radius:14px;padding:28px;box-shadow:0 0 30px rgba(31,168,150,0.08)">
-        <div style="font-size:24px;margin-bottom:12px">&#10004;</div>
-        <h3 style="font-size:16px;margin-bottom:12px;color:var(--primary)">EIAAW SalesAgent AI</h3>
-        <ul style="list-style:none;font-size:14px;color:var(--text);line-height:2.2">
-          <li>&#10003; <strong>AI generates leads for you</strong> — describe audience, get prospects</li>
-          <li>&#10003; <strong>AI scores with reasoning</strong> — 0-100 + why, not gut feeling</li>
-          <li>&#10003; <strong>AI writes & sends outreach</strong> — personalized per lead, on schedule</li>
-          <li>&#10003; <strong>AI creates all your content</strong> — emails, social, ads, SEO</li>
-          <li>&#10003; <strong>AI voice agent talks to leads</strong> — qualifies them without you</li>
-          <li>&#10003; <strong>All-in-one</strong> — CRM + email + content + pipeline + voice</li>
-          <li>&#10003; <strong>From RM 99/month</strong> — fraction of enterprise tools</li>
+
+      <div class="compare-col us rvl">
+        <h3>EIAAW &mdash; a <em>sales agent</em>, not a spreadsheet.</h3>
+        <ul class="compare-list">
+          <li>Leads generated on brief, on demand.</li>
+          <li>Outreach written, scheduled, sent.</li>
+          <li>Scored with reasoning &mdash; you read the why.</li>
+          <li>One surface: CRM, content, email, voice.</li>
+          <li>From RM 99 / month. No consulting.</li>
+          <li>Live in five minutes, not five weeks.</li>
+          <li>Built to <em>act</em>, not just remember.</li>
         </ul>
       </div>
-    </div>
-
-    <!-- Comparison Table -->
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden">
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
-        <thead>
-          <tr style="border-bottom:1px solid var(--border)">
-            <th style="text-align:left;padding:14px 18px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:0.5px">Feature</th>
-            <th style="text-align:center;padding:14px 18px;background:rgba(31,168,150,0.08);color:var(--primary);font-weight:700">EIAAW SalesAgent</th>
-            <th style="text-align:center;padding:14px 18px;color:var(--text-muted)">HubSpot</th>
-            <th style="text-align:center;padding:14px 18px;color:var(--text-muted)">Apollo.io</th>
-            <th style="text-align:center;padding:14px 18px;color:var(--text-muted)">Instantly.ai</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
-            <td style="padding:12px 18px">AI Lead Generation</td>
-            <td style="text-align:center;padding:12px;background:rgba(31,168,150,0.04);color:var(--primary);font-weight:700">&#10003; Built-in</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">Database only</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-          </tr>
-          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
-            <td style="padding:12px 18px">AI Content Generation</td>
-            <td style="text-align:center;padding:12px;background:rgba(31,168,150,0.04);color:var(--primary);font-weight:700">&#10003; Email, Social, Ads, SEO</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">Paid add-on</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-          </tr>
-          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
-            <td style="padding:12px 18px">AI Lead Scoring</td>
-            <td style="text-align:center;padding:12px;background:rgba(31,168,150,0.04);color:var(--primary);font-weight:700">&#10003; With reasoning</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">Enterprise only</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">Basic</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-          </tr>
-          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
-            <td style="padding:12px 18px">Auto-Outreach Sequences</td>
-            <td style="text-align:center;padding:12px;background:rgba(31,168,150,0.04);color:var(--primary);font-weight:700">&#10003; AI-personalized</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">Add-on</td>
-            <td style="text-align:center;padding:12px;color:var(--success)">&#10003;</td>
-            <td style="text-align:center;padding:12px;color:var(--success)">&#10003;</td>
-          </tr>
-          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
-            <td style="padding:12px 18px">AI Chat Assistant (CRM context)</td>
-            <td style="text-align:center;padding:12px;background:rgba(31,168,150,0.04);color:var(--primary);font-weight:700">&#10003; Full CRM context</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">Beta</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-          </tr>
-          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
-            <td style="padding:12px 18px">Sales Pipeline</td>
-            <td style="text-align:center;padding:12px;background:rgba(31,168,150,0.04);color:var(--primary);font-weight:700">&#10003; + AI Analysis</td>
-            <td style="text-align:center;padding:12px;color:var(--success)">&#10003;</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">Basic</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-          </tr>
-          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
-            <td style="padding:12px 18px">AI Voice Agent (talks to leads)</td>
-            <td style="text-align:center;padding:12px;background:rgba(31,168,150,0.04);color:var(--primary);font-weight:700">&#10003; Via browser link</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-          </tr>
-          <tr style="border-bottom:1px solid rgba(42,84,112,0.3)">
-            <td style="padding:12px 18px">Social Media Poster Design</td>
-            <td style="text-align:center;padding:12px;background:rgba(31,168,150,0.04);color:var(--primary);font-weight:700">&#10003; Built-in</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-            <td style="text-align:center;padding:12px;color:var(--text-muted)">&#10007;</td>
-          </tr>
-          <tr>
-            <td style="padding:14px 18px;font-weight:700">Starting Price</td>
-            <td style="text-align:center;padding:14px;background:rgba(31,168,150,0.08);color:var(--primary);font-weight:800;font-size:15px">RM 99/mo</td>
-            <td style="text-align:center;padding:14px;color:var(--text-muted)">Free - RM 3,600/mo</td>
-            <td style="text-align:center;padding:14px;color:var(--text-muted)">Free - $99/mo</td>
-            <td style="text-align:center;padding:14px;color:var(--text-muted)">$30-$77/mo</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div style="text-align:center;margin-top:32px">
-      <button class="btn btn-primary btn-lg" onclick="openSignup('pro')">Start Selling Smarter — 14 Days Free</button>
     </div>
   </div>
 </section>
 
 <!-- Pricing -->
-<section id="pricing">
-  <div class="container">
-    <div class="section-tag">Pricing</div>
-    <h2 class="section-title">Simple, Transparent Pricing</h2>
-    <p class="section-desc">Choose the plan that fits your sales team. Upgrade anytime as you grow.</p>
+<section id="pricing" class="section-pad">
+  <div class="wrap">
+    <header class="section-head rvl">
+      <div class="label eyebrow">Pricing</div>
+      <h2 class="title section-h">Flat monthly. <em>Cancel anytime.</em></h2>
+      <div class="aside">MYR &middot; 14-day trial</div>
+    </header>
 
-    <div class="pricing-grid">
-      <div class="price-card">
-        <div class="price-name">Starter</div>
-        <div class="price-desc">For individual salespeople getting started</div>
-        <div class="price-amount">RM 99<span>/mo</span></div>
-        <div class="price-period">Billed monthly</div>
-        <ul class="price-features">
-          <li>100 leads</li>
-          <li>3 campaigns</li>
-          <li>50 AI actions/month</li>
-          <li>5 voice calls/month</li>
-          <li>AI email & social content</li>
-          <li>Sales pipeline</li>
-          <li>AI chat assistant</li>
-          <li class="disabled">Auto-outreach & lead gen</li>
+    <div class="pricing">
+      <div class="pricing-row rvl">
+        <div class="price-tier"><span class="tag">Tier 01</span>Starter</div>
+        <div class="price-num">RM 99<span class="per">/ mo</span></div>
+        <p class="price-blurb">Individual salespeople getting started.</p>
+        <ul class="price-features-inline">
+          <li>100 leads &middot; 3 campaigns</li>
+          <li>50 AI actions / month</li>
+          <li>5 voice calls / month</li>
+          <li>Email &amp; social content</li>
         </ul>
-        <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="openSignup('starter')">Start 14-Day Free Trial</button>
+        <button class="btn btn-ghost" onclick="openSignup('starter')">Start trial <span class="arrow">&rarr;</span></button>
       </div>
 
-      <div class="price-card featured">
-        <div class="price-name">Pro</div>
-        <div class="price-desc">For serious salespeople who want AI advantage</div>
-        <div class="price-amount">RM 199<span>/mo</span></div>
-        <div class="price-period">14-day free trial, then billed monthly</div>
-        <ul class="price-features">
-          <li>500 leads</li>
-          <li>10 campaigns</li>
-          <li>200 AI actions/month</li>
-          <li>20 voice calls/month</li>
-          <li>AI email, social, ads & GEO</li>
-          <li>Sales pipeline + AI analysis</li>
-          <li>AI chat assistant (full CRM)</li>
+      <div class="pricing-row featured rvl">
+        <div class="price-tier"><span class="tag">Tier 02 &middot; Most chosen</span>Pro</div>
+        <div class="price-num">RM 199<span class="per">/ mo</span></div>
+        <p class="price-blurb">Operators who want real AI leverage.</p>
+        <ul class="price-features-inline">
+          <li>500 leads &middot; 10 campaigns</li>
+          <li>200 AI actions / month</li>
+          <li>20 voice calls / month</li>
           <li>Auto-outreach + AI lead gen</li>
         </ul>
-        <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="openSignup('pro')">Start 14-Day Free Trial</button>
+        <button class="btn btn-primary" onclick="openSignup('pro')">Start trial <span class="arrow">&rarr;</span></button>
       </div>
 
-      <div class="price-card">
-        <div class="price-name">Business</div>
-        <div class="price-desc">For sales teams and agencies</div>
-        <div class="price-amount">RM 399<span>/mo</span></div>
-        <div class="price-period">14-day free trial, then billed monthly</div>
-        <ul class="price-features">
-          <li>Unlimited leads</li>
-          <li>Unlimited campaigns</li>
-          <li>1,000 AI actions/month</li>
-          <li>100 voice calls/month</li>
-          <li>All AI content tools</li>
-          <li>Pipeline + AI analysis</li>
-          <li>Priority AI model (Claude Sonnet)</li>
-          <li>Up to 10 team users</li>
+      <div class="pricing-row rvl">
+        <div class="price-tier"><span class="tag">Tier 03</span>Business</div>
+        <div class="price-num">RM 399<span class="per">/ mo</span></div>
+        <p class="price-blurb">Sales teams and agencies.</p>
+        <ul class="price-features-inline">
+          <li>Unlimited leads &amp; campaigns</li>
+          <li>1,000 AI actions / month</li>
+          <li>100 voice calls / month</li>
+          <li>Priority model (Claude Sonnet) &middot; up to 10 seats</li>
         </ul>
-        <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="openSignup('business')">Start 14-Day Free Trial</button>
+        <button class="btn btn-ghost" onclick="openSignup('business')">Start trial <span class="arrow">&rarr;</span></button>
       </div>
     </div>
   </div>
 </section>
 
-<!-- CTA -->
-<section class="cta-section">
-  <h2>Ready to Let AI Do The Selling?</h2>
-  <p>Generate leads, score them, write outreach, create content, and let your AI voice agent talk to prospects — all from one platform. 14-day free trial.</p>
-  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
-    <button class="btn btn-white btn-lg" onclick="openSignup('pro')">Start 14-Day Free Trial</button>
-    <button class="btn btn-outline btn-lg" onclick="openContact()">Talk to Us</button>
+<!-- Final CTA -->
+<section class="cta-final">
+  <div class="wrap">
+    <div class="eyebrow rvl">The ask</div>
+    <h2 class="display rvl" style="margin-top:20px">
+      Give the agent <em>fourteen days</em>.
+    </h2>
+    <div class="cta-final-meta rvl">
+      <p class="lead">No card charged during the trial. The agent is live the moment you sign in. If it doesn't carry its weight, walk.</p>
+      <div class="hero-cta-row">
+        <button class="btn btn-primary btn-lg magnetic" onclick="openSignup('pro')">Start 14-day trial <span class="arrow">&rarr;</span></button>
+        <button class="btn btn-outline btn-lg" onclick="openContact()">Talk to us</button>
+      </div>
+    </div>
   </div>
 </section>
 
 <!-- Footer -->
-<footer style="padding:56px 24px 32px; border-top:1px solid var(--border); background:var(--surface2); color:var(--text-muted); font-size:13px">
-  <div class="footer-inner">
-    <div class="footer-lockup">
-      <img src="/brand/shield.png?v=3" alt="EIAAW Solutions shield">
-      <div class="footer-brand">
-        <strong>EIAAW SOLUTIONS</strong>
-        <span>AI &middot; Human Partnerships</span>
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-lockup-blk">
+        <div class="lockup">
+          <img src="/brand/shield.png?v=3" alt="EIAAW Solutions">
+          <div class="brand">
+            <strong>EIAAW SOLUTIONS</strong>
+            <span>AI &middot; Human Partnerships</span>
+          </div>
+        </div>
+        <p class="footer-statement">Sales, written and spoken by an agent that doesn't sleep.</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#capabilities">Capabilities</a></li>
+          <li><a href="#approach">Approach</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="/app">Sign in</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://eiaawsolutions.com" target="_blank">EIAAW Solutions</a></li>
+          <li><a href="#" onclick="openContact();return false">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">Terms</a></li>
+        </ul>
       </div>
     </div>
-    <p class="footer-tagline">&ldquo;AI that generates leads, writes outreach, creates content, and talks to prospects &mdash; so you focus on closing.&rdquo;</p>
-    <div class="footer-links">
-      <a href="/landing.html">Features</a>
-      <a href="/landing.html#pricing">Pricing</a>
-      <a href="/app">Sign In</a>
-      <a href="https://eiaawsolutions.com" target="_blank">EIAAW Solutions</a>
+
+    <div class="footer-bottom">
+      <div>&copy; 2026 EIAAW Solutions &mdash; All rights reserved</div>
+      <div>Kuala Lumpur &middot; Built for sales teams that act</div>
     </div>
-    <div class="footer-copy">&copy; 2026 EIAAW Solutions. All rights reserved.</div>
   </div>
 </footer>
 
-<!-- AI Chatbot Widget -->
-<div id="chatbot-toggle" onclick="toggleChatbot()" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:300;box-shadow:0 4px 20px rgba(31,168,150,0.4);transition:transform 0.2s">
-  <span style="font-size:24px;color:#fff" id="chatbot-icon">&#128172;</span>
+<!-- Chatbot -->
+<div id="chatbot-toggle" onclick="toggleChatbot()" class="chat-toggle" aria-label="Open chat">
+  <span id="chatbot-icon" aria-hidden="true">&#128172;</span>
 </div>
-
-<div id="chatbot-panel" style="display:none;position:fixed;bottom:90px;right:24px;width:380px;max-height:500px;background:var(--bg);border:1px solid var(--border);border-radius:16px;z-index:300;box-shadow:0 8px 40px rgba(0,0,0,0.4);overflow:hidden;flex-direction:column">
-  <div style="background:var(--gradient);padding:16px;display:flex;justify-content:space-between;align-items:center">
+<div id="chatbot-panel" class="chat-panel" style="display:none">
+  <div class="chat-header">
     <div>
-      <div style="font-weight:700;color:#fff;font-size:14px">EIAAW Sales Assistant</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.7)">Ask me anything about our AI sales tool</div>
+      <div class="chat-title">EIAAW Sales Assistant</div>
+      <div class="chat-sub">Ask anything about the proposal</div>
     </div>
-    <button onclick="toggleChatbot()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer">&times;</button>
+    <button onclick="toggleChatbot()" class="chat-close" aria-label="Close chat">&times;</button>
   </div>
-  <div id="chatbot-messages" style="flex:1;overflow-y:auto;padding:12px;max-height:340px;min-height:200px">
-    <div style="background:var(--surface);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);margin-bottom:8px;max-width:85%">
-      Hi! I'm the EIAAW Sales Assistant. Ask me about our AI sales tool, pricing, or how we can help you close more deals!
-    </div>
+  <div id="chatbot-messages" class="chat-msgs">
+    <div class="chat-msg">Hi &mdash; I'm the EIAAW assistant. Ask me anything about this proposal, the product, or pricing.</div>
   </div>
-  <div style="padding:10px;border-top:1px solid var(--border);display:flex;gap:8px">
-    <input id="chatbot-input" placeholder="Ask me anything..." style="flex:1;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px" onkeydown="if(event.key==='Enter')sendChatbotMsg()">
-    <button onclick="sendChatbotMsg()" class="btn btn-primary" style="padding:8px 14px;font-size:13px">Send</button>
+  <div class="chat-input-row">
+    <input id="chatbot-input" placeholder="Ask anything&hellip;" class="chat-input" onkeydown="if(event.key==='Enter')sendChatbotMsg()">
+    <button onclick="sendChatbotMsg()" class="btn btn-primary chat-send">Send</button>
   </div>
 </div>
 
 <!-- Contact Modal -->
-<div id="contact-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center">
-  <div style="background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:32px;width:90%;max-width:480px;position:relative">
-    <button onclick="closeContact()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">&times;</button>
-    <div style="text-align:center;margin-bottom:24px">
-      <h2 style="font-size:22px;margin-bottom:4px">Get in Touch</h2>
-      <p style="color:var(--text-muted);font-size:13px">Have questions? We'd love to hear from you. Our team will get back to you within 24 hours.</p>
+<div id="contact-modal" class="modal-backdrop">
+  <div class="modal-card">
+    <button onclick="closeContact()" class="modal-close" aria-label="Close">&times;</button>
+    <div class="modal-head">
+      <h2>Get in touch.</h2>
+      <p>Questions? We reply within 24 hours.</p>
     </div>
     <div id="contact-form">
-      <div style="margin-bottom:14px">
-        <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Full Name *</label>
-        <input id="ct-name" placeholder="Your name" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
-      </div>
-      <div style="margin-bottom:14px">
-        <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Email *</label>
-        <input id="ct-email" type="email" placeholder="you@company.com" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
-      </div>
-      <div style="margin-bottom:14px">
-        <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Phone</label>
-        <input id="ct-phone" placeholder="+60 12-345 6789" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
-      </div>
-      <div style="margin-bottom:14px">
-        <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Company</label>
-        <input id="ct-company" placeholder="Your company name" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
-      </div>
-      <div style="margin-bottom:14px">
-        <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">How can we help? *</label>
-        <textarea id="ct-message" rows="4" placeholder="Tell us about your sales needs, team size, or any questions..." style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
-      </div>
-      <div id="ct-error" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none"></div>
-      <button id="ct-btn" onclick="submitContact()" class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px">
-        Send Enquiry
-      </button>
+      <div class="form-group"><label>Full name *</label><input id="ct-name" placeholder="Your name"></div>
+      <div class="form-group"><label>Email *</label><input id="ct-email" type="email" placeholder="you@company.com"></div>
+      <div class="form-group"><label>Phone</label><input id="ct-phone" placeholder="+60 12-345 6789"></div>
+      <div class="form-group"><label>Company</label><input id="ct-company" placeholder="Your company"></div>
+      <div class="form-group"><label>How can we help? *</label><textarea id="ct-message" rows="4" placeholder="Tell us about your team, pipeline, or any questions."></textarea></div>
+      <div id="ct-error" class="modal-err"></div>
+      <button id="ct-btn" onclick="submitContact()" class="modal-btn">Send enquiry &rarr;</button>
     </div>
     <div id="contact-success" style="display:none;text-align:center;padding:20px 0">
-      <div style="font-size:48px;margin-bottom:12px">&#10003;</div>
-      <h3 style="margin-bottom:8px;color:var(--primary)">Message Sent!</h3>
-      <p style="color:var(--text-muted);font-size:14px">Thank you for reaching out. We'll get back to you within 24 hours.</p>
-      <button onclick="closeContact()" class="btn btn-outline" style="margin-top:20px">Close</button>
+      <div style="font-size:44px;margin-bottom:12px;color:var(--primary-dark)">&#10003;</div>
+      <h3 style="margin-bottom:8px;color:var(--primary-dark);font-family:var(--sans);font-weight:500">Message sent.</h3>
+      <p style="color:var(--mute);font-size:14px">We'll reply within 24 hours.</p>
+      <button onclick="closeContact()" class="modal-btn" style="margin-top:20px;background:transparent;border:1px solid var(--ink);color:var(--ink)">Close</button>
     </div>
   </div>
 </div>
 
 <!-- Signup Modal -->
-<div id="signup-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:none;align-items:center;justify-content:center">
-  <div style="background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:32px;width:90%;max-width:440px;position:relative">
-    <button onclick="closeSignup()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">&times;</button>
-    <div style="text-align:center;margin-bottom:24px">
-      <h2 style="font-size:22px;margin-bottom:4px">Start Your Free Trial</h2>
-      <p style="color:var(--text-muted);font-size:13px">14 days free. Cancel anytime. Payment method required.</p>
+<div id="signup-modal" class="modal-backdrop">
+  <div class="modal-card">
+    <button onclick="closeSignup()" class="modal-close" aria-label="Close">&times;</button>
+    <div class="modal-head">
+      <h2>Start your free trial.</h2>
+      <p>14 days free. No card charged until the trial ends.</p>
     </div>
-    <div id="signup-plan-badge" style="text-align:center;margin-bottom:20px">
-      <span style="background:var(--primary-light);color:var(--primary);padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600" id="signup-plan-label">PRO - RM 199/mo</span>
-    </div>
-    <div style="margin-bottom:14px">
-      <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Full Name</label>
-      <input id="su-name" placeholder="e.g. Ahmad Firdaus" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
-    </div>
-    <div style="margin-bottom:14px">
-      <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Email</label>
-      <input id="su-email" type="email" placeholder="you@company.com" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
-    </div>
-    <div style="margin-bottom:14px">
-      <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Username</label>
-      <input id="su-username" placeholder="Choose a username" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
-    </div>
-    <div style="margin-bottom:6px">
-      <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">Select Plan</label>
-      <select id="su-plan" onchange="updatePlanLabel()" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
-        <option value="starter">Starter - RM 99/mo</option>
-        <option value="pro" selected>Pro - RM 199/mo (Recommended)</option>
-        <option value="business">Business - RM 399/mo</option>
+    <div class="plan-badge"><span id="signup-plan-label">PRO &middot; RM 199 / mo</span></div>
+    <div class="form-group"><label>Full name</label><input id="su-name" placeholder="e.g. Ahmad Firdaus"></div>
+    <div class="form-group"><label>Email</label><input id="su-email" type="email" placeholder="you@company.com"></div>
+    <div class="form-group"><label>Username</label><input id="su-username" placeholder="Choose a username"></div>
+    <div class="form-group"><label>Plan</label>
+      <select id="su-plan" onchange="updatePlanLabel()">
+        <option value="starter">Starter &mdash; RM 99 / mo</option>
+        <option value="pro" selected>Pro &mdash; RM 199 / mo (recommended)</option>
+        <option value="business">Business &mdash; RM 399 / mo</option>
       </select>
     </div>
-    <p style="font-size:11px;color:var(--text-muted);margin-bottom:20px;text-align:center">You won't be charged during the 14-day trial. Cancel anytime before the trial ends.</p>
-    <div id="su-error" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none"></div>
-    <button id="su-btn" onclick="startCheckout()" class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px">
-      Continue to Payment &rarr;
-    </button>
-    <p style="text-align:center;margin-top:16px;font-size:13px;color:var(--text-muted)">
-      Already have an account? <a href="/app" style="color:var(--primary);text-decoration:none">Sign in</a>
-    </p>
+    <p style="font-family:var(--mono);font-size:10px;color:var(--mute);margin-bottom:20px;text-align:center;letter-spacing:0.1em;text-transform:uppercase">No charge during trial &middot; Cancel anytime</p>
+    <div id="su-error" class="modal-err"></div>
+    <button id="su-btn" onclick="startCheckout()" class="modal-btn">Continue to payment &rarr;</button>
+    <p class="modal-foot">Already have an account? <a href="/app">Sign in</a></p>
   </div>
 </div>
 
+<script src="/brand/eiaaw-motion.js?v=1"></script>
 <script>
 let selectedPlan = 'pro';
 
@@ -652,15 +706,12 @@ function openSignup(plan) {
   document.getElementById('signup-modal').style.display = 'flex';
   document.getElementById('su-name').focus();
 }
-
-function closeSignup() {
-  document.getElementById('signup-modal').style.display = 'none';
-}
+function closeSignup() { document.getElementById('signup-modal').style.display = 'none'; }
 
 function updatePlanLabel() {
   const plan = document.getElementById('su-plan').value;
   selectedPlan = plan;
-  const labels = { starter: 'STARTER - RM 99/mo', pro: 'PRO - RM 199/mo', business: 'BUSINESS - RM 399/mo' };
+  const labels = { starter: 'STARTER \u00b7 RM 99 / MO', pro: 'PRO \u00b7 RM 199 / MO', business: 'BUSINESS \u00b7 RM 399 / MO' };
   document.getElementById('signup-plan-label').textContent = labels[plan] || labels.pro;
 }
 
@@ -672,57 +723,28 @@ async function startCheckout() {
   const errEl = document.getElementById('su-error');
   const btn = document.getElementById('su-btn');
 
-  if (!name || !email || !username) {
-    errEl.textContent = 'Please fill in all fields.';
-    errEl.style.display = 'block';
-    return;
-  }
+  if (!name || !email || !username) { errEl.textContent = 'Please fill in all fields.'; errEl.style.display = 'block'; return; }
+  if (username.length < 3) { errEl.textContent = 'Username must be at least 3 characters.'; errEl.style.display = 'block'; return; }
 
-  if (username.length < 3) {
-    errEl.textContent = 'Username must be at least 3 characters.';
-    errEl.style.display = 'block';
-    return;
-  }
-
-  errEl.style.display = 'none';
-  btn.disabled = true;
-  btn.textContent = 'Redirecting to payment...';
+  errEl.style.display = 'none'; btn.disabled = true; btn.textContent = 'Redirecting\u2026';
 
   try {
     const res = await fetch('/api/billing/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ plan, email, username, displayName: name }),
     });
     const data = await res.json();
-
-    if (data.error) {
-      errEl.textContent = data.error;
-      errEl.style.display = 'block';
-      btn.disabled = false;
-      btn.innerHTML = 'Continue to Payment &rarr;';
-      return;
-    }
-
-    // Redirect to Stripe Checkout
+    if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; btn.disabled = false; btn.innerHTML = 'Continue to payment &rarr;'; return; }
     window.location.href = data.url;
   } catch (e) {
     errEl.textContent = 'Something went wrong. Please try again.';
-    errEl.style.display = 'block';
-    btn.disabled = false;
-    btn.innerHTML = 'Continue to Payment &rarr;';
+    errEl.style.display = 'block'; btn.disabled = false; btn.innerHTML = 'Continue to payment &rarr;';
   }
 }
 
-// Close modals on backdrop click
-document.getElementById('signup-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeSignup();
-});
-document.getElementById('contact-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeContact();
-});
+document.getElementById('signup-modal').addEventListener('click', function(e) { if (e.target === this) closeSignup(); });
+document.getElementById('contact-modal').addEventListener('click', function(e) { if (e.target === this) closeContact(); });
 
-// Contact form
 function openContact() {
   document.getElementById('contact-form').style.display = 'block';
   document.getElementById('contact-success').style.display = 'none';
@@ -730,10 +752,7 @@ function openContact() {
   document.getElementById('contact-modal').style.display = 'flex';
   document.getElementById('ct-name').focus();
 }
-
-function closeContact() {
-  document.getElementById('contact-modal').style.display = 'none';
-}
+function closeContact() { document.getElementById('contact-modal').style.display = 'none'; }
 
 async function submitContact() {
   const name = document.getElementById('ct-name').value.trim();
@@ -744,43 +763,25 @@ async function submitContact() {
   const errEl = document.getElementById('ct-error');
   const btn = document.getElementById('ct-btn');
 
-  if (!name || !email || !message) {
-    errEl.textContent = 'Please fill in your name, email, and message.';
-    errEl.style.display = 'block';
-    return;
-  }
+  if (!name || !email || !message) { errEl.textContent = 'Please fill in your name, email, and message.'; errEl.style.display = 'block'; return; }
 
-  errEl.style.display = 'none';
-  btn.disabled = true;
-  btn.textContent = 'Sending...';
+  errEl.style.display = 'none'; btn.disabled = true; btn.textContent = 'Sending\u2026';
 
   try {
     const res = await fetch('/api/contact', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, phone, company, message }),
     });
     const data = await res.json();
-
-    if (data.error) {
-      errEl.textContent = data.error;
-      errEl.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'Send Enquiry';
-      return;
-    }
-
+    if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; btn.disabled = false; btn.innerHTML = 'Send enquiry &rarr;'; return; }
     document.getElementById('contact-form').style.display = 'none';
     document.getElementById('contact-success').style.display = 'block';
   } catch (e) {
-    errEl.textContent = 'Something went wrong. Please email us at eiaawsolutions@gmail.com';
-    errEl.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Send Enquiry';
+    errEl.textContent = 'Something went wrong. Email us at eiaawsolutions@gmail.com';
+    errEl.style.display = 'block'; btn.disabled = false; btn.innerHTML = 'Send enquiry &rarr;';
   }
 }
 
-// Chatbot
 function toggleChatbot() {
   const panel = document.getElementById('chatbot-panel');
   const icon = document.getElementById('chatbot-icon');
@@ -799,35 +800,29 @@ async function sendChatbotMsg() {
   const msg = input?.value?.trim();
   if (!msg) return;
   input.value = '';
-
   const messages = document.getElementById('chatbot-messages');
-  messages.innerHTML += `<div style="background:var(--primary);color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:8px;margin-left:auto;max-width:85%;text-align:right">${msg}</div>`;
-  messages.innerHTML += `<div id="chatbot-typing" style="color:var(--text-muted);font-size:12px;padding:4px 14px;animation:pulse 1s infinite">Typing...</div>`;
+  messages.innerHTML += `<div class="chat-msg" style="background:var(--gradient);color:#fff;border:none;margin-left:auto;max-width:85%">${msg}</div>`;
+  messages.innerHTML += `<div id="chatbot-typing" class="chat-msg" style="color:var(--mute);font-size:12px;background:transparent;border:none">Typing\u2026</div>`;
   messages.scrollTop = messages.scrollHeight;
-
   try {
     const res = await fetch('/api/chatbot', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: msg }),
     }).then(r => r.json());
-
     document.getElementById('chatbot-typing')?.remove();
-    messages.innerHTML += `<div style="background:var(--surface);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);margin-bottom:8px;max-width:85%;white-space:pre-wrap;line-height:1.5">${res.response || res.error}</div>`;
+    messages.innerHTML += `<div class="chat-msg" style="white-space:pre-wrap">${res.response || res.error}</div>`;
   } catch (e) {
     document.getElementById('chatbot-typing')?.remove();
-    messages.innerHTML += `<div style="background:var(--surface);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--danger);margin-bottom:8px">Something went wrong. Email us at eiaawsolutions@gmail.com</div>`;
+    messages.innerHTML += `<div class="chat-msg" style="color:var(--danger)">Something went wrong. Email us at eiaawsolutions@gmail.com</div>`;
   }
   messages.scrollTop = messages.scrollHeight;
 }
 
-// Handle welcome redirect from successful signup
+// Welcome redirect from successful signup
 if (window.location.search.includes('welcome=1')) {
   const params = new URLSearchParams(window.location.search);
   const token = params.get('token');
-  if (token) {
-    sessionStorage.setItem('auth_token', token);
-    window.location.href = '/app';
-  }
+  if (token) { sessionStorage.setItem('auth_token', token); window.location.href = '/app'; }
 }
 </script>
 
