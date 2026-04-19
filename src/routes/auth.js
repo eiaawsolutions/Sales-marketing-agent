@@ -483,6 +483,73 @@ router.post('/reset-password-with-token', (req, res) => {
   res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
 });
 
+// POST /api/auth/resend-verification — resend the email verification code
+router.post('/resend-verification', requireAuth, async (req, res) => {
+  const user = db.prepare('SELECT id, username, email, display_name, email_verified FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (user.email_verified) return res.json({ success: true, message: 'Email already verified' });
+  if (!user.email) return res.status(400).json({ error: 'No email on file. Update your profile first.' });
+
+  const throttleKey = `verify_resend_${user.id}`;
+  const last = db.prepare("SELECT value FROM settings WHERE key = ?").get(throttleKey);
+  if (last) {
+    const elapsed = Date.now() - parseInt(last.value, 10);
+    if (elapsed < 60_000) {
+      const wait = Math.ceil((60_000 - elapsed) / 1000);
+      return res.status(429).json({ error: `Please wait ${wait}s before requesting another code.` });
+    }
+  }
+
+  const verifyCode = Math.random().toString(36).slice(-8).toUpperCase();
+  db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+    .run(`verify_code_${user.id}`, verifyCode);
+  db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+    .run(throttleKey, String(Date.now()));
+
+  try {
+    const nodemailer = (await import('nodemailer')).default;
+    const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value;
+    const smtpPort = db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || '587';
+    const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value;
+    const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value;
+    const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value;
+
+    if (!smtpUser || !smtpHost) {
+      return res.status(500).json({ error: 'Email service not configured. Contact support.' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost, port: parseInt(smtpPort), secure: parseInt(smtpPort) === 465,
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+
+    await transporter.sendMail({
+      from: fromEmail || smtpUser,
+      to: user.email,
+      subject: 'Your EIAAW SalesAgent verification code',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto">
+          <h1 style="color:#2ec4b6">Verify your email</h1>
+          <p>Hi ${user.display_name || user.username},</p>
+          <p>Use the code below to verify your email address:</p>
+          <p style="background:#fff3cd;padding:16px;border-radius:8px;text-align:center;margin:20px 0">
+            <strong style="font-size:24px;letter-spacing:4px">${verifyCode}</strong>
+          </p>
+          <p style="color:#999;font-size:13px">If you didn't request this, you can ignore this email.</p>
+          <hr style="margin:24px 0">
+          <p style="color:#999;font-size:12px">EIAAW SalesAgent AI<br><a href="https://eiaawsolutions.com">eiaawsolutions.com</a></p>
+        </div>
+      `,
+    });
+
+    const masked = user.email.replace(/(.{2}).*(@.*)/, '$1***$2');
+    res.json({ success: true, message: `Verification code sent to ${masked}` });
+  } catch (e) {
+    console.error('Resend verification email failed:', e.message);
+    res.status(500).json({ error: 'Failed to send email. Try again shortly.' });
+  }
+});
+
 // POST /api/auth/verify-email — verify email with code
 router.post('/verify-email', requireAuth, (req, res) => {
   const { code } = req.body;

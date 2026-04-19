@@ -321,6 +321,32 @@ async function verifyEmail() {
   }
 }
 
+async function resendVerificationCode() {
+  const btn = document.getElementById('verify-resend-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const result = await api.post('/auth/resend-verification');
+    showNotification(result.message || 'Verification code sent. Check your inbox.', 'success');
+    if (btn) {
+      let secs = 60;
+      btn.textContent = `Resend (${secs}s)`;
+      const timer = setInterval(() => {
+        secs -= 1;
+        if (secs <= 0) {
+          clearInterval(timer);
+          btn.disabled = false;
+          btn.textContent = 'Resend code';
+        } else {
+          btn.textContent = `Resend (${secs}s)`;
+        }
+      }, 1000);
+    }
+  } catch (e) {
+    showNotification(e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Resend code'; }
+  }
+}
+
 function doLogout() {
   api.post('/auth/logout').catch(() => {});
   authToken = null; currentUser = null;
@@ -350,6 +376,7 @@ function render() {
           <div class="flex gap-2">
             <input id="verify-code-input" placeholder="Enter code" style="width:120px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;text-transform:uppercase">
             <button class="btn btn-sm btn-primary" onclick="verifyEmail()">Verify</button>
+            <button id="verify-resend-btn" class="btn btn-sm btn-secondary" onclick="resendVerificationCode()" title="Send a new code to your inbox">Resend code</button>
           </div>
         </div>
       ` : ''}
