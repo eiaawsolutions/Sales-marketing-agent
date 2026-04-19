@@ -25,6 +25,60 @@ router.get('/ai-costs', (req, res) => {
   res.json({ overall, byCampaign });
 });
 
+// Superadmin tree: users -> their campaigns -> lead counts (must be before /:id)
+router.get('/grouped-by-user', (req, res) => {
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
+
+  const users = db.prepare(`
+    SELECT u.id, u.username, u.display_name, u.email, u.role, u.plan,
+      (SELECT COUNT(*) FROM campaigns c WHERE c.user_id = u.id) as campaign_count,
+      (SELECT COUNT(*) FROM leads l WHERE l.user_id = u.id) as lead_count
+    FROM users u
+    WHERE u.status = 'active'
+    ORDER BY u.role = 'superadmin' DESC, u.created_at ASC
+  `).all();
+
+  const campaignsPerUser = db.prepare(`
+    SELECT c.id, c.user_id, c.name, c.type, c.status, c.pipeline_status, c.created_at,
+      (SELECT COUNT(*) FROM campaign_leads cl WHERE cl.campaign_id = c.id) as lead_count,
+      c.sent_count, c.open_count, c.click_count
+    FROM campaigns c
+    ORDER BY c.created_at DESC
+  `).all();
+
+  const tree = users.map(u => ({
+    ...u,
+    campaigns: campaignsPerUser.filter(c => c.user_id === u.id),
+  }));
+
+  res.json(tree);
+});
+
+// Leads attached to a specific campaign (with performance metrics per lead)
+router.get('/:id/leads', (req, res) => {
+  const userId = req.user.role === 'superadmin' ? null : req.user.id;
+  const campaignId = parseInt(req.params.id);
+
+  // Enforce ownership
+  const campaign = campaignsService.getById(userId, campaignId);
+  if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+
+  const leads = db.prepare(`
+    SELECT l.id, l.name, l.email, l.phone, l.company, l.title, l.source,
+      l.score, l.status, l.notes, l.created_at,
+      cl.status as campaign_status, cl.sent_at, cl.opened_at, cl.clicked_at,
+      (SELECT COUNT(*) FROM campaign_leads cl2 WHERE cl2.lead_id = l.id AND cl2.status IN ('opened','clicked','replied')) as open_count,
+      (SELECT COUNT(*) FROM campaign_leads cl2 WHERE cl2.lead_id = l.id AND cl2.status IN ('clicked','replied')) as click_count
+    FROM campaign_leads cl
+    JOIN leads l ON cl.lead_id = l.id
+    WHERE cl.campaign_id = ?
+    ORDER BY l.score DESC, l.created_at DESC
+  `).all(campaignId);
+
+  const payload = req.user.role === 'superadmin' ? leads : maskLeads(leads);
+  res.json(payload);
+});
+
 router.get('/:id', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;
   const campaign = campaignsService.getById(userId, req.params.id);

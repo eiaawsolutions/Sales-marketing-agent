@@ -49,6 +49,7 @@ function renderLoginPage() {
       <h1 style="background:linear-gradient(135deg,#2ec4b6,#0e8b7d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;font-size:28px">EIAAW SalesAgent</h1>
       <p class="text-muted" style="font-size:12px;margin-bottom:16px">AI-Human Sales Partnerships</p>
       <p class="text-muted mb-4">Sign in to your account</p>
+      <p style="margin-bottom:16px"><a href="/landing.html" style="display:inline-flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-size:13px;padding:7px 16px;border-radius:999px;background:linear-gradient(135deg,#2ec4b6,#0e8b7d);box-shadow:0 2px 6px rgba(46,196,182,0.25)">&#8592; Home</a></p>
       <div class="card" id="login-card">
         <div class="form-group"><label>Username</label><input id="login-user" placeholder="Username" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()"></div>
         <div class="form-group"><label>Password</label><input id="login-pass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"></div>
@@ -573,29 +574,31 @@ async function deleteLead(id) {
   loadLeads();
 }
 
-async function revealContact(leadId) {
+async function revealContact(leadId, campaignId) {
   if (!confirm('Reveal this contact? This uses 1 of your monthly contact reveal credits.')) return;
   try {
     const result = await api.post(`/leads/${leadId}/reveal`);
     const parts = [result.email, result.phone].filter(Boolean);
     showNotification(`Contact revealed: ${parts.join(' | ')}`, 'success');
 
-    // Update DOM inline so revealed data stays visible (reloading would re-mask)
+    // Standalone leads page: patch DOM in place
     const emailEl = document.getElementById(`lead-email-${leadId}`);
     if (emailEl) emailEl.innerHTML = esc(result.email);
     const phoneEl = document.getElementById(`lead-phone-${leadId}`);
     if (phoneEl) phoneEl.innerHTML = esc(result.phone || '-');
     const nameEl = document.getElementById(`lead-name-${leadId}`);
     if (nameEl) nameEl.textContent = result.name;
-    // Remove the reveal button
     const revealBtn = document.getElementById(`reveal-btn-${leadId}`);
     if (revealBtn) revealBtn.remove();
+
+    // Campaign panel context: refresh the table
+    if (campaignId) refreshCampaignLeads(campaignId);
   } catch (e) {
     showNotification(e.message, 'error');
   }
 }
 
-async function aiScoreLead(id) {
+async function aiScoreLead(id, campaignId) {
   showNotification('Scoring lead with AI...');
   try {
     const result = await api.post(`/leads/${id}/score`);
@@ -607,11 +610,20 @@ async function aiScoreLead(id) {
       <p><strong>Reasoning:</strong> ${result.reasoning}</p>
       <p style="margin-top:8px"><strong>Recommended Action:</strong> ${result.recommended_action}</p>
     `);
-    loadLeads();
+    if (campaignId) { refreshCampaignLeads(campaignId); }
+    else if (currentPage === 'leads') loadLeads();
   } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
 
-async function aiQualifyLead(id) {
+function refreshCampaignLeads(campaignId) {
+  const panel = document.getElementById(`camp-leads-${campaignId}`);
+  if (panel && panel.style.display !== 'none') {
+    toggleCampaignLeads(campaignId); // close
+    toggleCampaignLeads(campaignId); // reopen & refetch
+  }
+}
+
+async function aiQualifyLead(id, campaignId) {
   showNotification('Qualifying lead with AI...');
   try {
     const result = await api.post(`/leads/${id}/qualify`);
@@ -630,7 +642,8 @@ async function aiQualifyLead(id) {
       <p style="margin-top:8px"><strong>Next Steps:</strong></p>
       <ul>${(result.next_steps || []).map(s => `<li>${s}</li>`).join('')}</ul>
     `);
-    loadLeads();
+    if (campaignId) refreshCampaignLeads(campaignId);
+    else if (currentPage === 'leads') loadLeads();
   } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
 
@@ -818,7 +831,7 @@ function endVoiceCall() {
   activeCall = null;
 }
 
-async function aiOutreach(id) {
+async function aiOutreach(id, campaignId) {
   showNotification('Generating outreach sequence...');
   try {
     const result = await api.post(`/leads/${id}/outreach`, {
@@ -834,6 +847,7 @@ async function aiOutreach(id) {
         </div>
       `).join('')}
     `);
+    if (campaignId) refreshCampaignLeads(campaignId);
   } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
 
@@ -970,6 +984,11 @@ async function loadCampaigns() {
   // If wizard is active, render the wizard instead
   if (wizardState) { renderCampaignWizard(); return; }
 
+  // Superadmin: show grouped-by-user tree
+  if (currentUser?.role === 'superadmin') {
+    return loadCampaignsGroupedByUser();
+  }
+
   try {
     const [campaigns, costData] = await Promise.all([
       api.get('/campaigns'),
@@ -1072,6 +1091,97 @@ async function loadCampaigns() {
   }
 }
 
+// Superadmin: Campaigns grouped by user → campaigns → leads
+async function loadCampaignsGroupedByUser() {
+  try {
+    const [tree, costData] = await Promise.all([
+      api.get('/campaigns/grouped-by-user'),
+      api.get('/campaigns/ai-costs').catch(() => ({ overall: { total_cost: 0, total_tokens: 0, call_count: 0 }, byCampaign: [] })),
+    ]);
+
+    const costMap = {};
+    (costData.byCampaign || []).forEach(c => { costMap[c.id] = c; });
+
+    const totalCampaigns = tree.reduce((s, u) => s + (u.campaigns?.length || 0), 0);
+    const activeUsers = tree.filter(u => (u.campaigns?.length || 0) > 0).length;
+
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar">
+        <h2>Campaigns &middot; <span class="text-muted">Grouped by User</span> (${totalCampaigns})</h2>
+        <button class="btn btn-primary" onclick="startCampaignWizard()">+ New Campaign</button>
+      </div>
+
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card"><div class="stat-value blue">${tree.length}</div><div class="stat-label">Total Users</div></div>
+        <div class="stat-card"><div class="stat-value green">${activeUsers}</div><div class="stat-label">Users with Campaigns</div></div>
+        <div class="stat-card"><div class="stat-value purple">${totalCampaigns}</div><div class="stat-label">Total Campaigns</div></div>
+        <div class="stat-card"><div class="stat-value yellow">$${(costData.overall.total_cost || 0).toFixed(4)}</div><div class="stat-label">Total AI Cost</div></div>
+      </div>
+
+      ${tree.length === 0 ? `
+        <div class="card text-center" style="padding:40px">No users yet.</div>
+      ` : tree.map(u => `
+        <div class="camp-card" id="user-${u.id}" style="margin-bottom:10px">
+          <div class="camp-header" onclick="toggleUserCampaigns(${u.id})" style="cursor:pointer">
+            <div class="camp-info">
+              <div class="camp-title" style="display:flex;align-items:center;gap:10px">
+                <strong>${esc(u.display_name || u.username)}</strong>
+                <span class="badge ${u.role === 'superadmin' ? 'badge-proposal' : 'badge-new'}">${esc(u.role)}</span>
+                <span class="badge badge-draft">${esc(u.plan || 'free')}</span>
+              </div>
+              <div class="camp-meta text-muted text-sm">
+                ${esc(u.email || '')} &middot; <strong>${u.campaign_count}</strong> campaign${u.campaign_count !== 1 ? 's' : ''} &middot; <strong>${u.lead_count}</strong> leads
+              </div>
+            </div>
+            <div class="camp-actions flex gap-2">
+              <span class="camp-toggle" id="user-toggle-${u.id}">&#9660;</span>
+            </div>
+          </div>
+          <div id="user-campaigns-${u.id}" style="display:none;padding:12px 16px;border-top:1px solid var(--border)">
+            ${(u.campaigns || []).length === 0 ? `
+              <div class="empty text-sm" style="padding:12px">No campaigns yet.</div>
+            ` : (u.campaigns || []).map(c => {
+              const cost = costMap[c.id] || { total_cost: 0, call_count: 0 };
+              return `
+              <div class="camp-card" id="camp-${c.id}" style="margin-bottom:8px">
+                <div class="camp-header" onclick="toggleCampaignLeads(${c.id})" style="padding:10px 14px">
+                  <div class="camp-info">
+                    <div class="camp-title" style="font-size:14px">
+                      <strong>${esc(c.name)}</strong>
+                      <span class="badge badge-${c.status}">${c.status}</span>
+                      <span class="badge badge-new">${c.type}</span>
+                      ${c.pipeline_status && c.pipeline_status !== 'idle' ? `<span class="badge badge-${c.pipeline_status === 'running' ? 'paused' : c.pipeline_status === 'completed' ? 'qualified' : 'lost'}">${c.pipeline_status}</span>` : ''}
+                    </div>
+                    <div class="camp-meta text-muted text-sm">
+                      <strong>${c.lead_count}</strong> lead${c.lead_count !== 1 ? 's' : ''} &middot; Sent: ${c.sent_count || 0} &middot; Opens: ${c.open_count || 0} &middot; Clicks: ${c.click_count || 0} &middot; AI Cost: $${cost.total_cost.toFixed(4)}
+                    </div>
+                  </div>
+                  <div class="camp-actions flex gap-2" onclick="event.stopPropagation()">
+                    <button class="btn btn-sm btn-outline" onclick="startCampaignWizard(${c.id})">Edit</button>
+                    <span class="camp-toggle" id="camp-toggle-${c.id}">&#9660;</span>
+                  </div>
+                </div>
+                <div class="camp-leads" id="camp-leads-${c.id}" style="display:none"></div>
+              </div>
+            `; }).join('')}
+          </div>
+        </div>
+      `).join('')}
+    `;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+function toggleUserCampaigns(userId) {
+  const panel = document.getElementById(`user-campaigns-${userId}`);
+  const toggle = document.getElementById(`user-toggle-${userId}`);
+  if (!panel) return;
+  const isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? 'block' : 'none';
+  if (toggle) toggle.innerHTML = isHidden ? '&#9650;' : '&#9660;';
+}
+
 // Budget modal
 function showBudgetModal(campaignId, currentBudget) {
   modal = {
@@ -1108,11 +1218,10 @@ async function toggleCampaignLeads(id) {
   if (isHidden) {
     panel.innerHTML = '<div class="loading text-sm" style="padding:16px">Loading...</div>';
     try {
-      const [campaign, outreachQueue] = await Promise.all([
-        api.get(`/campaigns/${id}`),
+      const [leads, outreachQueue] = await Promise.all([
+        api.get(`/campaigns/${id}/leads`),
         api.get(`/campaigns/${id}/outreach-queue`).catch(() => []),
       ]);
-      const leads = campaign.leads || [];
 
       // Count outreach stats
       const outreachSent = outreachQueue.filter(q => q.status === 'sent').length;
@@ -1123,25 +1232,29 @@ async function toggleCampaignLeads(id) {
         <div style="padding:12px 16px;border-top:1px solid var(--border)">
           <!-- Leads Section -->
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-            <span class="text-sm"><strong>${leads.length}</strong> leads assigned</span>
+            <span class="text-sm"><strong>${leads.length}</strong> leads in this campaign</span>
             <div class="flex gap-2">
               <button class="btn btn-sm btn-primary" onclick="aiGenerateLeads(${id})">+ Find More Leads</button>
               ${leads.length > 0 ? `<button class="btn btn-sm btn-success" onclick="aiAutoOutreach(${id})">Auto-Outreach All</button>` : ''}
             </div>
           </div>
           ${leads.length > 0 ? `
-            <table style="font-size:13px">
-              <tr><th>Name</th><th>Email</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Performance</th></tr>
+            <div style="overflow-x:auto">
+            <table style="font-size:13px;min-width:960px">
+              <tr><th>Name</th><th>Email</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Performance</th><th>Actions</th></tr>
               ${leads.map(l => {
                 const cs = l.campaign_status || 'pending';
-                const opened = ['opened','clicked','replied'].includes(cs) ? 1 : 0;
-                const clicked = ['clicked','replied'].includes(cs) ? 1 : 0;
+                const openCount = l.open_count || 0;
+                const clickCount = l.click_count || 0;
                 return `
-                <tr>
-                  <td><strong>${esc(l.name)}</strong></td>
-                  <td>${esc(l.email)}</td>
+                <tr id="cl-row-${id}-${l.id}">
+                  <td><strong><span id="cl-name-${id}-${l.id}">${esc(l.name)}</span></strong></td>
+                  <td>
+                    <span id="cl-email-${id}-${l.id}">${l._masked ? `<span class="text-muted">${esc(l.email)}</span>` : esc(l.email)}</span>
+                    ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" onclick="revealContact(${l.id}, ${id})">Reveal</button>` : ''}
+                  </td>
                   <td>${esc(l.company || '-')}</td>
-                  <td>${l.source === 'ai_generated' ? '<span class="badge badge-new">AI Found</span>' : l.source}</td>
+                  <td>${l.source === 'ai_generated' ? '<span class="badge badge-new">AI Found</span>' : esc(l.source)}</td>
                   <td>
                     <div style="display:flex;align-items:center;gap:6px">
                       <div class="score-bar" style="width:40px"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
@@ -1150,12 +1263,22 @@ async function toggleCampaignLeads(id) {
                   </td>
                   <td><span class="badge badge-${cs}">${cs}</span></td>
                   <td>
-                    <span style="color:${opened ? 'var(--success)' : 'var(--text-muted)'}">${opened} open${opened !== 1 ? 's' : ''}</span>,
-                    <span style="color:${clicked ? 'var(--primary)' : 'var(--text-muted)'}">${clicked} click${clicked !== 1 ? 's' : ''}</span>
+                    <span style="color:${openCount > 0 ? 'var(--success)' : 'var(--text-muted)'}">${openCount} open${openCount !== 1 ? 's' : ''}</span>,
+                    <span style="color:${clickCount > 0 ? 'var(--primary)' : 'var(--text-muted)'}">${clickCount} click${clickCount !== 1 ? 's' : ''}</span>
+                  </td>
+                  <td>
+                    <div class="flex gap-2" style="flex-wrap:wrap">
+                      <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id}, ${id})" title="Re-score with BANT reasoning">Score</button>
+                      <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id}, ${id})" title="Qualify lead">Qualify</button>
+                      <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id}, ${id})" title="Write outreach for this lead">Outreach</button>
+                      <button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="shareCallLink(${l.id})" title="Share voice call link">&#128279; Call</button>
+                      ${currentUser?.role === 'superadmin' ? `<button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>` : ''}
+                    </div>
                   </td>
                 </tr>
               `; }).join('')}
             </table>
+            </div>
           ` : `
             <div class="empty text-sm" style="padding:20px">
               No leads yet. Click <strong>Find More Leads</strong> to let AI find matching leads.

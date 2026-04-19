@@ -685,9 +685,13 @@ ${input.ctaUrl || landingUrl ? `IMPORTANT: Include the URL "${input.ctaUrl || la
 async function generateLeadsTask(input) {
   const { campaignId, targetAudience, campaignName, count } = input;
   const numLeads = Math.min(count || 5, 15);
+  const leadUserId = input._userId || 1;
 
-  // Get existing lead emails to avoid duplicates
-  const existingEmails = db.prepare('SELECT email FROM leads').all().map(r => r.email.toLowerCase());
+  // Only dedup within THIS user's leads — each user owns their own lead database.
+  // A lead existing under user A must not block user B from getting the same email.
+  const userLeads = db.prepare('SELECT id, email FROM leads WHERE user_id = ?').all(leadUserId);
+  const userEmailToId = new Map(userLeads.map(r => [r.email.toLowerCase(), r.id]));
+  const existingEmails = Array.from(userEmailToId.keys());
 
   const result = await chatJSON(
     `Generate ${numLeads} realistic potential leads for a marketing campaign.
@@ -710,8 +714,9 @@ Do NOT use these existing emails: ${existingEmails.slice(0, 30).join(', ')}`
 
   const leads = result.leads || [];
   const created = [];
+  const linked = [];           // existing user-owned leads attached to this campaign
+  const skippedInBatch = [];   // in-batch duplicates the AI returned
 
-  const leadUserId = input._userId || 1;
   const insertLead = db.prepare(`
     INSERT INTO leads (user_id, name, email, company, title, phone, source, notes)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -720,23 +725,40 @@ Do NOT use these existing emails: ${existingEmails.slice(0, 30).join(', ')}`
     'INSERT OR IGNORE INTO campaign_leads (campaign_id, lead_id) VALUES (?, ?)'
   );
 
+  // Track emails seen within this batch to prevent the AI from sneaking in duplicates
+  const seenInBatch = new Set();
+
   const addLeads = db.transaction((leadsToAdd) => {
     for (const lead of leadsToAdd) {
-      // Skip duplicates
-      if (existingEmails.includes(lead.email?.toLowerCase())) continue;
+      const email = lead.email?.toLowerCase();
+      if (!email) continue;
 
+      // In-batch dedup
+      if (seenInBatch.has(email)) {
+        skippedInBatch.push(email);
+        continue;
+      }
+      seenInBatch.add(email);
+
+      // Lead already exists under this user — attach the existing row to the campaign
+      // instead of skipping. This is the master-database reuse pattern.
+      const existingId = userEmailToId.get(email);
+      if (existingId) {
+        if (campaignId) insertCampaignLead.run(campaignId, existingId);
+        linked.push({ id: existingId, email, reused: true });
+        continue;
+      }
+
+      // New lead — insert into leads table (becomes part of user's master database)
       const res = insertLead.run(
         leadUserId, lead.name, lead.email, lead.company, lead.title,
         lead.phone, 'ai_generated', lead.notes
       );
       const leadId = res.lastInsertRowid;
+      userEmailToId.set(email, leadId);
 
-      // Auto-assign to campaign
-      if (campaignId) {
-        insertCampaignLead.run(campaignId, leadId);
-      }
+      if (campaignId) insertCampaignLead.run(campaignId, leadId);
 
-      // Log activity
       db.prepare(
         'INSERT INTO activities (lead_id, type, description) VALUES (?, ?, ?)'
       ).run(leadId, 'ai_action', `AI generated lead for campaign: ${campaignName || 'Unknown'}`);
@@ -747,7 +769,17 @@ Do NOT use these existing emails: ${existingEmails.slice(0, 30).join(', ')}`
 
   addLeads(leads);
 
-  return { generated: created.length, leads: created, campaignId };
+  if (skippedInBatch.length) {
+    console.log(`[generateLeads] AI returned ${skippedInBatch.length} in-batch duplicates (skipped):`, skippedInBatch);
+  }
+
+  return {
+    generated: created.length,
+    reused: linked.length,
+    leads: created,
+    reusedLeads: linked,
+    campaignId,
+  };
 }
 
 async function autoOutreachTask(input) {
@@ -770,6 +802,24 @@ async function autoOutreachTask(input) {
   const newLeads = leads.filter(l => !alreadyQueued.includes(l.id));
   if (!newLeads.length) throw new Error('All leads already have outreach sequences. Check the outreach queue.');
 
+  // Generate a unique voice call link per lead and stash into a map so we can
+  // inject it into the AI prompt + replace placeholders after generation.
+  // Links expire in 30 days (longer than the 3/7-day follow-up schedule).
+  const baseUrl = process.env.PUBLIC_BASE_URL || 'https://sa.eiaawsolutions.com';
+  const leadCallLinks = new Map(); // leadId -> callUrl
+  const insertCallLinkSetting = db.prepare(
+    "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)"
+  );
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const ownerUserId = input._userId || campaign.user_id || 1;
+
+  for (const lead of newLeads) {
+    const token = Math.random().toString(36).slice(2) + Date.now().toString(36) + lead.id;
+    const linkData = { leadId: lead.id, userId: ownerUserId, campaignId, expiresAt };
+    insertCallLinkSetting.run(`call_link_${token}`, JSON.stringify(linkData));
+    leadCallLinks.set(lead.id, `${baseUrl}/call.html?t=${token}`);
+  }
+
   const insertStep = db.prepare(`
     INSERT INTO outreach_queue (campaign_id, lead_id, step, channel, subject, message, goal, delay_days, scheduled_at, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+' || ? || ' days'), ?)
@@ -784,7 +834,7 @@ async function autoOutreachTask(input) {
   for (let i = 0; i < newLeads.length; i += BATCH_SIZE) {
     const batch = newLeads.slice(i, i + BATCH_SIZE);
     const leadsInfo = batch.map(l =>
-      `- ${l.name} | ${l.company || 'Unknown'} | ${l.title || 'Unknown'} | Source: ${l.source} | Score: ${l.score}`
+      `- ${l.name} | ${l.company || 'Unknown'} | ${l.title || 'Unknown'} | Source: ${l.source} | Score: ${l.score} | CallLink: ${leadCallLinks.get(l.id)}`
     ).join('\n');
 
     const result = await chatJSON(
@@ -792,12 +842,17 @@ async function autoOutreachTask(input) {
 Campaign: ${campaign.type} | Target: ${campaign.target_audience || 'general'}
 ${campaign.subject ? `Subject: ${campaign.subject}` : ''}
 
-Leads:
+Leads (each lead has a unique CallLink — use THAT exact URL, never invent one):
 ${leadsInfo}
 
-Return JSON: { "sequences": [ { "lead_name": "exact name", "steps": [ { "step": 1, "channel": "email", "delay_days": 0, "subject": "...", "message": "short personalized msg", "goal": "..." } ] } ] }
+Return JSON: { "sequences": [ { "lead_name": "exact name", "steps": [ { "step": 1, "channel": "email", "delay_days": 0, "subject": "...", "message": "short personalized msg with {{CALL_LINK}} placeholder", "goal": "..." } ] } ] }
 
-Rules: Step 1 = email, delay_days=0. Then steps 2-3 on days 3, 7. Keep messages SHORT (2-3 sentences). 3 steps per lead.`,
+Rules:
+- Step 1 = email, delay_days=0. Then steps 2-3 on days 3, 7.
+- Keep messages SHORT (2-3 sentences). 3 steps per lead.
+- Every EMAIL message MUST include the literal placeholder {{CALL_LINK}} exactly once, positioned as a clear call-to-action (e.g. "Take a 2-minute voice demo: {{CALL_LINK}}").
+- Phrase it as an invitation to speak with an AI sales assistant by voice.
+- For non-email channels (linkedin/call), skip the placeholder.`,
       '',
       { maxTokens: 6000 }
     );
@@ -809,11 +864,28 @@ Rules: Step 1 = email, delay_days=0. Then steps 2-3 on days 3, 7. Keep messages 
         const lead = batch.find(l => l.name === seq.lead_name);
         if (!lead) continue;
 
+        const callUrl = leadCallLinks.get(lead.id);
+
         for (const step of (seq.steps || [])) {
           const isImmediate = step.delay_days === 0 && step.step === 1;
+
+          // Inject the real call link.
+          // 1. Replace {{CALL_LINK}} placeholder if AI followed instructions.
+          // 2. For email channel, if AI forgot the placeholder, append the CTA.
+          let msg = step.message || '';
+          if (callUrl && step.channel === 'email') {
+            if (msg.includes('{{CALL_LINK}}')) {
+              msg = msg.replace(/\{\{CALL_LINK\}\}/g, callUrl);
+            } else {
+              msg = `${msg}\n\nPrefer to talk? Take a 2-minute voice demo with our AI assistant — no call scheduling needed: ${callUrl}`;
+            }
+          } else {
+            msg = msg.replace(/\{\{CALL_LINK\}\}/g, callUrl || '');
+          }
+
           insertStep.run(
             campaignId, lead.id, step.step, step.channel,
-            step.subject || null, step.message, step.goal || '',
+            step.subject || null, msg, step.goal || '',
             step.delay_days, step.delay_days,
             isImmediate ? 'sent' : 'pending'
           );
@@ -823,7 +895,7 @@ Rules: Step 1 = email, delay_days=0. Then steps 2-3 on days 3, 7. Keep messages 
             db.prepare(
               'INSERT INTO activities (lead_id, campaign_id, type, description) VALUES (?, ?, ?, ?)'
             ).run(lead.id, campaignId, 'email',
-              `Auto-outreach Step 1: ${step.subject || step.channel} — ${(step.message || '').substring(0, 100)}`
+              `Auto-outreach Step 1: ${step.subject || step.channel} — ${msg.substring(0, 100)}`
             );
             db.prepare(
               "UPDATE campaign_leads SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE campaign_id = ? AND lead_id = ? AND status = 'pending'"
