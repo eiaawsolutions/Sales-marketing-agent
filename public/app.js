@@ -4476,7 +4476,7 @@ async function loadAccount() {
         <button class="btn btn-primary" onclick="changeAccountPassword()">Change password</button>
       </div>
 
-      <!-- Security card (reuses Settings page's loadSecuritySection) -->
+      <!-- Security card (canonical home — 2FA + active sessions) -->
       <div class="card" id="security-card">
         <h3>Security</h3>
         <div id="security-body" class="text-sm text-muted" style="padding:8px 0">Loading&hellip;</div>
