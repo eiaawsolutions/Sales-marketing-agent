@@ -335,7 +335,7 @@ function renderSidebar() {
   return `
     <div class="sidebar">
       <div class="sidebar-logo">
-        <img src="/brand/shield.png?v=2" alt="EIAAW Solutions" class="sidebar-shield">
+        <img src="/brand/shield.png?v=3" alt="EIAAW Solutions" class="sidebar-shield">
         <div class="sidebar-logo-text">
           <h1>EIAAW SOLUTIONS</h1>
           <small>AI &middot; Human Partnerships</small>
