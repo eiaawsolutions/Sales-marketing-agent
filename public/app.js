@@ -230,7 +230,7 @@ async function doLogin() {
     sessionStorage.setItem('auth_token', authToken);
     if (result.mustEnrolMfa) {
       sessionStorage.setItem('must_enrol_mfa', '1');
-      setTimeout(() => navigate('settings'), 500);
+      setTimeout(() => navigate('account'), 500);
     } else {
       setTimeout(() => navigate('dashboard'), 800);
     }
@@ -415,6 +415,7 @@ function renderSidebar() {
     { id: 'appointments', icon: '&#128197;', label: 'Appointments' },
     { id: 'chat', icon: '&#10070;', label: 'AI Assistant' },
     { id: 'billing', icon: '&#9733;', label: 'Plan & Billing' },
+    { id: 'account', icon: '&#9790;', label: 'Account & Security' },
   ];
 
   if (isSuperadmin) {
@@ -460,6 +461,7 @@ function renderPage() {
     case 'appointments': return '<div id="page" class="loading">Loading appointments...</div>';
     case 'chat': return renderChatPage();
     case 'billing': return '<div id="page" class="loading">Loading plan...</div>';
+    case 'account': return '<div id="page" class="loading">Loading account...</div>';
     case 'settings': return '<div id="page" class="loading">Loading settings...</div>';
     case 'accounts': return '<div id="page" class="loading">Loading accounts...</div>';
     case 'system-overview': return '<div id="page" class="loading">Loading overview...</div>';
@@ -478,6 +480,7 @@ async function afterRender() {
     case 'content': return loadContent();
     case 'appointments': return loadAppointments();
     case 'billing': return loadBilling();
+    case 'account': return loadAccount();
     case 'settings': return loadSettings();
     case 'accounts': return loadAccounts();
     case 'system-overview': return loadSystemOverview();
@@ -4376,6 +4379,131 @@ async function loadSystemOverview() {
   `;
 }
 
+// ========== Account & Security (available to all users) ==========
+async function loadAccount() {
+  try {
+    const me = await api.get('/auth/me');
+    const joinedDate = me.created_at ? new Date(me.created_at + 'Z').toLocaleDateString() : '—';
+    const mustEnrolMfa = sessionStorage.getItem('must_enrol_mfa') === '1' && !me.mfaEnabled;
+
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar"><h2>Account &amp; Security</h2></div>
+
+      ${mustEnrolMfa ? `
+        <div class="card" style="border:2px solid var(--danger);background:rgba(180,65,43,0.04)">
+          <h3 style="color:var(--danger);text-transform:none;letter-spacing:0">&#9888; 2FA required</h3>
+          <p class="text-muted text-sm mb-4">As a superadmin, you must enable two-factor authentication before continuing. Scroll to the Security section below.</p>
+        </div>
+      ` : ''}
+
+      <!-- Profile card -->
+      <div class="card">
+        <h3>Profile</h3>
+        <p class="text-muted text-sm mb-4">Update how your name and contact email appear on this account.</p>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Username</label>
+            <input id="acc-username" value="${esc(me.username || '')}" disabled style="opacity:0.7">
+            <small class="text-muted">Username cannot be changed.</small>
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <input value="${esc(me.role === 'superadmin' ? 'Super Admin' : 'User')}" disabled style="opacity:0.7">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Display name *</label>
+          <input id="acc-display" value="${esc(me.displayName || '')}" placeholder="e.g. Amos Wafula">
+        </div>
+        <div class="form-group">
+          <label>Email *
+            ${me.emailVerified ? `<span class="badge badge-active" style="margin-left:8px;font-size:9px">Verified</span>` : `<span class="badge badge-draft" style="margin-left:8px;font-size:9px">Unverified</span>`}
+          </label>
+          <input id="acc-email" type="email" value="${esc(me.email || '')}" placeholder="you@company.com">
+          <small class="text-muted">Changing your email requires re-verification.</small>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Plan</label>
+            <input value="${esc((me.plan || 'starter').toUpperCase())}" disabled style="opacity:0.7">
+          </div>
+          <div class="form-group">
+            <label>Account created</label>
+            <input value="${joinedDate}" disabled style="opacity:0.7">
+          </div>
+        </div>
+        <div id="acc-msg" style="font-size:13px;margin-bottom:12px;display:none"></div>
+        <button class="btn btn-primary" onclick="saveAccountProfile()">Save profile</button>
+      </div>
+
+      <!-- Password card -->
+      <div class="card">
+        <h3>Password</h3>
+        <p class="text-muted text-sm mb-4">Use at least 8 characters. A password manager is recommended.</p>
+        <div class="form-group"><label>Current password</label><input id="acc-cur-pass" type="password"></div>
+        <div class="grid-2">
+          <div class="form-group"><label>New password</label><input id="acc-new-pass" type="password"></div>
+          <div class="form-group"><label>Confirm new password</label><input id="acc-new-pass2" type="password"></div>
+        </div>
+        <div id="acc-pass-msg" style="font-size:13px;margin-bottom:12px;display:none"></div>
+        <button class="btn btn-primary" onclick="changeAccountPassword()">Change password</button>
+      </div>
+
+      <!-- Security card (reuses Settings page's loadSecuritySection) -->
+      <div class="card" id="security-card">
+        <h3>Security</h3>
+        <div id="security-body" class="text-sm text-muted" style="padding:8px 0">Loading&hellip;</div>
+      </div>
+    `;
+    loadSecuritySection();
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error loading account: ${esc(e.message)}</div>`;
+  }
+}
+
+async function saveAccountProfile() {
+  const msg = document.getElementById('acc-msg');
+  const displayName = document.getElementById('acc-display')?.value?.trim();
+  const email = document.getElementById('acc-email')?.value?.trim();
+  if (!displayName) { msg.style.display = 'block'; msg.style.color = 'var(--danger)'; msg.textContent = 'Display name is required.'; return; }
+  if (!email) { msg.style.display = 'block'; msg.style.color = 'var(--danger)'; msg.textContent = 'Email is required.'; return; }
+
+  try {
+    const body = {};
+    if (displayName !== currentUser?.displayName) body.display_name = displayName;
+    if (email !== currentUser?.email) body.email = email;
+    if (Object.keys(body).length === 0) {
+      msg.style.display = 'block'; msg.style.color = 'var(--text-muted)'; msg.textContent = 'No changes to save.';
+      return;
+    }
+    const updated = await apiRequest('/auth/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    currentUser = { ...currentUser, ...updated };
+    msg.style.display = 'block'; msg.style.color = 'var(--success)'; msg.textContent = 'Saved.';
+    setTimeout(() => { msg.style.display = 'none'; loadAccount(); }, 800);
+  } catch (e) {
+    msg.style.display = 'block'; msg.style.color = 'var(--danger)'; msg.textContent = e.message;
+  }
+}
+
+async function changeAccountPassword() {
+  const msg = document.getElementById('acc-pass-msg');
+  const cur = document.getElementById('acc-cur-pass')?.value;
+  const newPass = document.getElementById('acc-new-pass')?.value;
+  const newPass2 = document.getElementById('acc-new-pass2')?.value;
+  if (!cur || !newPass) { msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='Enter current and new password.'; return; }
+  if (newPass !== newPass2) { msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='New passwords do not match.'; return; }
+  if (newPass.length < 8) { msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='New password must be at least 8 characters.'; return; }
+  try {
+    await api.post('/auth/reset-password', { currentPassword: cur, newPassword: newPass });
+    msg.style.display='block'; msg.style.color='var(--success)'; msg.textContent='Password changed. Other sessions have been signed out.';
+    document.getElementById('acc-cur-pass').value = '';
+    document.getElementById('acc-new-pass').value = '';
+    document.getElementById('acc-new-pass2').value = '';
+  } catch (e) {
+    msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent=e.message;
+  }
+}
+
 // ========== Settings ==========
 async function loadSettings() {
   try {
@@ -4646,7 +4774,7 @@ function showMfaSetupModal(qrDataUrl, secret) {
     onSave: mfaVerifySetup,
     saveLabel: 'Verify & enable',
   };
-  renderModal();
+  render();
   setTimeout(() => document.getElementById('mfa-setup-code')?.focus(), 50);
 }
 
@@ -4656,7 +4784,6 @@ async function mfaVerifySetup() {
   if (!code || !/^\d{6}$/.test(code)) { if (err) { err.style.display='block'; err.textContent='Enter the 6-digit code.'; } return; }
   try {
     const r = await api.post('/auth/mfa/verify-setup', { code });
-    modal = null; renderModal();
     sessionStorage.removeItem('must_enrol_mfa');
     if (currentUser) currentUser.mfaEnabled = true;
     showRecoveryCodesModal(r.recovery_codes);
@@ -4680,10 +4807,10 @@ function showRecoveryCodesModal(codes) {
         <button class="btn btn-outline btn-sm" onclick="downloadText(${JSON.stringify(text)}, 'eiaaw-recovery-codes.txt')">Download</button>
       </div>
     `,
-    onSave: () => { modal = null; renderModal(); },
+    onSave: () => { modal = null; render(); },
     saveLabel: 'I\u2019ve saved them',
   };
-  renderModal();
+  render();
 }
 
 function downloadText(text, filename) {

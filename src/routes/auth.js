@@ -313,9 +313,53 @@ router.post('/logout', requireAuth, (req, res) => {
 // GET /api/auth/me
 router.get('/me', requireAuth, (req, res) => {
   const plan = req.user.plan || 'starter';
+  // Pull created_at + last_login indirectly for the Account page
+  let meta = null;
+  try { meta = db.prepare('SELECT created_at, email_verified FROM users WHERE id = ?').get(req.user.id); } catch (e) { meta = null; }
   res.json({
     ...req.user,
     planLimits: getPlanLimits(plan),
+    created_at: meta?.created_at || null,
+  });
+});
+
+// PATCH /api/auth/profile — self-service edit: display_name + email only
+router.patch('/profile', requireAuth, (req, res) => {
+  const { display_name, email } = req.body || {};
+  const fields = [];
+  const params = [];
+
+  if (display_name !== undefined) {
+    const s = String(display_name).trim();
+    if (s.length < 1 || s.length > 80) return res.status(400).json({ error: 'Display name must be 1-80 characters' });
+    fields.push('display_name = ?'); params.push(s);
+  }
+  if (email !== undefined) {
+    const e = String(email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return res.status(400).json({ error: 'Invalid email' });
+    const collision = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(e, req.user.id);
+    if (collision) return res.status(409).json({ error: 'That email is already in use' });
+    fields.push('email = ?'); params.push(e);
+    // Changing email invalidates verification
+    fields.push('email_verified = 0');
+  }
+
+  if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+  fields.push('updated_at = CURRENT_TIMESTAMP');
+  params.push(req.user.id);
+
+  db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+
+  const updated = db.prepare('SELECT id, username, email, display_name, role, plan, email_verified, mfa_enabled FROM users WHERE id = ?').get(req.user.id);
+  res.json({
+    id: updated.id,
+    username: updated.username,
+    email: updated.email,
+    displayName: updated.display_name,
+    role: updated.role,
+    plan: updated.plan,
+    emailVerified: !!updated.email_verified,
+    mfaEnabled: !!updated.mfa_enabled,
   });
 });
 
