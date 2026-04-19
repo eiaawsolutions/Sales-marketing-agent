@@ -4794,7 +4794,8 @@ async function mfaVerifySetup() {
 }
 
 function showRecoveryCodesModal(codes) {
-  const text = codes.join('\n');
+  // Stash on window to avoid fragile inline-onclick escaping of multi-line strings
+  window.__recoveryCodesBuffer = codes.join('\n');
   modal = {
     title: 'Save your recovery codes',
     body: `
@@ -4803,14 +4804,30 @@ function showRecoveryCodesModal(codes) {
         ${codes.map(c => esc(c)).join('<br>')}
       </div>
       <div class="flex gap-2">
-        <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(${JSON.stringify(text)}).then(()=>showNotification('Copied to clipboard', 'success'))">Copy</button>
-        <button class="btn btn-outline btn-sm" onclick="downloadText(${JSON.stringify(text)}, 'eiaaw-recovery-codes.txt')">Download</button>
+        <button class="btn btn-outline btn-sm" onclick="copyRecoveryCodesFromBuffer()">Copy</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadRecoveryCodesFromBuffer()">Download .txt</button>
       </div>
     `,
     onSave: () => { modal = null; render(); },
     saveLabel: 'I\u2019ve saved them',
   };
   render();
+}
+
+function copyRecoveryCodesFromBuffer() {
+  const text = window.__recoveryCodesBuffer || '';
+  if (!text) { showNotification('No codes to copy', 'error'); return; }
+  navigator.clipboard.writeText(text).then(
+    () => showNotification('Recovery codes copied to clipboard', 'success'),
+    () => showNotification('Could not copy. Use Download instead.', 'error'),
+  );
+}
+
+function downloadRecoveryCodesFromBuffer() {
+  const text = window.__recoveryCodesBuffer || '';
+  if (!text) { showNotification('No codes to download', 'error'); return; }
+  downloadText(text, 'eiaaw-recovery-codes.txt');
+  showNotification('Downloaded eiaaw-recovery-codes.txt', 'success');
 }
 
 function downloadText(text, filename) {
