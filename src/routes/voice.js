@@ -463,7 +463,9 @@ router.post('/public-session', async (req, res) => {
     db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
       .run(`call_link_${token}`, JSON.stringify(linkData));
 
-    const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+    // Always return a callUrl on the Sales Agent host so cross-origin callers
+    // (e.g. eiaawsolutions.com) receive a link that actually serves call.html.
+    const baseUrl = process.env.PUBLIC_BASE_URL || `https://${req.headers.host}`;
     res.json({ callUrl: `${baseUrl}/call.html?t=${token}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
