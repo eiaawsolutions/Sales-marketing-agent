@@ -3141,7 +3141,7 @@ function renderModal() {
         <div>${modal.body}</div>
         <div class="modal-actions">
           <button class="btn btn-outline" onclick="modal=null;render();">Cancel</button>
-          ${modal.onSave ? `<button class="btn btn-primary" onclick="modal.onSave()">${modal.saveLabel || 'Save'}</button>` : ''}
+          ${modal.onSave ? `<button class="btn btn-primary" onclick="Promise.resolve(modal.onSave()).catch(e => showNotification(e.message || 'Save failed', 'error'))">${modal.saveLabel || 'Save'}</button>` : ''}
         </div>
       </div>
     </div>
@@ -3795,9 +3795,22 @@ async function showEditAccountModal(userId) {
           <small class="text-muted">Subscription fee charged to user</small>
         </div>
       </div>
-      <div class="form-group">
-        <label>New Password (leave empty to keep current)</label>
-        <input id="f-password" type="password" placeholder="Leave blank to keep">
+      <div class="form-group" style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface-2,#fafafa)">
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <input type="checkbox" id="f-change-pass" onchange="document.getElementById('f-password-wrap').style.display=this.checked?'block':'none';if(!this.checked){document.getElementById('f-password').value='';document.getElementById('f-password2').value='';}">
+          <span>Change password for this user</span>
+        </label>
+        <div id="f-password-wrap" style="display:none">
+          <div class="form-group">
+            <label>New password (min 8 characters)</label>
+            <input id="f-password" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" name="eiaaw-admin-newpass-${userId}-${Date.now()}" placeholder="Enter new password">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Confirm new password</label>
+            <input id="f-password2" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" name="eiaaw-admin-newpass2-${userId}-${Date.now()}" placeholder="Re-enter to confirm">
+          </div>
+          <small class="text-muted" style="display:block;margin-top:8px">Passwords are shown in plain text so you can verify what you set. The user's existing sessions will be signed out.</small>
+        </div>
       </div>
     `,
     onSave: async () => {
@@ -3807,10 +3820,16 @@ async function showEditAccountModal(userId) {
         budget_limit: parseFloat(gv('f-budget')) || 0,
         monthly_system_cost: parseFloat(gv('f-monthly')) || 0,
       });
-      const newPass = document.getElementById('f-password')?.value;
-      if (newPass) await api.put(`/users/${userId}/password`, { password: newPass });
+      const wantsChange = document.getElementById('f-change-pass')?.checked;
+      if (wantsChange) {
+        const newPass = document.getElementById('f-password')?.value || '';
+        const newPass2 = document.getElementById('f-password2')?.value || '';
+        if (newPass.length < 8) throw new Error('New password must be at least 8 characters.');
+        if (newPass !== newPass2) throw new Error('Passwords do not match.');
+        await api.put(`/users/${userId}/password`, { password: newPass });
+      }
       modal = null;
-      showNotification('Account updated!', 'success');
+      showNotification(wantsChange ? 'Account updated. Password changed — user must sign in again.' : 'Account updated!', 'success');
       navigate('accounts');
     },
   };
