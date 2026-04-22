@@ -1025,6 +1025,190 @@
     @media (max-width: 480px) {
       .stats-grid { grid-template-columns: 1fr; }
     }
+
+    /* ===== Email Designer ===== */
+    .email-designer { margin-top: 8px; }
+    .ed-tabs {
+      display: flex; align-items: center; gap: 6px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px; margin-bottom: 14px;
+    }
+    .ed-tab {
+      background: transparent; border: 1px solid transparent;
+      color: var(--text-muted); padding: 8px 14px; border-radius: 8px;
+      cursor: pointer; font-size: 13px; font-weight: 500;
+    }
+    .ed-tab:hover { background: var(--surface2); color: var(--text); }
+    .ed-tab.active {
+      background: rgba(31,168,150,0.12); color: var(--primary);
+      border-color: rgba(31,168,150,0.3);
+    }
+    .ed-body { min-height: 320px; }
+    .ed-footnote {
+      margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border);
+      color: var(--text-muted); font-size: 12px; text-align: center;
+    }
+
+    /* Templates tab */
+    .ed-tpl-cats { display: flex; flex-direction: column; gap: 22px; }
+    .ed-tpl-cat h4 {
+      margin: 0 0 10px 0; font-size: 12px; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
+    }
+    .ed-tpl-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    }
+    @media (max-width: 720px) { .ed-tpl-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px) { .ed-tpl-grid { grid-template-columns: 1fr; } }
+    .ed-tpl-card {
+      display: flex; flex-direction: column; gap: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px; cursor: pointer;
+      transition: all 0.15s; text-align: left;
+    }
+    .ed-tpl-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+    .ed-tpl-thumb {
+      height: 90px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 18px; letter-spacing: -0.02em;
+    }
+    .ed-tpl-name { font-size: 13px; font-weight: 600; color: var(--text); }
+
+    /* Scratch tab */
+    .ed-scratch-grid {
+      display: grid; grid-template-columns: 320px 1fr; gap: 16px;
+    }
+    @media (max-width: 880px) { .ed-scratch-grid { grid-template-columns: 1fr; } }
+    .ed-side {
+      display: flex; flex-direction: column; gap: 14px;
+      max-height: 70vh; overflow-y: auto; padding-right: 6px;
+    }
+    .ed-section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px;
+    }
+    .ed-section h4 {
+      margin: 0 0 8px 0; font-size: 12px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted);
+    }
+    .ed-section label {
+      display: block; font-size: 11px; color: var(--text-muted);
+      margin-top: 8px; margin-bottom: 4px;
+    }
+    .ed-section label.checkbox-row {
+      display: flex; align-items: center; gap: 8px; font-size: 12px;
+      color: var(--text); margin-bottom: 6px;
+    }
+    .ed-section input[type="text"], .ed-section input[type="number"], .ed-section select {
+      width: 100%; padding: 7px 9px; font-size: 13px;
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+    }
+    .ed-color-row { display: flex; gap: 6px; }
+    .ed-color-row input[type="color"] { width: 38px; height: 32px; padding: 0; border-radius: 6px; cursor: pointer; }
+    .ed-color-row input[type="text"] { flex: 1; }
+    .ed-logo-row, .ed-img-row { display: flex; gap: 10px; align-items: flex-start; }
+    .ed-logo-thumb, .ed-img-thumb {
+      width: 64px; height: 64px; object-fit: contain;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px; flex-shrink: 0;
+    }
+    .ed-logo-thumb.empty, .ed-img-thumb.empty {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; color: var(--text-muted);
+    }
+    .flex-col { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+    .ed-block-add { display: flex; flex-wrap: wrap; gap: 6px; }
+    .btn-link { background: none; border: none; color: var(--primary); padding: 0; font-size: 11px; cursor: pointer; text-align: left; }
+
+    /* Canvas */
+    .ed-canvas {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px; max-height: 70vh; overflow-y: auto;
+    }
+    .ed-canvas-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+    .ed-blocks { display: flex; flex-direction: column; gap: 10px; }
+    .ed-block {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px;
+    }
+    .ed-block-toolbar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+    .ed-block-type {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+      color: var(--primary); background: rgba(31,168,150,0.12);
+      padding: 3px 8px; border-radius: 4px;
+    }
+    .btn-icon {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text-muted); width: 26px; height: 26px;
+      border-radius: 6px; cursor: pointer; font-size: 11px;
+    }
+    .btn-icon:hover:not(:disabled) { background: var(--surface2); color: var(--text); }
+    .btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-icon.danger:hover { background: rgba(180,65,43,0.1); color: var(--danger); }
+    .ed-block-input {
+      width: 100%; padding: 8px 10px; font-size: 14px;
+      background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      margin-bottom: 6px;
+    }
+    .ed-block-meta {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px;
+      font-size: 11px; color: var(--text-muted);
+    }
+    .ed-block-meta label { display: flex; flex-direction: column; gap: 3px; }
+    .ed-block-meta select, .ed-block-meta input[type="number"] {
+      padding: 4px 6px; font-size: 12px;
+      background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 4px;
+    }
+    .ed-block-meta input[type="color"] { width: 30px; height: 24px; padding: 0; border-radius: 4px; cursor: pointer; border: 1px solid var(--border); }
+    .ed-block-meta.cta-meta { gap: 12px; }
+    .ed-divider-preview { height: 1px; background: var(--border); margin: 8px 0; }
+
+    /* AI tab */
+    .ed-ai { max-width: 460px; }
+    .ed-ai p { color: var(--text-muted); font-size: 13px; margin-bottom: 14px; }
+
+    /* Preview modal */
+    .ed-preview-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+      z-index: 9999; display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .ed-preview-shell {
+      background: var(--surface); border-radius: 12px;
+      width: min(900px, 100%); max-height: 90vh;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .ed-preview-bar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+    }
+    .ed-preview-tabs { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .ed-preview-tabs button {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 6px 12px; font-size: 12px; cursor: pointer;
+    }
+    .ed-preview-tabs button.active {
+      background: var(--primary); color: #fff; border-color: var(--primary);
+    }
+    .ed-preview-close {
+      background: transparent; border: none; color: var(--text-muted);
+      font-size: 22px; cursor: pointer; line-height: 1; padding: 4px 8px;
+    }
+    .ed-preview-stage {
+      flex: 1; overflow: auto; background: #FAF7F2;
+      display: flex; justify-content: center; padding: 20px;
+    }
+    .ed-preview-stage iframe {
+      border: none; min-height: 600px; height: 100%;
+      background: white; box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      transition: width 0.2s;
+    }
   </style>
 </head>
 <body>
@@ -1034,6 +1218,8 @@
     import { RetellWebClient } from 'https://esm.sh/retell-client-js-sdk@2.0.7';
     window.RetellWebClient = RetellWebClient;
   </script>
-  <script src="/app.js?v=20260420f"></script>
+  <script src="/email-templates.js?v=20260422a"></script>
+  <script src="/email-designer.js?v=20260422a"></script>
+  <script src="/app.js?v=20260422a"></script>
 </body>
 </html>

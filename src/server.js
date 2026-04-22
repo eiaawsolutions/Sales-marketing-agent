@@ -21,6 +21,7 @@ import systemLogicRouter from './routes/system-logic.js';
 import voiceRouter from './routes/voice.js';
 import appointmentsRouter from './routes/appointments.js';
 import trackingRouter from './routes/tracking.js';
+import uploadsRouter from './routes/uploads.js';
 import { maskLeads, maskLead } from './services/leads.js';
 import { startScheduler } from './services/scheduler.js';
 
@@ -352,6 +353,7 @@ app.use('/api/system-logic', requireAuth, systemLogicRouter);
 app.use('/api/voice', voiceRouter);
 app.use('/api/appointments', appointmentsRouter);
 app.use('/api/tracking', trackingRouter);
+app.use('/api/uploads', requireAuth, uploadsRouter);
 
 // Dashboard overview endpoint
 app.get('/api/dashboard', requireAuth, (req, res) => {

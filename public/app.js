@@ -36,6 +36,9 @@ const api = {
   async put(url, body, headers = {}) { return apiRequest(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }); },
   async del(url, headers = {}) { return apiRequest(url, { method: 'DELETE', headers }); },
 };
+// Expose to other script files (email-designer.js)
+window.api = api;
+window.esc = esc;
 
 // ========== State ==========
 let currentPage = 'dashboard';
@@ -1108,7 +1111,11 @@ async function requestPipelineAnalysis() {
 }
 
 // ========== Campaigns ==========
+// wizardState is exposed on window so the email-designer module can read/write the same object.
+// All assignments inside this file go through setWizardState(...) to keep window.wizardState in sync.
 let wizardState = null; // holds wizard data when active
+function setWizardState(v) { wizardState = v; window.wizardState = v; }
+window.wizardState = null;
 
 async function loadCampaigns() {
   // If wizard is active, render the wizard instead
@@ -1551,7 +1558,7 @@ async function startCampaignWizard(editId) {
     assignedLeadIds = (campaign.leads || []).map(l => l.id);
   }
 
-  wizardState = {
+  setWizardState({
     editId: editId || null,
     step: 0,
     data: {
@@ -1561,10 +1568,12 @@ async function startCampaignWizard(editId) {
       body: campaign.body || '',
       target_audience: campaign.target_audience || '',
       budget_limit: campaign.budget_limit || 0,
+      // design state — only populated when user opens email designer
+      design: null,
     },
     selectedLeads: assignedLeadIds,
     allLeads: [],
-  };
+  });
 
   renderCampaignWizard();
 }
@@ -1638,6 +1647,16 @@ function renderCampaignWizard() {
   if (s.step === 2 && s.allLeads.length === 0) {
     loadWizardLeads();
   }
+
+  // Mount the email designer for new email campaigns on the content step.
+  // Existing legacy campaigns (editId + body but no design) keep the textarea.
+  if (s.step === 1 && s.data.type === 'email' && window.EmailDesigner) {
+    const isLegacyEdit = s.editId && s.data.body && !s.data.design;
+    if (!isLegacyEdit) {
+      if (!s.data.design) s.data.design = window.EmailDesigner.defaultDesign();
+      window.EmailDesigner.render('ed-root');
+    }
+  }
 }
 
 function getStepDescription(step) {
@@ -1694,24 +1713,54 @@ function renderWizardStepContent(step) {
 
     case 1:
       const isEmail = d.type === 'email';
-      return `
-        ${isEmail ? `
+      if (isEmail) {
+        // Existing campaigns saved before the designer launched keep the legacy
+        // textarea so we don't clobber their already-sent body. New campaigns
+        // (no editId, or editId with no prior body) get the new designer.
+        const isLegacyEdit = wizardState.editId && d.body && !d.design;
+        if (isLegacyEdit) {
+          return `
+            <div class="form-group">
+              <label>Email Subject Line</label>
+              <input id="wz-subject" value="${esc(d.subject)}" placeholder="e.g. Introducing our new AI-powered features..."
+                oninput="wizardState.data.subject=this.value">
+            </div>
+            <div class="form-group">
+              <label>Email Body (HTML)</label>
+              <textarea id="wz-body" style="min-height:240px;font-family:monospace;font-size:12px"
+                oninput="wizardState.data.body=this.value">${esc(d.body)}</textarea>
+              <small class="text-muted">This campaign was created with the legacy editor. Save and re-create to use the new designer.</small>
+            </div>
+            <div class="wizard-ai-box">
+              <div style="flex:1">
+                <strong>Need help writing?</strong>
+                <p class="text-muted text-sm">Let AI generate an email based on your campaign details.</p>
+              </div>
+              <button class="btn btn-primary" onclick="wizardAiGenerate()" id="wz-ai-btn">Generate with AI</button>
+            </div>
+          `;
+        }
+        // Email designer renders into #ed-root after this template returns.
+        return `
           <div class="form-group">
             <label>Email Subject Line</label>
-            <input id="wz-subject" value="${d.subject}" placeholder="e.g. Introducing our new AI-powered features..."
+            <input id="wz-subject" value="${esc(d.subject)}" placeholder="e.g. Introducing our new AI-powered features..."
               oninput="wizardState.data.subject=this.value">
             <small class="text-muted">A compelling subject line increases your open rate.</small>
           </div>
-        ` : ''}
+          <div id="ed-root" class="email-designer"></div>
+        `;
+      }
+      return `
         <div class="form-group">
-          <label>${isEmail ? 'Email Body' : d.type === 'social' ? 'Post Content' : d.type === 'ad' ? 'Ad Copy' : 'Content'}</label>
+          <label>${d.type === 'social' ? 'Post Content' : d.type === 'ad' ? 'Ad Copy' : 'Content'}</label>
           <textarea id="wz-body" style="min-height:180px" placeholder="${getContentPlaceholder(d.type)}"
-            oninput="wizardState.data.body=this.value">${d.body}</textarea>
+            oninput="wizardState.data.body=this.value">${esc(d.body)}</textarea>
         </div>
         <div class="wizard-ai-box">
           <div style="flex:1">
             <strong>Need help writing?</strong>
-            <p class="text-muted text-sm">Let AI generate ${isEmail ? 'an email' : 'content'} based on your campaign details.</p>
+            <p class="text-muted text-sm">Let AI generate content based on your campaign details.</p>
           </div>
           <button class="btn btn-primary" onclick="wizardAiGenerate()" id="wz-ai-btn">Generate with AI</button>
         </div>
@@ -1837,13 +1886,18 @@ function renderWizardReview() {
       ${d.type === 'email' ? `
         <div class="wizard-review-section">
           <div class="wizard-review-label">Subject</div>
-          <div class="wizard-review-value">${d.subject || '<span class="text-muted">No subject</span>'}</div>
+          <div class="wizard-review-value">${esc(d.subject) || '<span class="text-muted">No subject</span>'}</div>
         </div>
       ` : ''}
       <div class="wizard-review-section">
         <div class="wizard-review-label">Content Preview</div>
         <div class="wizard-review-value">
-          ${d.body ? `<div class="wizard-review-content">${d.body.substring(0, 300)}${d.body.length > 300 ? '...' : ''}</div>` : '<span class="text-muted">No content</span>'}
+          ${d.type === 'email'
+            ? (d.body
+                ? `<button class="btn btn-sm btn-outline" type="button" onclick="window.EmailDesigner && window.EmailDesigner.openPreview(wizardState.data.design)">&#128065; Preview email</button>`
+                : '<span class="text-muted">No content yet — go back to the Content step.</span>')
+            : (d.body ? `<div class="wizard-review-content">${esc(d.body.substring(0, 300))}${d.body.length > 300 ? '...' : ''}</div>` : '<span class="text-muted">No content</span>')
+          }
         </div>
       </div>
       <div class="wizard-review-section">
@@ -1921,7 +1975,7 @@ function exitCampaignWizard() {
   if (wizardState && (wizardState.data.name || wizardState.data.body)) {
     if (!confirm('Are you sure? Your campaign progress will be lost.')) return;
   }
-  wizardState = null;
+  setWizardState(null);
   loadCampaigns();
 }
 
@@ -2011,7 +2065,7 @@ async function wizardSave(action) {
     } else if (action === 'launch' && campaign.id) {
       await api.post(`/campaigns/${campaign.id}/launch`);
       showNotification('AI Pipeline launched! Generating leads, scoring, creating content, sending outreach...', 'success');
-      wizardState = null;
+      setWizardState(null);
       loadCampaigns();
       // Start polling for pipeline status
       pollPipelineStatus(campaign.id);
@@ -2020,7 +2074,7 @@ async function wizardSave(action) {
       showNotification('Campaign saved as draft!', 'success');
     }
 
-    wizardState = null;
+    setWizardState(null);
     loadCampaigns();
   } catch (e) {
     showNotification('Error saving: ' + e.message, 'error');
