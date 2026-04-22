@@ -694,25 +694,87 @@ async function generateLeadsTask(input) {
   const existingEmails = Array.from(userEmailToId.keys());
 
   const result = await chatJSON(
-    `Generate ${numLeads} realistic potential leads for a marketing campaign.
+    `You are a cross-market lead generation and verification engine designed to generate HIGH-QUALITY, VERIFIED leads for B2B, B2C, and B2B2C campaigns.
 
-Campaign: "${campaignName || 'Marketing Campaign'}"
-Target audience: "${targetAudience || 'general business professionals'}"
+Your primary goal is ACCURACY and VERIFIABILITY — not volume.
 
-Return JSON with a "leads" array. Each lead must have:
-- "name": Full realistic name
-- "email": Realistic business email (use real-looking domains, NOT @example.com)
-- "company": Real-sounding company name relevant to the target audience
-- "title": Job title appropriate for the target audience
-- "phone": Phone number with area code
+## 🎯 OBJECTIVE
+Generate a list of qualified leads based on the campaign input provided, ensuring every lead is backed by verifiable evidence.
+
+## 🔒 NON-NEGOTIABLE RULES
+1. DO NOT fabricate, assume, or infer data without evidence.
+2. Every lead MUST have a verifiable digital footprint.
+3. Emails, phone numbers, or personal data MUST NOT be guessed.
+4. If verification is weak or unclear → DISCARD the lead.
+5. Fewer high-quality leads are better than many unverified ones.
+
+## 🌐 SUPPORTED LEAD TYPES
+- B2B — Founders, Directors, Heads of Marketing / Growth / Digital / Sales, other decision makers
+- B2C — Individuals with identifiable traits, professions, or interests relevant to the campaign, with a real digital presence (LinkedIn, portfolio, social, community)
+- B2B2C — Agencies, distributors, platforms, creators, partners who influence end consumers
+
+## ✅ VERIFICATION REQUIREMENTS (minimum 1, prefer 2+) — each lead MUST have at least one of:
+- LinkedIn profile (preferred)
+- Official company website (team page, author page, listing)
+- Verified social media account clearly tied to identity
+- Media mention (news, interview, speaker profile)
+- Public directory or marketplace listing
+- Verified email published on a credible source
+
+## 🔥 CAMPAIGN CONTEXT
+- Campaign Name: "${campaignName || 'Marketing Campaign'}"
+- Target Audience / ICP: "${targetAudience || 'general business professionals'}"
+- Requested lead count (maximum, not a quota): ${numLeads}
+
+## 🧠 LEAD CLASSIFICATION — for EACH lead classify as:
+- HOT LEAD — strong intent signals (recent activity, posting, hiring, launching, fundraising, actively working in relevant role, expressed need/problem related to offering)
+- COLD LEAD — fits ICP but no immediate intent signals
+
+## 🧪 VALIDATION CHECK (MANDATORY BEFORE YOU RETURN EACH LEAD)
+- Does this lead have REAL, traceable presence?
+- Is their association with company / persona clearly proven?
+- Is any contact info assumed? → If yes, REMOVE that field (leave empty string).
+- Is this lead relevant to campaign context?
+If any answer fails → DISCARD the lead (do not return it).
+
+## 🚫 DISALLOWED
+- No fake names.
+- No assumed emails (e.g., john@company.com patterns).
+- No generic personas without traceable identity.
+- No outdated or unverifiable roles.
+
+## ⭐ STANDARD
+Accuracy > Quantity. Relevance > Volume. Verification > Assumption.
+If only 3–5 strong leads qualify, return only those. It is acceptable to return fewer than ${numLeads}.
+
+## 📊 OUTPUT FORMAT (STRICT)
+Respond with JSON of the form: { "leads": [ ... ] }
+Each lead object MUST have these fields (use empty string "" — never a guess — when a field cannot be verified):
+- "name": Full verified name
+- "type": "B2B" | "B2C" | "B2B2C"
+- "title": Job title / persona description
+- "company": Company / platform name (or "" if not applicable)
+- "geography": City / country
+- "lead_type": "Hot" | "Cold"
+- "email": Verified email only; otherwise "" (NEVER guess patterns like first.last@company.com)
+- "phone": Publicly listed phone only; otherwise ""
+- "other_contact": Any additional verified contact channel, or ""
+- "linkedin_url": LinkedIn or primary profile URL (or "")
+- "company_website": Company / platform website URL (or "")
+- "verification_sources": Array of URLs (≥1 required) that prove the identity + role
+- "reason_for_fit": Why this lead matches the ICP
+- "buying_signal": Required if lead_type is "Hot"; else ""
+- "confidence_score": "High" | "Medium" | "Low" (based on verification strength)
+- "enrichment": Optional short string — recent activity, hiring signals, growth signals, tech stack, audience reach (or "")
 - "source": Always "ai_generated"
-- "notes": One sentence about why this person matches the target audience
 
-Make the leads diverse and realistic for the specified target audience. Vary company sizes and seniority levels.
-Do NOT use these existing emails: ${existingEmails.slice(0, 30).join(', ')}`
+## DEDUPLICATION
+Do NOT return any lead whose verified email matches one of these already-known emails: ${existingEmails.slice(0, 30).join(', ') || '(none)'}
+
+Return ONLY the JSON object. No prose, no markdown fences.`
   );
 
-  const leads = result.leads || [];
+  const leads = Array.isArray(result.leads) ? result.leads : [];
   const created = [];
   const linked = [];           // existing user-owned leads attached to this campaign
   const skippedInBatch = [];   // in-batch duplicates the AI returned
@@ -727,11 +789,51 @@ Do NOT use these existing emails: ${existingEmails.slice(0, 30).join(', ')}`
 
   // Track emails seen within this batch to prevent the AI from sneaking in duplicates
   const seenInBatch = new Set();
+  const rejected = [];
+
+  // Verification gate — enforces the "accuracy > volume" contract server-side so
+  // weak leads never reach the DB even if the model ignores the prompt.
+  function isVerified(lead) {
+    const sources = Array.isArray(lead.verification_sources) ? lead.verification_sources : [];
+    const hasSource = sources.some(s => typeof s === 'string' && /^https?:\/\//i.test(s));
+    const hasProfile = typeof lead.linkedin_url === 'string' && /^https?:\/\//i.test(lead.linkedin_url);
+    const hasSite = typeof lead.company_website === 'string' && /^https?:\/\//i.test(lead.company_website);
+    const confidence = String(lead.confidence_score || '').toLowerCase();
+    if (confidence === 'low') return false;
+    if (!hasSource) return false;
+    if (!hasProfile && !hasSite) return false;
+    return true;
+  }
+
+  function buildNotes(lead) {
+    const lines = [];
+    if (lead.reason_for_fit) lines.push(`Fit: ${lead.reason_for_fit}`);
+    if (lead.lead_type) lines.push(`Lead type: ${lead.lead_type}${lead.confidence_score ? ` (confidence: ${lead.confidence_score})` : ''}`);
+    if (lead.type) lines.push(`Segment: ${lead.type}`);
+    if (lead.geography) lines.push(`Geography: ${lead.geography}`);
+    if (lead.buying_signal) lines.push(`Buying signal: ${lead.buying_signal}`);
+    if (lead.linkedin_url) lines.push(`Profile: ${lead.linkedin_url}`);
+    if (lead.company_website) lines.push(`Website: ${lead.company_website}`);
+    if (Array.isArray(lead.verification_sources) && lead.verification_sources.length) {
+      lines.push(`Verification: ${lead.verification_sources.join(' | ')}`);
+    }
+    if (lead.enrichment) lines.push(`Enrichment: ${lead.enrichment}`);
+    if (lead.other_contact) lines.push(`Other contact: ${lead.other_contact}`);
+    return lines.join('\n');
+  }
 
   const addLeads = db.transaction((leadsToAdd) => {
     for (const lead of leadsToAdd) {
+      if (!isVerified(lead)) {
+        rejected.push({ name: lead.name, email: lead.email, reason: 'failed verification gate' });
+        continue;
+      }
+
       const email = lead.email?.toLowerCase();
-      if (!email) continue;
+      if (!email) {
+        rejected.push({ name: lead.name, reason: 'missing verified email' });
+        continue;
+      }
 
       // In-batch dedup
       if (seenInBatch.has(email)) {
@@ -749,10 +851,12 @@ Do NOT use these existing emails: ${existingEmails.slice(0, 30).join(', ')}`
         continue;
       }
 
+      const notes = buildNotes(lead);
+
       // New lead — insert into leads table (becomes part of user's master database)
       const res = insertLead.run(
         leadUserId, lead.name, lead.email, lead.company, lead.title,
-        lead.phone, 'ai_generated', lead.notes
+        lead.phone, 'ai_generated', notes
       );
       const leadId = res.lastInsertRowid;
       userEmailToId.set(email, leadId);
@@ -761,9 +865,13 @@ Do NOT use these existing emails: ${existingEmails.slice(0, 30).join(', ')}`
 
       db.prepare(
         'INSERT INTO activities (lead_id, type, description) VALUES (?, ?, ?)'
-      ).run(leadId, 'ai_action', `AI generated lead for campaign: ${campaignName || 'Unknown'}`);
+      ).run(
+        leadId,
+        'ai_action',
+        `AI generated verified lead (${lead.lead_type || 'Cold'}, ${lead.confidence_score || 'Medium'}) for campaign: ${campaignName || 'Unknown'}`
+      );
 
-      created.push({ id: leadId, ...lead });
+      created.push({ id: leadId, ...lead, notes });
     }
   });
 
@@ -772,12 +880,17 @@ Do NOT use these existing emails: ${existingEmails.slice(0, 30).join(', ')}`
   if (skippedInBatch.length) {
     console.log(`[generateLeads] AI returned ${skippedInBatch.length} in-batch duplicates (skipped):`, skippedInBatch);
   }
+  if (rejected.length) {
+    console.log(`[generateLeads] Rejected ${rejected.length} leads that failed the verification gate:`, rejected);
+  }
 
   return {
     generated: created.length,
     reused: linked.length,
+    rejected: rejected.length,
     leads: created,
     reusedLeads: linked,
+    rejectedLeads: rejected,
     campaignId,
   };
 }
