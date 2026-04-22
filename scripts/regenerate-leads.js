@@ -14,7 +14,7 @@ const email = process.argv[2] || 'eiaawsolutions@gmail.com';
 const count = parseInt(process.argv[3] || '10', 10);
 const statuses = ['active', 'draft'];
 
-const user = db.prepare('SELECT id, email, name FROM users WHERE email = ?').get(email);
+const user = db.prepare('SELECT id, email, display_name FROM users WHERE email = ?').get(email);
 if (!user) {
   console.error(`[regen] user not found: ${email}`);
   process.exit(1);
