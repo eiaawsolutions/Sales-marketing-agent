@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import db from '../db/index.js';
 import { sendEmail } from '../utils/email.js';
-import { injectTracking } from './campaigns.js';
+import { injectTracking, appendFormCta } from './campaigns.js';
 import { refreshMetrics } from './metrics.js';
 
 /**
@@ -37,7 +37,7 @@ export function startScheduler() {
 async function processOutreachQueue() {
   try {
     const pendingItems = db.prepare(`
-      SELECT oq.*, l.email as lead_email, l.name as lead_name, c.name as campaign_name, c.user_id
+      SELECT oq.*, l.email as lead_email, l.name as lead_name, c.name as campaign_name, c.user_id, c.form_id
       FROM outreach_queue oq
       JOIN leads l ON oq.lead_id = l.id
       JOIN campaigns c ON oq.campaign_id = c.id
@@ -62,7 +62,8 @@ async function processOutreachQueue() {
 
         // Inject tracking into the email
         const emailBody = item.message || `<p>Hi ${item.lead_name},</p><p>${item.goal || 'Just following up on our previous conversation.'}</p>`;
-        const trackedHtml = injectTracking(emailBody, item.campaign_id, item.lead_id, baseUrl);
+        const withForm = appendFormCta(emailBody, item.form_id, item.campaign_id, item.lead_id, baseUrl);
+        const trackedHtml = injectTracking(withForm, item.campaign_id, item.lead_id, baseUrl);
 
         await sendEmail({
           to: item.lead_email,

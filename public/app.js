@@ -441,6 +441,7 @@ function renderSidebar() {
     { id: 'leads', icon: '&#9679;', label: 'Leads' },
     { id: 'pipeline', icon: '&#9654;', label: 'Pipeline' },
     { id: 'campaigns', icon: '&#9993;', label: 'Campaigns' },
+    { id: 'forms', icon: '&#9634;', label: 'Forms' },
     { id: 'content', icon: '&#9998;', label: 'AI Content' },
     { id: 'appointments', icon: '&#128197;', label: 'Appointments' },
     { id: 'chat', icon: '&#10070;', label: 'AI Assistant' },
@@ -487,6 +488,7 @@ function renderPage() {
     case 'leads': return '<div id="page" class="loading">Loading leads...</div>';
     case 'pipeline': return '<div id="page" class="loading">Loading pipeline...</div>';
     case 'campaigns': return '<div id="page" class="loading">Loading campaigns...</div>';
+    case 'forms': return '<div id="page" class="loading">Loading forms...</div>';
     case 'content': return '<div id="page" class="loading">Loading content...</div>';
     case 'appointments': return '<div id="page" class="loading">Loading appointments...</div>';
     case 'chat': return renderChatPage();
@@ -507,6 +509,7 @@ async function afterRender() {
     case 'leads': return loadLeads();
     case 'pipeline': return loadPipeline();
     case 'campaigns': return loadCampaigns();
+    case 'forms': return loadForms();
     case 'content': return loadContent();
     case 'appointments': return loadAppointments();
     case 'billing': return loadBilling();
@@ -1568,6 +1571,7 @@ async function startCampaignWizard(editId) {
       body: campaign.body || '',
       target_audience: campaign.target_audience || '',
       budget_limit: campaign.budget_limit || 0,
+      form_id: campaign.form_id || null,
       // design state — only populated when user opens email designer
       design: null,
     },
@@ -1738,6 +1742,7 @@ function renderWizardStepContent(step) {
               </div>
               <button class="btn btn-primary" onclick="wizardAiGenerate()" id="wz-ai-btn">Generate with AI</button>
             </div>
+            ${renderWizardFormAttach(d)}
           `;
         }
         // Email designer renders into #ed-root after this template returns.
@@ -1748,6 +1753,7 @@ function renderWizardStepContent(step) {
               oninput="wizardState.data.subject=this.value">
             <small class="text-muted">A compelling subject line increases your open rate.</small>
           </div>
+          ${renderWizardFormAttach(d)}
           <div id="ed-root" class="email-designer"></div>
         `;
       }
@@ -1783,6 +1789,28 @@ function getContentPlaceholder(type) {
     case 'ad': return 'Write your ad copy here...';
     case 'content': return 'Write your content here...';
   }
+}
+
+function renderWizardFormAttach(d) {
+  const attached = d.form_id;
+  return `
+    <div class="form-group" style="margin-top:12px;padding:12px;background:var(--bg);border:1px dashed var(--border);border-radius:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div>
+          <strong style="font-size:13px">Attach a Form</strong>
+          <div class="text-muted text-sm">
+            ${attached
+              ? `Form #${attached} is attached. A CTA button will appear at the bottom of each email.`
+              : 'Optional. Recipients can fill in your custom form straight from the email.'}
+          </div>
+        </div>
+        <div class="flex gap-2">
+          ${attached ? `<button class="btn btn-sm btn-outline" type="button" onclick="wizardAttachForm(null); renderCampaignWizard()">Detach</button>` : ''}
+          <button class="btn btn-sm btn-primary" type="button" onclick="openAttachFormModal()">${attached ? 'Change Form' : '+ Attach Form'}</button>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 async function loadWizardLeads() {
@@ -1914,6 +1942,16 @@ function renderWizardReview() {
           ${d.budget_limit > 0 ? `<strong>$${d.budget_limit.toFixed(2)}</strong> — AI features will pause when this limit is reached` : '<span class="text-muted">No limit set — unlimited AI usage</span>'}
         </div>
       </div>
+      ${d.type === 'email' ? `
+        <div class="wizard-review-section">
+          <div class="wizard-review-label">Attached Form</div>
+          <div class="wizard-review-value">
+            ${d.form_id
+              ? `<strong>Form #${d.form_id}</strong> — a CTA button will be appended to each email <a href="/f/${d.form_id}" target="_blank" style="margin-left:6px;color:var(--primary);font-size:13px">(preview)</a>`
+              : '<span class="text-muted">No form attached</span>'}
+          </div>
+        </div>
+      ` : ''}
     </div>
 
     ${!d.name ? `
@@ -2040,6 +2078,7 @@ async function wizardSave(action) {
       name: d.name, type: d.type, subject: d.subject,
       body: d.body, target_audience: d.target_audience,
       budget_limit: d.budget_limit || 0,
+      form_id: d.form_id || null,
     };
 
     if (wizardState.editId) {
@@ -5410,4 +5449,470 @@ async function init() {
     render();
   }
 }
+// ========== Forms (Form Creator) ==========
+let formsState = { list: [], editing: null, selectedForm: null };
+
+async function loadForms() {
+  if (formsState.editing) return renderFormBuilder();
+  const page = document.getElementById('page');
+  if (!page) return;
+  page.innerHTML = '<div class="loading">Loading forms...</div>';
+  try {
+    formsState.list = await api.get('/forms');
+  } catch (e) {
+    page.innerHTML = `<div class="empty">Error loading forms: ${esc(e.message)}</div>`;
+    return;
+  }
+  const forms = formsState.list;
+
+  page.innerHTML = `
+    <div class="toolbar">
+      <h2>Forms</h2>
+      <button class="btn btn-primary" onclick="startFormBuilder()">+ New Form</button>
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:16px">
+      <p class="text-muted text-sm" style="margin:0">
+        Build custom forms with your own header, footer, logo, and fields. Attach a form to any campaign — recipients click the CTA in the email and fill it in.
+        Submissions are captured against the lead and campaign that sent them.
+      </p>
+    </div>
+
+    ${forms.length === 0 ? `
+      <div class="empty" style="padding:40px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">&#9634;</div>
+        <p class="text-muted">No forms yet. Create your first form to collect responses from leads.</p>
+        <button class="btn btn-primary" onclick="startFormBuilder()" style="margin-top:12px">+ New Form</button>
+      </div>
+    ` : `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+        ${forms.map(f => `
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:10px">
+            ${f.logo_url ? `<img src="${esc(f.logo_url)}" alt="" style="max-height:36px;max-width:120px;object-fit:contain">` : ''}
+            <div>
+              <strong style="font-size:15px">${esc(f.name)}</strong>
+              ${f.title ? `<div class="text-muted text-sm">${esc(f.title)}</div>` : ''}
+            </div>
+            <div class="text-sm text-muted">
+              ${(f.fields || []).length} field${(f.fields || []).length === 1 ? '' : 's'}
+              &middot; Updated ${new Date(f.updated_at).toLocaleDateString()}
+            </div>
+            <div class="flex gap-2" style="flex-wrap:wrap">
+              <button class="btn btn-sm btn-outline" onclick="startFormBuilder(${f.id})">Edit</button>
+              <button class="btn btn-sm btn-outline" onclick="previewForm(${f.id})">Preview</button>
+              <button class="btn btn-sm btn-outline" onclick="viewFormSubmissions(${f.id})">Submissions</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteForm(${f.id})">Delete</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+  `;
+}
+
+function startFormBuilder(id) {
+  if (id) {
+    api.get(`/forms/${id}`).then(f => {
+      formsState.editing = { ...f, fields: Array.isArray(f.fields) ? f.fields : [] };
+      renderFormBuilder();
+    }).catch(e => alert('Load failed: ' + e.message));
+    return;
+  }
+  formsState.editing = {
+    id: null,
+    name: '',
+    title: '',
+    description: '',
+    header_html: '',
+    footer_html: '',
+    logo_url: '',
+    button_text: 'Submit',
+    redirect_url: '',
+    fields: [],
+  };
+  renderFormBuilder();
+}
+
+function exitFormBuilder() {
+  formsState.editing = null;
+  loadForms();
+}
+
+const FIELD_TYPES = [
+  { type: 'name', label: 'Name' },
+  { type: 'email', label: 'Email' },
+  { type: 'phone', label: 'Phone' },
+  { type: 'text', label: 'Short text' },
+  { type: 'textarea', label: 'Long text' },
+  { type: 'dropdown', label: 'Dropdown' },
+  { type: 'calendar', label: 'Calendar / Date' },
+  { type: 'social_links', label: 'Social links' },
+];
+
+function defaultFieldFor(type) {
+  const id = 'f' + Math.random().toString(36).slice(2, 8);
+  const base = { id, type, required: false, placeholder: '' };
+  switch (type) {
+    case 'name': return { ...base, name: 'name', label: 'Your name', required: true };
+    case 'email': return { ...base, name: 'email', label: 'Email address', required: true };
+    case 'phone': return { ...base, name: 'phone', label: 'Phone number' };
+    case 'text': return { ...base, name: 'text_' + id, label: 'Short answer' };
+    case 'textarea': return { ...base, name: 'long_' + id, label: 'Your message' };
+    case 'dropdown': return { ...base, name: 'choice_' + id, label: 'Pick one', options: ['Option 1', 'Option 2'] };
+    case 'calendar': return { ...base, name: 'date_' + id, label: 'Pick a date & time' };
+    case 'social_links': return { ...base, name: 'socials', label: 'Your social profiles' };
+  }
+}
+
+function renderFormBuilder() {
+  const f = formsState.editing;
+  const page = document.getElementById('page');
+  if (!page || !f) return;
+
+  page.innerHTML = `
+    <div class="toolbar">
+      <h2>${f.id ? 'Edit Form' : 'New Form'}</h2>
+      <div class="flex gap-2">
+        <button class="btn btn-outline" onclick="exitFormBuilder()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveForm()">${f.id ? 'Save Changes' : 'Create Form'}</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+      <!-- LEFT: editor -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="card" style="padding:16px">
+          <div class="form-group">
+            <label>Form Name (internal) *</label>
+            <input id="fb-name" value="${esc(f.name)}" placeholder="e.g. Demo Request, Newsletter Signup"
+              oninput="formsState.editing.name=this.value">
+            <small class="text-muted">Only you see this. Used to identify the form when attaching to campaigns.</small>
+          </div>
+          <div class="form-group">
+            <label>Title (shown to recipient)</label>
+            <input id="fb-title" value="${esc(f.title || '')}" placeholder="e.g. Book a free discovery call"
+              oninput="formsState.editing.title=this.value">
+          </div>
+          <div class="form-group">
+            <label>Description (shown to recipient)</label>
+            <textarea id="fb-desc" style="min-height:60px" placeholder="e.g. Tell us a bit about your needs and we'll be in touch within 24 hours."
+              oninput="formsState.editing.description=this.value">${esc(f.description || '')}</textarea>
+          </div>
+        </div>
+
+        <div class="card" style="padding:16px">
+          <h3 style="font-size:14px;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)">Branding</h3>
+          <div class="form-group">
+            <label>Logo</label>
+            ${f.logo_url ? `
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+                <img src="${esc(f.logo_url)}" style="max-height:48px;max-width:160px;object-fit:contain;background:var(--bg);padding:6px;border:1px solid var(--border);border-radius:6px">
+                <button class="btn btn-sm btn-outline" onclick="formsState.editing.logo_url=''; renderFormBuilder()">Remove</button>
+              </div>
+            ` : ''}
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" onchange="uploadFormLogo(this)">
+            <small class="text-muted">PNG, JPG, WEBP, GIF or SVG. Max 1.5 MB.</small>
+          </div>
+          <div class="form-group">
+            <label>Header HTML (optional)</label>
+            <textarea id="fb-header" style="min-height:80px;font-family:monospace;font-size:12px" placeholder="&lt;p&gt;Welcome! Fill in the form below.&lt;/p&gt;"
+              oninput="formsState.editing.header_html=this.value">${esc(f.header_html || '')}</textarea>
+            <small class="text-muted">Shown above the form. Plain HTML — no scripts.</small>
+          </div>
+          <div class="form-group">
+            <label>Footer HTML (optional)</label>
+            <textarea id="fb-footer" style="min-height:60px;font-family:monospace;font-size:12px" placeholder="&lt;p&gt;&copy; Your Company &middot; &lt;a href=&quot;https://…&quot;&gt;Privacy&lt;/a&gt;&lt;/p&gt;"
+              oninput="formsState.editing.footer_html=this.value">${esc(f.footer_html || '')}</textarea>
+          </div>
+        </div>
+
+        <div class="card" style="padding:16px">
+          <h3 style="font-size:14px;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)">Fields</h3>
+          <div id="fb-fields-list">
+            ${(f.fields || []).map((fld, i) => renderFieldRow(fld, i)).join('') || '<div class="empty text-muted text-sm">No fields yet. Add one below.</div>'}
+          </div>
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <div class="text-sm text-muted" style="margin-bottom:8px">Add a field</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              ${FIELD_TYPES.map(t => `
+                <button class="btn btn-sm btn-outline" onclick="addFormField('${t.type}')">+ ${t.label}</button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="padding:16px">
+          <h3 style="font-size:14px;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)">After Submit</h3>
+          <div class="form-group">
+            <label>Submit button text</label>
+            <input value="${esc(f.button_text || 'Submit')}" oninput="formsState.editing.button_text=this.value">
+          </div>
+          <div class="form-group">
+            <label>Redirect URL (optional)</label>
+            <input type="url" value="${esc(f.redirect_url || '')}" placeholder="https://your-thank-you-page.com"
+              oninput="formsState.editing.redirect_url=this.value">
+            <small class="text-muted">If set, recipients are sent here after submitting. Otherwise they see a "Thank you" message.</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: preview -->
+      <div class="card" style="padding:0;position:sticky;top:16px;overflow:hidden">
+        <div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">
+          Live Preview
+        </div>
+        <div id="fb-preview" style="padding:20px;max-height:70vh;overflow:auto;background:var(--bg)"></div>
+      </div>
+    </div>
+  `;
+
+  renderFormPreview();
+}
+
+function renderFieldRow(fld, i) {
+  const typeLabel = (FIELD_TYPES.find(t => t.type === fld.type) || {}).label || fld.type;
+  return `
+    <div class="card" style="padding:10px;margin-bottom:8px;background:var(--bg);border:1px solid var(--border)" data-field-idx="${i}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="text-sm"><strong>${esc(typeLabel)}</strong> <span class="text-muted">&middot; ${esc(fld.name)}</span></div>
+        <div class="flex gap-2">
+          <button class="btn btn-sm btn-outline" ${i === 0 ? 'disabled' : ''} onclick="moveField(${i},-1)">&uarr;</button>
+          <button class="btn btn-sm btn-outline" onclick="moveField(${i},1)">&darr;</button>
+          <button class="btn btn-sm btn-danger" onclick="removeField(${i})">&times;</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input placeholder="Label" value="${esc(fld.label || '')}" oninput="updateField(${i},'label',this.value)">
+        <input placeholder="Field name (a-z, 0-9, _)" value="${esc(fld.name || '')}" oninput="updateField(${i},'name',this.value.replace(/[^a-z0-9_]/gi,'_'))">
+      </div>
+      ${fld.type === 'dropdown' ? `
+        <div style="margin-top:8px">
+          <label class="text-sm text-muted" style="display:block;margin-bottom:4px">Options (one per line)</label>
+          <textarea style="min-height:70px;font-size:13px" oninput="updateDropdownOptions(${i}, this.value)">${esc((fld.options || []).join('\n'))}</textarea>
+        </div>
+      ` : ''}
+      ${fld.type !== 'social_links' && fld.type !== 'calendar' ? `
+        <div style="margin-top:8px">
+          <input placeholder="Placeholder (optional)" value="${esc(fld.placeholder || '')}" oninput="updateField(${i},'placeholder',this.value)">
+        </div>
+      ` : ''}
+      <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px">
+        <input type="checkbox" ${fld.required ? 'checked' : ''} onchange="updateField(${i},'required',this.checked)">
+        Required
+      </label>
+    </div>
+  `;
+}
+
+function addFormField(type) {
+  formsState.editing.fields.push(defaultFieldFor(type));
+  renderFormBuilder();
+}
+function removeField(i) {
+  formsState.editing.fields.splice(i, 1);
+  renderFormBuilder();
+}
+function moveField(i, dir) {
+  const arr = formsState.editing.fields;
+  const j = i + dir;
+  if (j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  renderFormBuilder();
+}
+function updateField(i, key, val) {
+  formsState.editing.fields[i][key] = val;
+  renderFormPreview();
+}
+function updateDropdownOptions(i, text) {
+  formsState.editing.fields[i].options = text.split('\n').map(s => s.trim()).filter(Boolean);
+  renderFormPreview();
+}
+
+async function uploadFormLogo(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  if (file.size > 1_500_000) { alert('File too large. Max 1.5 MB.'); return; }
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const res = await api.post('/uploads/logo', { dataUrl: reader.result, filename: file.name });
+      formsState.editing.logo_url = res.url;
+      renderFormBuilder();
+    } catch (e) { alert('Upload failed: ' + e.message); }
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderFormPreview() {
+  const el = document.getElementById('fb-preview');
+  if (!el) return;
+  const f = formsState.editing;
+  const logo = f.logo_url ? `<div style="text-align:center;margin-bottom:12px"><img src="${esc(f.logo_url)}" style="max-height:48px;max-width:200px"></div>` : '';
+  const header = f.header_html ? `<div style="margin-bottom:12px">${f.header_html}</div>` : '';
+  const footer = f.footer_html ? `<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);color:var(--text-muted);font-size:12px">${f.footer_html}</div>` : '';
+  const title = f.title ? `<h3 style="margin-bottom:6px;text-align:center">${esc(f.title)}</h3>` : '';
+  const desc = f.description ? `<p style="text-align:center;color:var(--text-muted);margin-bottom:14px;font-size:13px">${esc(f.description)}</p>` : '';
+  const fields = (f.fields || []).map(renderPreviewField).join('');
+  el.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px">
+      ${logo}${header}${title}${desc}
+      ${fields || '<div class="text-muted text-sm" style="text-align:center;padding:20px">Add fields from the left panel</div>'}
+      <button style="width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-weight:600;margin-top:8px">${esc(f.button_text || 'Submit')}</button>
+      ${footer}
+    </div>
+  `;
+}
+
+function renderPreviewField(f) {
+  const req = f.required ? ' <span style="color:var(--danger)">*</span>' : '';
+  const label = `<label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">${esc(f.label || f.name)}${req}</label>`;
+  const style = 'width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)';
+  const wrap = inner => `<div style="margin-bottom:10px">${label}${inner}</div>`;
+  switch (f.type) {
+    case 'name': return wrap(`<input style="${style}" placeholder="${esc(f.placeholder || 'Your name')}">`);
+    case 'email': return wrap(`<input type="email" style="${style}" placeholder="${esc(f.placeholder || 'you@example.com')}">`);
+    case 'phone': return wrap(`<input type="tel" style="${style}" placeholder="${esc(f.placeholder || '+60 12 345 6789')}">`);
+    case 'text': return wrap(`<input style="${style}" placeholder="${esc(f.placeholder || '')}">`);
+    case 'textarea': return wrap(`<textarea style="${style};min-height:70px" placeholder="${esc(f.placeholder || '')}"></textarea>`);
+    case 'dropdown': {
+      const opts = (f.options || []).map(o => `<option>${esc(o)}</option>`).join('');
+      return wrap(`<select style="${style}"><option value="">-- Select --</option>${opts}</select>`);
+    }
+    case 'calendar': return wrap(`<input type="datetime-local" style="${style}">`);
+    case 'social_links': return wrap(`
+      <div style="display:flex;gap:6px">
+        <select style="${style};width:120px">
+          <option>LinkedIn</option><option>Twitter</option><option>Instagram</option><option>Facebook</option>
+        </select>
+        <input style="${style}" placeholder="https://…">
+      </div>
+      <div class="text-muted text-sm" style="margin-top:4px">Recipients can add multiple.</div>
+    `);
+    default: return '';
+  }
+}
+
+async function saveForm() {
+  const f = formsState.editing;
+  if (!f.name?.trim()) { alert('Form name is required.'); return; }
+  if (!f.fields?.length) { if (!confirm('Save a form with no fields?')) return; }
+  try {
+    const saved = f.id
+      ? await api.put(`/forms/${f.id}`, f)
+      : await api.post('/forms', f);
+    formsState.editing = null;
+    alert('Form saved.');
+    navigate('forms');
+  } catch (e) {
+    alert('Save failed: ' + e.message);
+  }
+}
+
+async function deleteForm(id) {
+  if (!confirm('Delete this form? Submissions will also be removed.')) return;
+  try {
+    await api.del(`/forms/${id}`);
+    loadForms();
+  } catch (e) { alert('Delete failed: ' + e.message); }
+}
+
+function previewForm(id) {
+  window.open(`/f/${id}`, '_blank');
+}
+
+async function viewFormSubmissions(id) {
+  try {
+    const subs = await api.get(`/forms/${id}/submissions`);
+    const form = formsState.list.find(f => f.id === id);
+    modal = {
+      title: `Submissions — ${form?.name || 'Form'}`,
+      body: subs.length === 0 ? `<p class="text-muted">No submissions yet. Attach this form to a campaign and send it out.</p>` : `
+        <div style="max-height:60vh;overflow:auto">
+          ${subs.map(s => `
+            <div class="card" style="padding:12px;margin-bottom:10px">
+              <div class="text-sm text-muted" style="margin-bottom:6px">
+                ${new Date(s.submitted_at).toLocaleString()}
+                ${s.campaign_name ? ` &middot; Campaign: <strong>${esc(s.campaign_name)}</strong>` : ''}
+                ${s.lead_name ? ` &middot; Lead: <strong>${esc(s.lead_name)}</strong>` : ''}
+              </div>
+              <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px">
+                ${Object.entries(s.data || {}).map(([k, v]) => `
+                  <div class="text-muted">${esc(k)}</div>
+                  <div>${esc(typeof v === 'string' ? v : JSON.stringify(v))}</div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `,
+      onSave: () => { modal = null; render(); },
+      saveLabel: 'Close',
+    };
+    render();
+  } catch (e) { alert('Load failed: ' + e.message); }
+}
+
+window.loadForms = loadForms;
+window.startFormBuilder = startFormBuilder;
+window.exitFormBuilder = exitFormBuilder;
+window.addFormField = addFormField;
+window.removeField = removeField;
+window.moveField = moveField;
+window.updateField = updateField;
+window.updateDropdownOptions = updateDropdownOptions;
+window.uploadFormLogo = uploadFormLogo;
+window.saveForm = saveForm;
+window.deleteForm = deleteForm;
+window.previewForm = previewForm;
+window.viewFormSubmissions = viewFormSubmissions;
+
+// ========== Campaign wizard — Attach Form ==========
+async function openAttachFormModal() {
+  let forms = [];
+  try { forms = await api.get('/forms'); } catch (e) { alert('Failed to load forms: ' + e.message); return; }
+  const current = wizardState?.data?.form_id;
+  modal = {
+    title: 'Attach a Form',
+    body: `
+      <p class="text-muted text-sm" style="margin-bottom:12px">Recipients will see a CTA button in the email that opens this form.</p>
+      ${forms.length === 0 ? `
+        <div class="empty" style="padding:24px;text-align:center">
+          <p class="text-muted">You haven't created any forms yet.</p>
+          <button class="btn btn-primary" style="margin-top:10px" onclick="modal=null; exitCampaignWizard(); navigate('forms'); setTimeout(startFormBuilder,80)">Create a form</button>
+        </div>
+      ` : `
+        <div style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow:auto">
+          <label style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;cursor:pointer">
+            <input type="radio" name="attach-form" value="" ${!current ? 'checked' : ''} onchange="wizardAttachForm(null)">
+            <div><strong>No form</strong><div class="text-muted text-sm">Don't include a form in this campaign.</div></div>
+          </label>
+          ${forms.map(f => `
+            <label style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;cursor:pointer">
+              <input type="radio" name="attach-form" value="${f.id}" ${current === f.id ? 'checked' : ''} onchange="wizardAttachForm(${f.id})">
+              ${f.logo_url ? `<img src="${esc(f.logo_url)}" style="max-height:28px;max-width:60px;object-fit:contain">` : ''}
+              <div style="flex:1">
+                <strong>${esc(f.name)}</strong>
+                ${f.title ? `<div class="text-sm text-muted">${esc(f.title)}</div>` : ''}
+                <div class="text-sm text-muted">${(f.fields || []).length} field${(f.fields || []).length === 1 ? '' : 's'}</div>
+              </div>
+              <button class="btn btn-sm btn-outline" onclick="event.preventDefault(); window.open('/f/${f.id}', '_blank')">Preview</button>
+            </label>
+          `).join('')}
+        </div>
+      `}
+    `,
+    onSave: () => { modal = null; render(); renderCampaignWizard(); },
+    saveLabel: 'Done',
+  };
+  render();
+}
+
+function wizardAttachForm(formId) {
+  if (!wizardState) return;
+  wizardState.data.form_id = formId || null;
+}
+
+window.openAttachFormModal = openAttachFormModal;
+window.wizardAttachForm = wizardAttachForm;
+
 init();
