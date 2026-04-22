@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Form</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #FAF7F2;
+      --surface: #FFFFFF;
+      --border: #E6DDCC;
+      --text: #1A2A2E;
+      --text-muted: #6B7A7F;
+      --primary: #1FA896;
+      --primary-hover: #167A6D;
+      --danger: #dc2626;
+      --radius: 10px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 16px;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 640px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,.04);
+    }
+    .header-logo {
+      text-align: center;
+      padding: 28px 24px 0;
+    }
+    .header-logo img { max-height: 64px; max-width: 240px; }
+    .header-html, .footer-html {
+      padding: 0 28px;
+    }
+    .title-block {
+      padding: 20px 28px 0;
+      text-align: center;
+    }
+    .title-block h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .title-block p { color: var(--text-muted); font-size: 14px; }
+    form { padding: 24px 28px 28px; }
+    .field { margin-bottom: 16px; }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .req { color: var(--danger); margin-left: 2px; }
+    input[type="text"], input[type="email"], input[type="tel"],
+    input[type="date"], input[type="datetime-local"], input[type="url"],
+    textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+      transition: border .15s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--primary); }
+    textarea { min-height: 96px; resize: vertical; }
+    .social-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+    .social-row input { flex: 1; }
+    .social-row select { width: 140px; flex-shrink: 0; }
+    .btn-add-social {
+      margin-top: 4px;
+      background: none;
+      border: 1px dashed var(--border);
+      color: var(--text-muted);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      width: 100%;
+    }
+    .btn-add-social:hover { border-color: var(--primary); color: var(--primary); }
+    button[type="submit"] {
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 13px 20px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+      transition: background .15s;
+    }
+    button[type="submit"]:hover { background: var(--primary-hover); }
+    button[type="submit"]:disabled { opacity: .6; cursor: not-allowed; }
+    .footer-html {
+      padding: 16px 28px 24px;
+      color: var(--text-muted);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+    }
+    .status {
+      padding: 40px 28px;
+      text-align: center;
+    }
+    .status h2 { font-size: 20px; margin-bottom: 8px; }
+    .status p { color: var(--text-muted); }
+    .error {
+      background: #fef2f2;
+      color: var(--danger);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .loading { padding: 60px 28px; text-align: center; color: var(--text-muted); }
+    /* Sanitised header/footer block */
+    .header-html h1, .header-html h2, .header-html h3,
+    .footer-html h1, .footer-html h2, .footer-html h3 { margin: 12px 0 8px; }
+    .header-html p, .footer-html p { margin-bottom: 8px; }
+    .header-html a, .footer-html a { color: var(--primary); }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="root">
+    <div class="loading">Loading form…</div>
+  </div>
+
+<script>
+(function(){
+  // Very light HTML sanitiser — strips <script>, on* handlers, and javascript: URLs.
+  // Good enough for creator-controlled header/footer HTML rendered to recipients.
+  function sanitizeHtml(html) {
+    if (!html) return '';
+    const tpl = document.createElement('template');
+    tpl.innerHTML = String(html);
+    const walker = document.createTreeWalker(tpl.content, NodeFilter.SHOW_ELEMENT, null);
+    const kill = [];
+    while (walker.nextNode()) {
+      const el = walker.currentNode;
+      const tag = el.tagName.toLowerCase();
+      if (tag === 'script' || tag === 'iframe' || tag === 'object' || tag === 'embed' || tag === 'style') {
+        kill.push(el); continue;
+      }
+      for (const a of Array.from(el.attributes)) {
+        const n = a.name.toLowerCase();
+        const v = String(a.value || '').toLowerCase().trim();
+        if (n.startsWith('on')) el.removeAttribute(a.name);
+        else if ((n === 'href' || n === 'src') && (v.startsWith('javascript:') || v.startsWith('data:text/html'))) {
+          el.removeAttribute(a.name);
+        }
+      }
+    }
+    kill.forEach(el => el.remove());
+    return tpl.innerHTML;
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function getFormId() {
+    const m = location.pathname.match(/\/f\/(\d+)/);
+    return m ? parseInt(m[1]) : null;
+  }
+
+  function getQuery(k) {
+    return new URLSearchParams(location.search).get(k);
+  }
+
+  function renderField(f) {
+    const req = f.required ? '<span class="req">*</span>' : '';
+    const ph = esc(f.placeholder || '');
+    const label = esc(f.label || f.name);
+    const name = esc(f.name);
+    switch (f.type) {
+      case 'name':
+        return `<div class="field"><label>${label}${req}</label><input type="text" name="${name}" ${f.required?'required':''} placeholder="${ph || 'Your name'}"></div>`;
+      case 'email':
+        return `<div class="field"><label>${label}${req}</label><input type="email" name="${name}" ${f.required?'required':''} placeholder="${ph || 'you@example.com'}"></div>`;
+      case 'phone':
+        return `<div class="field"><label>${label}${req}</label><input type="tel" name="${name}" ${f.required?'required':''} placeholder="${ph || '+60 12 345 6789'}"></div>`;
+      case 'text':
+        return `<div class="field"><label>${label}${req}</label><input type="text" name="${name}" ${f.required?'required':''} placeholder="${ph}"></div>`;
+      case 'textarea':
+        return `<div class="field"><label>${label}${req}</label><textarea name="${name}" ${f.required?'required':''} placeholder="${ph}"></textarea></div>`;
+      case 'dropdown': {
+        const opts = (f.options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+        return `<div class="field"><label>${label}${req}</label><select name="${name}" ${f.required?'required':''}><option value="">-- Select --</option>${opts}</select></div>`;
+      }
+      case 'calendar':
+        return `<div class="field"><label>${label}${req}</label><input type="datetime-local" name="${name}" ${f.required?'required':''}></div>`;
+      case 'social_links':
+        return `
+          <div class="field" data-social="${name}">
+            <label>${label}${req}</label>
+            <div class="social-list"></div>
+            <button type="button" class="btn-add-social" onclick="window.__addSocial('${name}')">+ Add social link</button>
+          </div>`;
+      default:
+        return '';
+    }
+  }
+
+  function addSocialRow(listEl) {
+    const row = document.createElement('div');
+    row.className = 'social-row';
+    row.innerHTML = `
+      <select>
+        <option value="linkedin">LinkedIn</option>
+        <option value="twitter">Twitter / X</option>
+        <option value="instagram">Instagram</option>
+        <option value="facebook">Facebook</option>
+        <option value="tiktok">TikTok</option>
+        <option value="youtube">YouTube</option>
+        <option value="website">Website</option>
+        <option value="other">Other</option>
+      </select>
+      <input type="url" placeholder="https://…">
+    `;
+    listEl.appendChild(row);
+  }
+
+  window.__addSocial = function(name) {
+    const wrap = document.querySelector(`[data-social="${name}"] .social-list`);
+    if (wrap) addSocialRow(wrap);
+  };
+
+  function collectSocial(wrap) {
+    const rows = wrap.querySelectorAll('.social-row');
+    const out = [];
+    rows.forEach(r => {
+      const platform = r.querySelector('select')?.value || '';
+      const url = r.querySelector('input')?.value || '';
+      if (url.trim()) out.push({ platform, url: url.trim() });
+    });
+    return out;
+  }
+
+  async function init() {
+    const id = getFormId();
+    const root = document.getElementById('root');
+    if (!id) { root.innerHTML = '<div class="status"><h2>Form not found</h2></div>'; return; }
+
+    let form;
+    try {
+      const res = await fetch(`/api/forms/public/${id}`);
+      if (!res.ok) throw new Error('not found');
+      form = await res.json();
+    } catch {
+      root.innerHTML = '<div class="status"><h2>Form not available</h2><p>This form may have been removed.</p></div>';
+      return;
+    }
+
+    document.title = form.title || form.name || 'Form';
+
+    const logo = form.logo_url ? `<div class="header-logo"><img src="${esc(form.logo_url)}" alt="Logo"></div>` : '';
+    const header = form.header_html ? `<div class="header-html">${sanitizeHtml(form.header_html)}</div>` : '';
+    const footer = form.footer_html ? `<div class="footer-html">${sanitizeHtml(form.footer_html)}</div>` : '';
+    const titleBlock = (form.title || form.description) ? `
+      <div class="title-block">
+        ${form.title ? `<h1>${esc(form.title)}</h1>` : ''}
+        ${form.description ? `<p>${esc(form.description)}</p>` : ''}
+      </div>` : '';
+
+    const fieldsHtml = (form.fields || []).map(renderField).join('');
+    const btn = esc(form.button_text || 'Submit');
+
+    root.innerHTML = `
+      ${logo}${header}${titleBlock}
+      <form id="the-form" novalidate>
+        <div id="form-error" class="error" style="display:none"></div>
+        ${fieldsHtml}
+        <button type="submit" id="submit-btn">${btn}</button>
+      </form>
+      ${footer}
+    `;
+
+    // Init any social_links fields with one empty row
+    document.querySelectorAll('[data-social]').forEach(wrap => {
+      const list = wrap.querySelector('.social-list');
+      addSocialRow(list);
+    });
+
+    const el = document.getElementById('the-form');
+    el.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const errBox = document.getElementById('form-error');
+      errBox.style.display = 'none';
+      const btnEl = document.getElementById('submit-btn');
+      btnEl.disabled = true;
+
+      const data = {};
+      for (const f of form.fields || []) {
+        if (f.type === 'social_links') {
+          const wrap = document.querySelector(`[data-social="${f.name}"]`);
+          data[f.name] = wrap ? collectSocial(wrap) : [];
+        } else {
+          const inp = el.querySelector(`[name="${f.name}"]`);
+          data[f.name] = inp ? inp.value : '';
+        }
+      }
+
+      const payload = {
+        data,
+        campaign_id: getQuery('cid') ? parseInt(getQuery('cid')) : null,
+        lead_id: getQuery('lid') ? parseInt(getQuery('lid')) : null,
+      };
+
+      try {
+        const res = await fetch(`/api/forms/public/${id}/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          errBox.textContent = body.error || 'Submission failed';
+          errBox.style.display = 'block';
+          btnEl.disabled = false;
+          return;
+        }
+        if (body.redirect) {
+          window.location.href = body.redirect;
+          return;
+        }
+        root.innerHTML = `
+          ${logo}
+          <div class="status">
+            <h2>Thank you!</h2>
+            <p>Your response has been received.</p>
+          </div>
+          ${footer}
+        `;
+      } catch (e) {
+        errBox.textContent = 'Network error — please try again.';
+        errBox.style.display = 'block';
+        btnEl.disabled = false;
+      }
+    });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

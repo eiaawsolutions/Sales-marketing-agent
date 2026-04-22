@@ -168,6 +168,35 @@ export function initializeDatabase(db) {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS forms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      title TEXT,
+      description TEXT,
+      header_html TEXT,
+      footer_html TEXT,
+      logo_url TEXT,
+      button_text TEXT DEFAULT 'Submit',
+      redirect_url TEXT,
+      fields TEXT NOT NULL DEFAULT '[]',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS form_submissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id INTEGER NOT NULL,
+      campaign_id INTEGER,
+      lead_id INTEGER,
+      data TEXT NOT NULL,
+      ip TEXT,
+      user_agent TEXT,
+      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (form_id) REFERENCES forms(id)
+    );
+
     CREATE TABLE IF NOT EXISTS system_logic (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       topic TEXT NOT NULL,
@@ -276,6 +305,9 @@ export function initializeDatabase(db) {
   try { db.exec("ALTER TABLE campaigns ADD COLUMN pipeline_status TEXT DEFAULT 'idle'"); } catch (e) { /* exists */ }
   try { db.exec("ALTER TABLE campaigns ADD COLUMN pipeline_log TEXT"); } catch (e) { /* exists */ }
   try { db.exec("ALTER TABLE campaign_leads ADD COLUMN clicked_at DATETIME"); } catch (e) { /* exists */ }
+
+  // Form creator: attach a form to a campaign
+  try { db.exec("ALTER TABLE campaigns ADD COLUMN form_id INTEGER"); } catch (e) { /* exists */ }
 
   // Base URL setting
   db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('base_url', 'https://sa.eiaawsolutions.com')").run();

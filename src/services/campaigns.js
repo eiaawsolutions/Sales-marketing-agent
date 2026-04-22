@@ -31,12 +31,13 @@ export const campaignsService = {
 
   create(userId, campaign) {
     const result = db.prepare(`
-      INSERT INTO campaigns (user_id, name, type, subject, body, target_audience, scheduled_at, budget_limit)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO campaigns (user_id, name, type, subject, body, target_audience, scheduled_at, budget_limit, form_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       userId, campaign.name, campaign.type, campaign.subject,
       campaign.body, campaign.target_audience, campaign.scheduled_at,
-      campaign.budget_limit || 0
+      campaign.budget_limit || 0,
+      campaign.form_id ? parseInt(campaign.form_id) : null
     );
     return this.getById(null, result.lastInsertRowid);
   },
@@ -50,9 +51,9 @@ export const campaignsService = {
     const fields = [];
     const params = [];
     for (const [key, value] of Object.entries(data)) {
-      if (['name', 'type', 'status', 'subject', 'body', 'target_audience', 'scheduled_at', 'budget_limit'].includes(key)) {
+      if (['name', 'type', 'status', 'subject', 'body', 'target_audience', 'scheduled_at', 'budget_limit', 'form_id'].includes(key)) {
         fields.push(`${key} = ?`);
-        params.push(value);
+        params.push(key === 'form_id' ? (value ? parseInt(value) : null) : value);
       }
     }
     if (fields.length === 0) return this.getById(null, id);
@@ -95,8 +96,10 @@ export const campaignsService = {
     for (const lead of campaign.leads) {
       if (lead.campaign_status !== 'pending') continue;
       try {
+        // Append form CTA if a form is attached to this campaign
+        const bodyWithForm = appendFormCta(campaign.body, campaign.form_id, campaignId, lead.id, baseUrl);
         // Inject tracking pixel and link tracking into email HTML
-        const trackedHtml = injectTracking(campaign.body, campaignId, lead.id, baseUrl);
+        const trackedHtml = injectTracking(bodyWithForm, campaignId, lead.id, baseUrl);
 
         await sendEmail({
           to: lead.email,
@@ -138,6 +141,28 @@ export const campaignsService = {
     return { total: total.count, byStatus, byType, emailStats };
   },
 };
+
+/**
+ * Append a "Complete this form" CTA block to the email body if the campaign
+ * has a form_id attached. The link carries cid + lid so submissions are
+ * correlated back to the campaign/lead.
+ */
+export function appendFormCta(html, formId, campaignId, leadId, baseUrl) {
+  if (!formId || !html) return html;
+  const base = (baseUrl || 'https://sa.eiaawsolutions.com').replace(/\/+$/, '');
+  const form = db.prepare('SELECT name, title, button_text FROM forms WHERE id = ?').get(formId);
+  if (!form) return html;
+  const label = form.button_text || 'Complete this form';
+  const formUrl = `${base}/f/${formId}?cid=${campaignId}&lid=${leadId}`;
+  const cta = `
+    <div style="margin:28px 0;padding:20px;background:#f3eee4;border-radius:10px;text-align:center;font-family:Inter,Arial,sans-serif">
+      <p style="margin:0 0 12px;color:#1a2a2e;font-size:14px">${form.title ? String(form.title).replace(/[<>]/g,'') : 'We’d love to hear from you.'}</p>
+      <a href="${formUrl}" style="display:inline-block;background:#1FA896;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">${String(label).replace(/[<>]/g,'')}</a>
+    </div>
+  `;
+  if (html.includes('</body>')) return html.replace('</body>', cta + '</body>');
+  return html + cta;
+}
 
 /**
  * Inject tracking pixel and rewrite links for click tracking.

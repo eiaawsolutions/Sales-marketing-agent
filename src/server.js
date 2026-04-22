@@ -22,6 +22,7 @@ import voiceRouter from './routes/voice.js';
 import appointmentsRouter from './routes/appointments.js';
 import trackingRouter from './routes/tracking.js';
 import uploadsRouter from './routes/uploads.js';
+import formsRouter from './routes/forms.js';
 import { maskLeads, maskLead } from './services/leads.js';
 import { startScheduler } from './services/scheduler.js';
 
@@ -71,7 +72,7 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
   // Skip for GET/HEAD/OPTIONS and public routes
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/lookup') || req.path.startsWith('/api/auth/forgot') || req.path.startsWith('/api/auth/reset-password-with-token') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/billing/checkout') || req.path.startsWith('/api/contact') || req.path.startsWith('/api/voice/webhook') || req.path.startsWith('/api/voice/tool-callback') || req.path.startsWith('/api/voice/call-link-token') || req.path.startsWith('/api/voice/public-session') || req.path.startsWith('/api/tracking/')) return next();
+  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/lookup') || req.path.startsWith('/api/auth/forgot') || req.path.startsWith('/api/auth/reset-password-with-token') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/billing/checkout') || req.path.startsWith('/api/contact') || req.path.startsWith('/api/voice/webhook') || req.path.startsWith('/api/voice/tool-callback') || req.path.startsWith('/api/voice/call-link-token') || req.path.startsWith('/api/voice/public-session') || req.path.startsWith('/api/tracking/') || req.path.startsWith('/api/forms/public/')) return next();
 
   // For authenticated requests, Bearer token in Authorization header provides CSRF protection
   // because third-party sites cannot set custom headers in cross-origin requests
@@ -354,6 +355,9 @@ app.use('/api/voice', voiceRouter);
 app.use('/api/appointments', appointmentsRouter);
 app.use('/api/tracking', trackingRouter);
 app.use('/api/uploads', requireAuth, uploadsRouter);
+// Forms router handles its own auth split — public submit/fetch routes come
+// before requireAuth inside the router. Don't wrap with requireAuth here.
+app.use('/api/forms', formsRouter);
 
 // Dashboard overview endpoint
 app.get('/api/dashboard', requireAuth, (req, res) => {
@@ -428,6 +432,11 @@ app.use((err, req, res, next) => {
     return res.status(500).json({ error: safeError(err) });
   }
   next(err);
+});
+
+// Public form page (recipients fill this in). No auth, no CSRF.
+app.get('/f/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'form.html'));
 });
 
 // SPA fallback for any other routes
