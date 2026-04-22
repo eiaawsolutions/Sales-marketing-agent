@@ -38,19 +38,24 @@ const MODEL_PRICING = {
   'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
 };
 
-function calculateCost(model, inputTokens, outputTokens) {
+// Anthropic web search tool: $10 per 1,000 searches
+const WEB_SEARCH_COST_PER_REQUEST = 0.01;
+
+function calculateCost(model, inputTokens, outputTokens, webSearchRequests = 0) {
   const pricing = MODEL_PRICING[model] || MODEL_PRICING['claude-sonnet-4-20250514'];
-  return (inputTokens * pricing.input / 1_000_000) + (outputTokens * pricing.output / 1_000_000);
+  const tokenCost = (inputTokens * pricing.input / 1_000_000) + (outputTokens * pricing.output / 1_000_000);
+  const searchCost = (webSearchRequests || 0) * WEB_SEARCH_COST_PER_REQUEST;
+  return tokenCost + searchCost;
 }
 
-function logAICost(campaignId, taskType, model, inputTokens, outputTokens, userId) {
+function logAICost(campaignId, taskType, model, inputTokens, outputTokens, userId, webSearchRequests = 0) {
   const totalTokens = inputTokens + outputTokens;
-  const cost = calculateCost(model, inputTokens, outputTokens);
+  const cost = calculateCost(model, inputTokens, outputTokens, webSearchRequests);
   db.prepare(`
     INSERT INTO ai_cost_log (campaign_id, task_type, input_tokens, output_tokens, total_tokens, cost_usd, model, user_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(campaignId || null, taskType, inputTokens, outputTokens, totalTokens, cost, model, userId || 1);
-  return { inputTokens, outputTokens, totalTokens, cost };
+  return { inputTokens, outputTokens, totalTokens, cost, webSearchRequests };
 }
 
 function getCampaignCost(campaignId) {
@@ -194,10 +199,10 @@ export async function runAgent(userId, taskType, input) {
   try {
     const result = await executeTask(taskType, input);
 
-    // Log AI cost
+    // Log AI cost (includes web search usage when applicable)
     let costInfo = null;
     if (_lastUsage) {
-      costInfo = logAICost(campaignId, taskType, _lastUsage.model, _lastUsage.inputTokens, _lastUsage.outputTokens, userId);
+      costInfo = logAICost(campaignId, taskType, _lastUsage.model, _lastUsage.inputTokens, _lastUsage.outputTokens, userId, _lastUsage.webSearchRequests);
     }
 
     db.prepare(
@@ -207,7 +212,7 @@ export async function runAgent(userId, taskType, input) {
     return { taskId, ...result, _cost: costInfo };
   } catch (error) {
     if (_lastUsage) {
-      logAICost(campaignId, taskType, _lastUsage.model, _lastUsage.inputTokens, _lastUsage.outputTokens, userId);
+      logAICost(campaignId, taskType, _lastUsage.model, _lastUsage.inputTokens, _lastUsage.outputTokens, userId, _lastUsage.webSearchRequests);
     }
 
     const friendlyMessage = cleanAIError(error);
@@ -298,24 +303,44 @@ async function chat(userMessage, extraContext = '', options = {}) {
   let lastError;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const response = await client.messages.create({
+      const requestBody = {
         model,
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
-      });
+      };
+      // Anthropic native web search tool — lets Claude actually browse and cite sources.
+      // Enabled per-call via options.useWebSearch; cost is ~$10 per 1,000 searches.
+      if (options.useWebSearch) {
+        requestBody.tools = [{
+          type: 'web_search_20250305',
+          name: 'web_search',
+          max_uses: options.webSearchMaxUses || 8,
+        }];
+      }
+      const response = await client.messages.create(requestBody);
 
-      // Capture usage for cost tracking
+      // Capture usage for cost tracking (web_search_requests lives on usage.server_tool_use)
       _lastUsage = {
         model: response.model || model,
         inputTokens: response.usage?.input_tokens || 0,
         outputTokens: response.usage?.output_tokens || 0,
+        webSearchRequests: response.usage?.server_tool_use?.web_search_requests || 0,
       };
 
-      if (!response.content || !response.content[0] || !response.content[0].text) {
+      // When web search is used the content array contains server_tool_use and
+      // web_search_tool_result blocks interleaved with text. Join every text block.
+      if (!Array.isArray(response.content) || !response.content.length) {
         throw new Error('AI returned an empty response. Please try again.');
       }
-      return response.content[0].text;
+      const joined = response.content
+        .filter(b => b && b.type === 'text' && typeof b.text === 'string')
+        .map(b => b.text)
+        .join('\n');
+      if (!joined) {
+        throw new Error('AI returned an empty response. Please try again.');
+      }
+      return joined;
     } catch (err) {
       lastError = err;
       const msg = err.message || String(err);
@@ -698,13 +723,20 @@ async function generateLeadsTask(input) {
 
 Your primary goal is ACCURACY and VERIFIABILITY — not volume.
 
+## 🔎 MANDATORY — USE THE WEB SEARCH TOOL
+You have access to a live web_search tool. You MUST use it to find real people and real companies that match the ICP. Do NOT invent names from training data. Suggested search strategy:
+1. Start with queries that surface real individuals: "<role> <industry> <geography> LinkedIn", "<industry> <geography> directors site:linkedin.com", "<niche> company Malaysia contact", "<event> speakers <industry> <year>".
+2. Open the most promising results and extract only what you can see on the page: full name, title, company, location, profile URL.
+3. Prefer LinkedIn profiles, company team pages, speaker bios, news/media mentions, public directories, and conference listings.
+4. Every lead you return MUST cite the URLs you actually visited in the verification_sources field. If you could not confirm a person on a real page, do NOT return them.
+
 ## 🎯 OBJECTIVE
-Generate a list of qualified leads based on the campaign input provided, ensuring every lead is backed by verifiable evidence.
+Generate a list of qualified leads based on the campaign input provided, ensuring every lead is backed by evidence you actually found on the open web.
 
 ## 🔒 NON-NEGOTIABLE RULES
 1. DO NOT fabricate, assume, or infer data without evidence.
-2. Every lead MUST have a verifiable digital footprint.
-3. Emails, phone numbers, or personal data MUST NOT be guessed.
+2. Every lead MUST have a verifiable digital footprint you retrieved via web_search.
+3. Emails, phone numbers, or personal data MUST NOT be guessed. Return empty string "" if not publicly listed — NEVER invent a pattern like first.last@company.com.
 4. If verification is weak or unclear → DISCARD the lead.
 5. Fewer high-quality leads are better than many unverified ones.
 
@@ -769,9 +801,11 @@ Each lead object MUST have these fields (use empty string "" — never a guess �
 - "source": Always "ai_generated"
 
 ## DEDUPLICATION
-Do NOT return any lead whose verified email matches one of these already-known emails: ${existingEmails.slice(0, 30).join(', ') || '(none)'}
+Do NOT return any lead whose verified email matches one of these already-known emails (if any): ${existingEmails.slice(0, 30).join(', ') || '(none)'}
 
-Return ONLY the JSON object. No prose, no markdown fences.`
+Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message after all web_search calls are complete.`,
+    '',
+    { useWebSearch: true, webSearchMaxUses: 8, maxTokens: 8192 }
   );
 
   const leads = Array.isArray(result.leads) ? result.leads : [];
@@ -822,6 +856,22 @@ Return ONLY the JSON object. No prose, no markdown fences.`
     return lines.join('\n');
   }
 
+  // When a verified lead has no public email, build a stable pseudo-email so the
+  // UNIQUE(leads.email) constraint holds and dedup still works. The pseudo-email
+  // is derived from the LinkedIn URL (preferred) or slugified name@company so the
+  // same person lands in the same row on re-runs. Real emails added later should
+  // overwrite the pseudo via an update path.
+  function pseudoEmailFor(lead) {
+    const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'unknown';
+    if (lead.linkedin_url) {
+      const m = /linkedin\.com\/in\/([^/?#]+)/i.exec(lead.linkedin_url);
+      if (m && m[1]) return `${slug(m[1])}@noemail.leads.local`;
+    }
+    const namePart = slug(lead.name);
+    const companyPart = slug(lead.company) || 'unknown';
+    return `${namePart}.${companyPart}@noemail.leads.local`;
+  }
+
   const addLeads = db.transaction((leadsToAdd) => {
     for (const lead of leadsToAdd) {
       if (!isVerified(lead)) {
@@ -829,13 +879,10 @@ Return ONLY the JSON object. No prose, no markdown fences.`
         continue;
       }
 
-      const email = lead.email?.toLowerCase();
-      if (!email) {
-        rejected.push({ name: lead.name, reason: 'missing verified email' });
-        continue;
-      }
+      const realEmail = lead.email?.toLowerCase() || '';
+      const email = realEmail || pseudoEmailFor(lead);
 
-      // In-batch dedup
+      // In-batch dedup (real email OR pseudo key)
       if (seenInBatch.has(email)) {
         skippedInBatch.push(email);
         continue;
@@ -853,9 +900,11 @@ Return ONLY the JSON object. No prose, no markdown fences.`
 
       const notes = buildNotes(lead);
 
-      // New lead — insert into leads table (becomes part of user's master database)
+      // New lead — insert into leads table (becomes part of user's master database).
+      // Use the real email when available; otherwise store the pseudo-email so the
+      // NOT NULL / UNIQUE constraints are satisfied and future enrichment can update it.
       const res = insertLead.run(
-        leadUserId, lead.name, lead.email, lead.company, lead.title,
+        leadUserId, lead.name, email, lead.company, lead.title,
         lead.phone, 'ai_generated', notes
       );
       const leadId = res.lastInsertRowid;
@@ -1131,10 +1180,10 @@ Total leads: ${allLeads.length} | Total campaigns: ${allCampaigns.length} | Open
 Total AI spend: $${totalCost.total.toFixed(4)}\n`;
 
     const result = await chat(message, context);
-    if (_lastUsage) logAICost(null, 'chat', _lastUsage.model, _lastUsage.inputTokens, _lastUsage.outputTokens, userId);
+    if (_lastUsage) logAICost(null, 'chat', _lastUsage.model, _lastUsage.inputTokens, _lastUsage.outputTokens, userId, _lastUsage.webSearchRequests);
     return result;
   } catch (error) {
-    if (_lastUsage) logAICost(null, 'chat', _lastUsage.model, _lastUsage.inputTokens, _lastUsage.outputTokens, userId);
+    if (_lastUsage) logAICost(null, 'chat', _lastUsage.model, _lastUsage.inputTokens, _lastUsage.outputTokens, userId, _lastUsage.webSearchRequests);
     throw new Error(cleanAIError(error));
   }
 }
