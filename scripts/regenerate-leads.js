@@ -3,7 +3,8 @@
 // active + draft campaigns belonging to the target user.
 //
 // Usage (on Railway):
-//   railway ssh "node scripts/regenerate-leads.js <email> [count]"
+//   railway ssh "node scripts/regenerate-leads.js <email> [count] [onlyIds]"
+//   onlyIds: optional comma-separated list of campaign IDs to scope the run, e.g. 2,3,5,6
 //
 // Defaults: email = eiaawsolutions@gmail.com, count = 10, statuses = active,draft
 
@@ -12,6 +13,7 @@ import { runAgent } from '../src/services/ai-agent.js';
 
 const email = process.argv[2] || 'eiaawsolutions@gmail.com';
 const count = parseInt(process.argv[3] || '10', 10);
+const onlyIds = (process.argv[4] || '').split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean);
 const statuses = ['active', 'draft'];
 
 const user = db.prepare('SELECT id, email, display_name FROM users WHERE email = ?').get(email);
@@ -21,11 +23,17 @@ if (!user) {
 }
 
 const placeholders = statuses.map(() => '?').join(',');
-const campaigns = db.prepare(
+let campaigns = db.prepare(
   `SELECT id, name, status, target_audience FROM campaigns
    WHERE user_id = ? AND status IN (${placeholders})
    ORDER BY id`
 ).all(user.id, ...statuses);
+
+if (onlyIds.length) {
+  const filter = new Set(onlyIds);
+  campaigns = campaigns.filter(c => filter.has(c.id));
+  console.log(`[regen] scoped to campaign IDs: ${[...filter].join(',')}`);
+}
 
 console.log(`[regen] user=${user.email} (id=${user.id})`);
 console.log(`[regen] ${campaigns.length} campaign(s) in [${statuses.join(', ')}]; count=${count}/each`);
