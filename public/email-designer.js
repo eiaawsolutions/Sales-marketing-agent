@@ -61,7 +61,6 @@
       blocks: [
         { id: uid(), type: 'h1', text: 'Welcome', align: 'left' },
         { id: uid(), type: 'p',  text: 'Write your message here. Tell your reader what this email is about and why it matters to them.', align: 'left' },
-        { id: uid(), type: 'cta', text: 'Get Started', url: 'https://example.com', font: FONT_OPTIONS[0].v, color: '#FFFFFF', bg: '#1FA896', size: 'md', align: 'center' },
       ],
       footer: {
         show: true,
@@ -207,7 +206,6 @@
               <button class="btn btn-sm btn-outline" type="button" onclick="EmailDesigner_addBlock('h3')">H3</button>
               <button class="btn btn-sm btn-outline" type="button" onclick="EmailDesigner_addBlock('p')">Paragraph</button>
               <button class="btn btn-sm btn-outline" type="button" onclick="EmailDesigner_addBlock('image')">Image</button>
-              <button class="btn btn-sm btn-outline" type="button" onclick="EmailDesigner_addBlock('cta')">CTA Button</button>
               <button class="btn btn-sm btn-outline" type="button" onclick="EmailDesigner_addBlock('divider')">Divider</button>
               <button class="btn btn-sm btn-outline" type="button" onclick="EmailDesigner_addBlock('spacer')">Spacer</button>
             </div>
@@ -441,7 +439,6 @@
       h3: { id: uid(), type: 'h3', text: 'Section title', align: 'left' },
       p:  { id: uid(), type: 'p',  text: 'New paragraph.', align: 'left' },
       image:   { id: uid(), type: 'image', url: '', alt: '' },
-      cta:     { id: uid(), type: 'cta', text: 'Click here', url: 'https://example.com', font: d.brand.font, color: '#FFFFFF', bg: d.brand.primaryColor, size: 'md', align: 'center' },
       divider: { id: uid(), type: 'divider' },
       spacer:  { id: uid(), type: 'spacer', height: 24 },
     }[type];
