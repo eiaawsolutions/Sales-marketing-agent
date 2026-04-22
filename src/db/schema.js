@@ -22,7 +22,7 @@ export function initializeDatabase(db) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       type TEXT NOT NULL CHECK(type IN ('email','social','content','ad')),
-      status TEXT DEFAULT 'draft' CHECK(status IN ('draft','active','paused','completed')),
+      status TEXT DEFAULT 'draft' CHECK(status IN ('draft','scheduled','active','paused','completed','stopped')),
       subject TEXT,
       body TEXT,
       target_audience TEXT,
@@ -305,6 +305,52 @@ export function initializeDatabase(db) {
   try { db.exec("ALTER TABLE campaigns ADD COLUMN pipeline_status TEXT DEFAULT 'idle'"); } catch (e) { /* exists */ }
   try { db.exec("ALTER TABLE campaigns ADD COLUMN pipeline_log TEXT"); } catch (e) { /* exists */ }
   try { db.exec("ALTER TABLE campaign_leads ADD COLUMN clicked_at DATETIME"); } catch (e) { /* exists */ }
+
+  // Migrate campaigns CHECK constraint to allow 'stopped' (and 'scheduled', long-referenced by scheduler).
+  // SQLite can't ALTER a CHECK — must rebuild. FKs disabled during the swap so child rows
+  // (campaign_leads, outreach_queue) don't trigger violations mid-rebuild.
+  try {
+    const campTableDef = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'campaigns'").get();
+    if (campTableDef?.sql && !campTableDef.sql.includes("'stopped'")) {
+      // Clean up any orphan from a previous failed run before retrying.
+      db.exec('DROP TABLE IF EXISTS campaigns_new');
+      db.pragma('foreign_keys = OFF');
+      try {
+        const cols = db.prepare("PRAGMA table_info(campaigns)").all().map(c => c.name);
+        db.exec(`
+          CREATE TABLE campaigns_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL CHECK(type IN ('email','social','content','ad')),
+            status TEXT DEFAULT 'draft' CHECK(status IN ('draft','scheduled','active','paused','completed','stopped')),
+            subject TEXT,
+            body TEXT,
+            target_audience TEXT,
+            scheduled_at DATETIME,
+            sent_count INTEGER DEFAULT 0,
+            open_count INTEGER DEFAULT 0,
+            click_count INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            user_id INTEGER DEFAULT 1,
+            budget_limit REAL DEFAULT 0,
+            pipeline_status TEXT DEFAULT 'idle',
+            pipeline_log TEXT,
+            form_id INTEGER
+          );
+        `);
+        const targetCols = ['id','name','type','status','subject','body','target_audience','scheduled_at',
+          'sent_count','open_count','click_count','created_at','user_id','budget_limit',
+          'pipeline_status','pipeline_log','form_id'];
+        const safeCols = targetCols.filter(c => cols.includes(c));
+        db.exec(`INSERT INTO campaigns_new (${safeCols.join(',')}) SELECT ${safeCols.join(',')} FROM campaigns;`);
+        db.exec(`DROP TABLE campaigns;`);
+        db.exec(`ALTER TABLE campaigns_new RENAME TO campaigns;`);
+        console.log("Campaigns table migrated: 'stopped' added to status CHECK constraint");
+      } finally {
+        db.pragma('foreign_keys = ON');
+      }
+    }
+  } catch (e) { console.error('Campaigns CHECK migration error:', e.message); }
 
   // Form creator: attach a form to a campaign
   try { db.exec("ALTER TABLE campaigns ADD COLUMN form_id INTEGER"); } catch (e) { /* exists */ }

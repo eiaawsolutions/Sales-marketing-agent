@@ -161,9 +161,75 @@ router.post('/', (req, res) => {
 
 router.put('/:id', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;
-  const campaign = campaignsService.update(userId, req.params.id, req.body);
+  // Block status changes via the generic PUT — must use PATCH /:id/status so the
+  // state machine + plan-limit + stop-confirmation gates always run.
+  const { status, ...rest } = req.body || {};
+  if (status !== undefined && req.user.role !== 'superadmin') {
+    return res.status(400).json({ error: 'Use PATCH /:id/status to change campaign status' });
+  }
+  const campaign = campaignsService.update(userId, req.params.id, req.user.role === 'superadmin' ? req.body : rest);
   if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
   res.json(campaign);
+});
+
+// PATCH /:id/status — change campaign lifecycle status with state-machine enforcement.
+// Allowed transitions:
+//   draft|paused → active        (reactivation; counts against plan's active-campaign limit)
+//   active       → paused        (reversible freeze)
+//   active|paused → stopped      (terminal; requires confirm:'STOP')
+// Forbidden: any transition out of stopped or completed.
+const ALLOWED_TRANSITIONS = {
+  draft:     new Set(['active']),
+  scheduled: new Set(['active', 'paused', 'stopped']),
+  active:    new Set(['paused', 'stopped']),
+  paused:    new Set(['active', 'stopped']),
+  completed: new Set([]),
+  stopped:   new Set([]),
+};
+
+router.patch('/:id/status', (req, res) => {
+  try {
+    const userId = req.user.role === 'superadmin' ? null : req.user.id;
+    const campaign = campaignsService.getById(userId, req.params.id);
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+
+    const next = String(req.body?.status || '').toLowerCase();
+    if (!['active', 'paused', 'stopped'].includes(next)) {
+      return res.status(400).json({ error: "status must be 'active', 'paused', or 'stopped'" });
+    }
+
+    const current = campaign.status || 'draft';
+    if (current === next) return res.json({ ok: true, status: current, unchanged: true });
+
+    const allowed = ALLOWED_TRANSITIONS[current] || new Set();
+    if (!allowed.has(next)) {
+      return res.status(409).json({
+        error: `Cannot change status from '${current}' to '${next}'. ${current === 'stopped' || current === 'completed' ? 'This campaign is terminal and cannot be revived.' : ''}`.trim(),
+      });
+    }
+
+    // Stop is irreversible — require explicit confirm string.
+    if (next === 'stopped' && req.body?.confirm !== 'STOP') {
+      return res.status(400).json({ error: "Stopping is permanent. Send { status: 'stopped', confirm: 'STOP' }." });
+    }
+
+    // Reactivating (paused → active) re-counts against the plan's active-campaign cap.
+    if (next === 'active' && (current === 'paused' || current === 'draft')) {
+      checkPlanLimit(req, 'active_campaigns');
+    }
+
+    db.prepare('UPDATE campaigns SET status = ? WHERE id = ?').run(next, req.params.id);
+
+    // Stopped: drain pending outreach so nothing fires after the user hit Stop.
+    if (next === 'stopped') {
+      db.prepare("UPDATE outreach_queue SET status = 'skipped' WHERE campaign_id = ? AND status = 'pending'")
+        .run(req.params.id);
+    }
+
+    res.json({ ok: true, status: next, previous: current });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 router.delete('/:id', (req, res) => {

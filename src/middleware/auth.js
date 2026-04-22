@@ -144,6 +144,18 @@ export function checkPlanLimit(req, resource) {
       }
       return true;
     }
+    case 'active_campaigns': {
+      // Cap on simultaneously-running campaigns. Reuses the `campaigns` plan limit
+      // but only counts campaigns currently consuming automation (active/scheduled).
+      // Paused/stopped/completed/draft do not count.
+      const count = db.prepare(
+        "SELECT COUNT(*) as c FROM campaigns WHERE user_id = ? AND status IN ('active','scheduled')"
+      ).get(userId);
+      if (count.c >= limits.campaigns) {
+        throw new Error(`Active-campaign limit reached (${limits.campaigns} running on ${req.user.plan} plan). Pause or stop one before activating another, or upgrade.`);
+      }
+      return true;
+    }
     case 'ai_action': {
       // Count AI actions this month
       const count = db.prepare(

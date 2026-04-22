@@ -44,6 +44,7 @@ async function processOutreachQueue() {
       WHERE oq.status = 'pending'
         AND oq.channel IN ('email', 'ai_action')
         AND oq.scheduled_at <= datetime('now')
+        AND c.status = 'active'
       ORDER BY oq.scheduled_at ASC
       LIMIT 20
     `).all();
