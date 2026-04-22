@@ -4151,7 +4151,7 @@ async function loadSystemOverview() {
         <tr><th>Feature</th><th style="text-align:center;color:var(--text-muted)">Starter<br><small>RM 99/mo</small></th><th style="text-align:center;color:var(--primary)">Pro<br><small>RM 199/mo</small></th><th style="text-align:center;color:var(--success)">Business<br><small>RM 399/mo</small></th><th style="text-align:center">Enterprise<br><small>Custom</small></th></tr>
         <tr><td>AI-verified leads / month</td><td style="text-align:center">30</td><td style="text-align:center">70</td><td style="text-align:center">140</td><td style="text-align:center">Custom</td></tr>
         <tr><td>Stored leads (lifetime)</td><td style="text-align:center">100</td><td style="text-align:center">500</td><td style="text-align:center">Unlimited</td><td style="text-align:center">Unlimited</td></tr>
-        <tr><td>Campaigns</td><td style="text-align:center">3</td><td style="text-align:center">10</td><td style="text-align:center">Unlimited</td></tr>
+        <tr><td>Campaigns</td><td style="text-align:center">3</td><td style="text-align:center">10</td><td style="text-align:center">25</td><td style="text-align:center">Custom</td></tr>
         <tr><td>AI Actions/month</td><td style="text-align:center">50</td><td style="text-align:center">200</td><td style="text-align:center">1,000</td></tr>
         <tr><td>AI Model</td><td style="text-align:center">Haiku (fast)</td><td style="text-align:center">Sonnet</td><td style="text-align:center">Sonnet (priority)</td></tr>
         <tr><td>Team Users</td><td style="text-align:center">1</td><td style="text-align:center">3</td><td style="text-align:center">10</td></tr>

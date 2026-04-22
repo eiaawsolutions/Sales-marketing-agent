@@ -107,7 +107,7 @@ export function requireSuperadmin(req, res, next) {
 const PLAN_LIMITS = {
   starter:    { leads: 100,   campaigns: 3,     ai_actions: 50,   ai_leads_per_month: 30,   contact_reveals: 10,  model: 'claude-haiku-4-5-20251001',   users: 1,  auto_outreach: false, auto_leads: false, voice_calls: 5,   chatbot: false },
   pro:        { leads: 500,   campaigns: 10,    ai_actions: 200,  ai_leads_per_month: 70,   contact_reveals: 50,  model: 'claude-sonnet-4-20250514',    users: 3,  auto_outreach: true,  auto_leads: true,  voice_calls: 20,  chatbot: true  },
-  business:   { leads: 99999, campaigns: 99999, ai_actions: 1000, ai_leads_per_month: 140,  contact_reveals: 200, model: 'claude-sonnet-4-20250514',    users: 10, auto_outreach: true,  auto_leads: true,  voice_calls: 100, chatbot: true  },
+  business:   { leads: 99999, campaigns: 25,    ai_actions: 1000, ai_leads_per_month: 140,  contact_reveals: 200, model: 'claude-sonnet-4-20250514',    users: 10, auto_outreach: true,  auto_leads: true,  voice_calls: 100, chatbot: true  },
   enterprise: { leads: 99999, campaigns: 99999, ai_actions: 99999,ai_leads_per_month: 99999,contact_reveals: 9999,model: 'claude-sonnet-4-20250514',    users: 9999,auto_outreach: true, auto_leads: true,  voice_calls: 9999,chatbot: true  },
 };
 

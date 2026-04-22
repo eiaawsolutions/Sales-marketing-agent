@@ -32,7 +32,7 @@ const PLANS = {
     name: 'Business',
     price_myr: 399,
     trial_days: 14,
-    features: '140 AI-verified leads/mo · unlimited campaigns · 1,000 AI actions/mo · 100 voice calls/mo · priority Sonnet · up to 10 seats',
+    features: '140 AI-verified leads/mo · 25 campaigns · 1,000 AI actions/mo · 100 voice calls/mo · priority Sonnet · up to 10 seats',
   },
 };
 
