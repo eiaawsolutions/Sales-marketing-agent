@@ -36,7 +36,7 @@ if (!campaigns.length) {
 
 // Anthropic Sonnet org rate limit is 30k input tokens/min. Web-search lead-gen
 // burns ~20-25k in one call, so a 70s gap between campaigns keeps us clear.
-const PACE_MS = parseInt(process.env.LEADGEN_PACE_MS || '70000', 10);
+const PACE_MS = parseInt(process.env.LEADGEN_PACE_MS || '300000', 10);
 
 const summary = [];
 let first = true;

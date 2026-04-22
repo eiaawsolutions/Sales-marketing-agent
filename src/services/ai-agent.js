@@ -366,7 +366,30 @@ async function chatJSON(userMessage, extraContext = '', options = {}) {
   const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
   try {
     return JSON.parse(cleaned);
-  } catch (e) {
+  } catch (_) {
+    // Tolerant fallback: when web search is used the model sometimes wraps the
+    // JSON with prose (citations, narration). Extract the outermost {...} block
+    // and retry once. Still throws if no balanced object can be found.
+    const start = cleaned.indexOf('{');
+    if (start !== -1) {
+      let depth = 0, end = -1, inStr = false, esc = false;
+      for (let i = start; i < cleaned.length; i++) {
+        const ch = cleaned[i];
+        if (inStr) {
+          if (esc) { esc = false; continue; }
+          if (ch === '\\') { esc = true; continue; }
+          if (ch === '"') inStr = false;
+          continue;
+        }
+        if (ch === '"') { inStr = true; continue; }
+        if (ch === '{') depth++;
+        else if (ch === '}') { depth--; if (depth === 0) { end = i; break; } }
+      }
+      if (end !== -1) {
+        const candidate = cleaned.slice(start, end + 1);
+        try { return JSON.parse(candidate); } catch (_) { /* fall through */ }
+      }
+    }
     throw new Error(`AI returned invalid JSON. Raw response: ${cleaned.substring(0, 200)}`);
   }
 }
@@ -805,7 +828,7 @@ Do NOT return any lead whose verified email matches one of these already-known e
 
 Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message after all web_search calls are complete.`,
     '',
-    { useWebSearch: true, webSearchMaxUses: 8, maxTokens: 8192 }
+    { useWebSearch: true, webSearchMaxUses: 4, maxTokens: 8192 }
   );
 
   const leads = Array.isArray(result.leads) ? result.leads : [];
