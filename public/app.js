@@ -1302,6 +1302,7 @@ async function loadCampaignsGroupedByUser() {
                     </div>
                   </div>
                   <div class="camp-actions flex gap-2" onclick="event.stopPropagation()">
+                    ${renderCampaignStatusControls(c)}
                     <button class="btn btn-sm btn-outline" onclick="startCampaignWizard(${c.id})">Edit</button>
                   </div>
                 </div>
