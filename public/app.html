@@ -1049,30 +1049,145 @@
       color: var(--text-muted); font-size: 12px; text-align: center;
     }
 
-    /* Templates tab */
-    .ed-tpl-cats { display: flex; flex-direction: column; gap: 22px; }
-    .ed-tpl-cat h4 {
-      margin: 0 0 10px 0; font-size: 12px; font-weight: 700;
-      letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
+    /* Templates tab — Beefree-style: left category sidebar + right grid with hover overlay */
+    .ed-tpl-shell {
+      display: grid; grid-template-columns: 220px 1fr; gap: 20px;
+      min-height: 520px;
     }
+    .ed-tpl-side {
+      display: flex; flex-direction: column; gap: 2px;
+      border-right: 1px solid var(--border); padding-right: 12px;
+    }
+    .ed-tpl-side-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: transparent; border: 1px solid transparent;
+      color: var(--text); padding: 9px 12px; border-radius: 8px;
+      cursor: pointer; font-size: 13px; font-weight: 500;
+      transition: background 0.15s, color 0.15s;
+    }
+    .ed-tpl-side-item:hover { background: var(--surface2); }
+    .ed-tpl-side-item.active {
+      background: rgba(31,168,150,0.12); color: var(--primary);
+      border-color: rgba(31,168,150,0.3); font-weight: 600;
+    }
+    .ed-tpl-side-label { text-align: left; }
+    .ed-tpl-side-count {
+      font-size: 11px; font-weight: 600;
+      color: var(--text-muted); padding: 1px 8px;
+      border-radius: 10px; background: var(--bg);
+      min-width: 24px; text-align: center;
+    }
+    .ed-tpl-side-item.active .ed-tpl-side-count {
+      color: var(--primary); background: rgba(31,168,150,0.18);
+    }
+
+    .ed-tpl-pane { min-width: 0; }
+    .ed-tpl-pane-head {
+      display: flex; align-items: baseline; gap: 12px;
+      margin-bottom: 14px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ed-tpl-pane-head h3 {
+      margin: 0; font-size: 16px; font-weight: 700;
+      color: var(--text); text-transform: none; letter-spacing: 0;
+    }
+    .ed-tpl-pane-meta { font-size: 12px; color: var(--text-muted); }
+
     .ed-tpl-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
     }
-    @media (max-width: 720px) { .ed-tpl-grid { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 480px) { .ed-tpl-grid { grid-template-columns: 1fr; } }
     .ed-tpl-card {
       display: flex; flex-direction: column; gap: 8px;
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 10px; padding: 10px; cursor: pointer;
-      transition: all 0.15s; text-align: left;
+      border-radius: 10px; padding: 10px;
+      transition: all 0.15s;
     }
-    .ed-tpl-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+    .ed-tpl-card:hover { border-color: var(--primary); }
+
+    .ed-tpl-card-thumb {
+      position: relative; height: 180px; border-radius: 8px; overflow: hidden;
+      border: 1px solid var(--border); background: var(--bg);
+    }
+    .ed-tpl-card-name {
+      font-size: 13px; font-weight: 600; color: var(--text);
+      padding: 0 2px;
+    }
+
+    /* Hover overlay with Preview / Choose (matches the Beefree screenshot) */
+    .ed-tpl-card-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px;
+      background: rgba(15, 26, 29, 0.72);
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .ed-tpl-card:hover .ed-tpl-card-overlay,
+    .ed-tpl-card-thumb:focus-within .ed-tpl-card-overlay { opacity: 1; }
+    .ed-tpl-btn {
+      min-width: 140px; padding: 9px 18px;
+      border-radius: 8px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: transform 0.12s, background 0.12s;
+    }
+    .ed-tpl-btn:active { transform: scale(0.98); }
+    .ed-tpl-btn-preview { background: #FFFFFF; color: var(--text); }
+    .ed-tpl-btn-preview:hover { background: #F3EDE0; }
+    .ed-tpl-btn-choose { background: var(--success); color: #FFFFFF; }
+    .ed-tpl-btn-choose:hover { background: #16a34a; }
+
+    /* Miniature in-card preview (fallback if build() fails: legacy ed-tpl-thumb) */
+    .ed-tpl-mini {
+      width: 100%; height: 100%; padding: 14px 14px;
+      display: flex; flex-direction: column; gap: 6px;
+      overflow: hidden;
+    }
+    .ed-tpl-mini-bar {
+      height: 4px; width: 40%; border-radius: 2px; margin-bottom: 4px;
+    }
+    .ed-tpl-mini-body {
+      flex: 1; display: flex; flex-direction: column; gap: 6px;
+      min-height: 0;
+    }
+    .ed-tpl-mini-h {
+      font-size: 13px; font-weight: 700; line-height: 1.25;
+      letter-spacing: -0.01em;
+      overflow: hidden; text-overflow: ellipsis;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .ed-tpl-mini-p {
+      font-size: 10px; line-height: 1.4; opacity: 0.75;
+      overflow: hidden; text-overflow: ellipsis;
+      display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+    }
+    .ed-tpl-mini-cta {
+      align-self: flex-start; padding: 5px 10px;
+      border-radius: 4px; font-size: 9px; font-weight: 700;
+      margin-top: 4px;
+    }
     .ed-tpl-thumb {
-      height: 90px; border-radius: 8px;
+      width: 100%; height: 100%;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 18px; letter-spacing: -0.02em;
+      font-weight: 700; font-size: 22px; letter-spacing: -0.02em;
     }
-    .ed-tpl-name { font-size: 13px; font-weight: 600; color: var(--text); }
+
+    @media (max-width: 960px) {
+      .ed-tpl-shell { grid-template-columns: 180px 1fr; }
+      .ed-tpl-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 720px) {
+      .ed-tpl-shell { grid-template-columns: 1fr; gap: 12px; }
+      .ed-tpl-side {
+        flex-direction: row; flex-wrap: wrap;
+        border-right: none; border-bottom: 1px solid var(--border);
+        padding-right: 0; padding-bottom: 10px;
+      }
+      .ed-tpl-side-item { flex: 0 0 auto; }
+      .ed-tpl-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 480px) {
+      .ed-tpl-grid { grid-template-columns: 1fr; }
+      .ed-tpl-card-thumb { height: 200px; }
+    }
 
     /* Scratch tab */
     .ed-scratch-grid {
@@ -1218,8 +1333,8 @@
     import { RetellWebClient } from 'https://esm.sh/retell-client-js-sdk@2.0.7';
     window.RetellWebClient = RetellWebClient;
   </script>
-  <script src="/email-templates.js?v=20260422a"></script>
-  <script src="/email-designer.js?v=20260422d"></script>
-  <script src="/app.js?v=20260422d-forms"></script>
+  <script src="/email-templates.js?v=20260422e"></script>
+  <script src="/email-designer.js?v=20260422e"></script>
+  <script src="/app.js?v=20260422e"></script>
 </body>
 </html>

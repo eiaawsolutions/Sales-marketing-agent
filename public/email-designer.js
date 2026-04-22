@@ -76,6 +76,9 @@
 
   // ------------- Public API -------------------------------------------------
   let __rootId = 'ed-root';
+  // Active category in the Templates tab (id from EmailTemplates.categories()).
+  // `null` means "Featured / All" view.
+  let __tplActiveCat = null;
   window.EmailDesigner = {
     defaultDesign,
     render: renderDesigner,
@@ -114,25 +117,81 @@
   }
 
   // ------------- Tabs -------------------------------------------------------
+  // Renders a tiny preview of a template (first couple of blocks, scaled down).
+  // Falls back to the old thumbLabel swatch if anything goes wrong — keeps the
+  // grid visually stable even if a template's build() throws.
+  function renderTemplateThumb(cat, tpl) {
+    try {
+      const d = tpl.build({ brand: {}, footer: { show: false } });
+      const brand = d.brand || {};
+      const firstHeading = (d.blocks || []).find(b => /^h[123]$/.test(b.type));
+      const firstPara = (d.blocks || []).find(b => b.type === 'p');
+      const firstCta = (d.blocks || []).find(b => b.type === 'cta');
+      const accent = brand.primaryColor || tpl.thumbBg || '#1FA896';
+      return `
+        <div class="ed-tpl-mini" style="background:${escAttr(brand.bgColor || '#FAF7F2')}">
+          <div class="ed-tpl-mini-bar" style="background:${escAttr(accent)}"></div>
+          <div class="ed-tpl-mini-body">
+            ${firstHeading ? `<div class="ed-tpl-mini-h" style="color:${escAttr(brand.textColor || '#0F1A1D')}">${esc(String(firstHeading.text || '').slice(0, 48))}</div>` : ''}
+            ${firstPara ? `<div class="ed-tpl-mini-p" style="color:${escAttr(brand.textColor || '#0F1A1D')}">${esc(String(firstPara.text || '').slice(0, 110))}</div>` : ''}
+            ${firstCta ? `<div class="ed-tpl-mini-cta" style="background:${escAttr(firstCta.bg || accent)};color:${escAttr(firstCta.color || '#FFFFFF')}">${esc(String(firstCta.text || '').slice(0, 20))}</div>` : ''}
+          </div>
+        </div>
+      `;
+    } catch (_) {
+      return `
+        <div class="ed-tpl-thumb" style="background:${escAttr(tpl.thumbBg || '#F3EDE0')};color:${escAttr(tpl.thumbInk || '#0F1A1D')}">
+          <span>${esc(tpl.thumbLabel || tpl.name.split(' ')[0])}</span>
+        </div>
+      `;
+    }
+  }
+
   function renderTemplatesTab() {
     const cats = window.EmailTemplates ? window.EmailTemplates.categories() : [];
+    if (!cats.length) {
+      return `<div class="ed-empty" style="padding:24px;text-align:center;color:var(--text-muted)">No templates available.</div>`;
+    }
+    // Default to the first category if nothing is picked yet.
+    const activeCat = __tplActiveCat && cats.find(c => c.id === __tplActiveCat)
+      ? cats.find(c => c.id === __tplActiveCat)
+      : cats[0];
+
     return `
-      <div class="ed-tpl-cats">
-        ${cats.map(c => `
-          <div class="ed-tpl-cat">
-            <h4>${esc(c.label)}</h4>
-            <div class="ed-tpl-grid">
-              ${c.templates.map(t => `
-                <button class="ed-tpl-card" onclick="EmailDesigner_useTemplate('${c.id}','${t.id}')" type="button">
-                  <div class="ed-tpl-thumb" style="background:${t.thumbBg || '#F3EDE0'};color:${t.thumbInk || '#0F1A1D'}">
-                    <span>${esc(t.thumbLabel || t.name.split(' ')[0])}</span>
-                  </div>
-                  <div class="ed-tpl-name">${esc(t.name)}</div>
-                </button>
-              `).join('')}
-            </div>
+      <div class="ed-tpl-shell">
+        <aside class="ed-tpl-side">
+          ${cats.map(c => `
+            <button type="button"
+              class="ed-tpl-side-item ${c.id === activeCat.id ? 'active' : ''}"
+              onclick="EmailDesigner_setTplCat('${c.id}')">
+              <span class="ed-tpl-side-label">${esc(c.label || c.name || c.id)}</span>
+              <span class="ed-tpl-side-count">${c.templates.length}</span>
+            </button>
+          `).join('')}
+        </aside>
+
+        <div class="ed-tpl-pane">
+          <div class="ed-tpl-pane-head">
+            <h3>${esc(activeCat.label || activeCat.name || activeCat.id)}</h3>
+            <span class="ed-tpl-pane-meta">${activeCat.templates.length} template${activeCat.templates.length === 1 ? '' : 's'}</span>
           </div>
-        `).join('')}
+          <div class="ed-tpl-grid">
+            ${activeCat.templates.map(t => `
+              <div class="ed-tpl-card">
+                <div class="ed-tpl-card-thumb">
+                  ${renderTemplateThumb(activeCat, t)}
+                  <div class="ed-tpl-card-overlay">
+                    <button class="ed-tpl-btn ed-tpl-btn-preview" type="button"
+                      onclick="EmailDesigner_previewTemplate('${activeCat.id}','${t.id}')">Preview</button>
+                    <button class="ed-tpl-btn ed-tpl-btn-choose" type="button"
+                      onclick="EmailDesigner_useTemplate('${activeCat.id}','${t.id}')">Choose</button>
+                  </div>
+                </div>
+                <div class="ed-tpl-card-name">${esc(t.name)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
       </div>
     `;
   }
@@ -532,6 +591,26 @@
     newDesign.mode = 'scratch'; // Drop the user into the editor for tweaking
     window.wizardState.data.design = newDesign;
     renderDesigner(__rootId);
+  };
+
+  // Switch which category the Templates tab is showing (Beefree-style sidebar).
+  window.EmailDesigner_setTplCat = function (catId) {
+    __tplActiveCat = catId || null;
+    renderDesigner(__rootId);
+  };
+
+  // Open the preview modal for a template without committing to it. Reuses the
+  // existing openPreview() that normally shows the user's current draft.
+  window.EmailDesigner_previewTemplate = function (catId, tplId) {
+    if (!window.EmailTemplates) return;
+    const tpl = window.EmailTemplates.get(catId, tplId);
+    if (!tpl) return;
+    const d = ensureDesign();
+    const previewDesign = tpl.build({
+      brand: clone(d.brand),
+      footer: clone(d.footer),
+    });
+    openPreview(previewDesign);
   };
 
   window.EmailDesigner_runAi = async function () {
