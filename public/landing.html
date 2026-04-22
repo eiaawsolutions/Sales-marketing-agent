@@ -1201,7 +1201,8 @@
         <div class="price-num">RM 99<span class="per">/ mo</span></div>
         <p class="price-blurb">Individual salespeople getting started.</p>
         <ul class="price-features-inline">
-          <li>100 leads &middot; 3 campaigns</li>
+          <li>30 AI-verified leads / month</li>
+          <li>3 campaigns</li>
           <li>50 AI actions / month</li>
           <li>5 voice calls / month</li>
           <li>Email &amp; social content</li>
@@ -1217,7 +1218,8 @@
         <div class="price-num">RM 199<span class="per">/ mo</span></div>
         <p class="price-blurb">For operators who want real AI leverage.</p>
         <ul class="price-features-inline">
-          <li>500 leads &middot; 10 campaigns</li>
+          <li>70 AI-verified leads / month</li>
+          <li>10 campaigns</li>
           <li>200 AI actions / month</li>
           <li>20 voice calls / month</li>
           <li>Auto-outreach + AI lead gen</li>
@@ -1233,12 +1235,29 @@
         <div class="price-num">RM 399<span class="per">/ mo</span></div>
         <p class="price-blurb">Sales teams and agencies.</p>
         <ul class="price-features-inline">
-          <li>Unlimited leads &amp; campaigns</li>
+          <li>140 AI-verified leads / month</li>
+          <li>Unlimited campaigns</li>
           <li>1,000 AI actions / month</li>
           <li>100 voice calls / month</li>
           <li>Priority model (Claude Sonnet) &middot; up to 10 seats</li>
         </ul>
         <button class="btn btn-ghost" onclick="openSignup('business')">Start trial <span class="arrow">&rarr;</span></button>
+      </div>
+
+      <div class="pricing-row rvl">
+        <div class="price-tier">
+          <span class="tag">Tier 04</span>
+          Enterprise
+        </div>
+        <div class="price-num">Custom<span class="per">&nbsp;</span></div>
+        <p class="price-blurb">In-house sales teams, agencies at scale, regulated industries.</p>
+        <ul class="price-features-inline">
+          <li>Custom lead volume &amp; seat count</li>
+          <li>Dedicated success manager</li>
+          <li>SLA, SSO, audit log, private data residency</li>
+          <li>Contract &amp; procurement on your terms</li>
+        </ul>
+        <button class="btn btn-ghost" onclick="openContact('enterprise')">Talk to sales <span class="arrow">&rarr;</span></button>
       </div>
     </div>
   </div>
@@ -1680,11 +1699,17 @@ document.getElementById('contact-modal').addEventListener('click', function(e) {
 });
 
 // Contact form
-function openContact() {
+function openContact(topic) {
   document.getElementById('contact-form').style.display = 'block';
   document.getElementById('contact-success').style.display = 'none';
   document.getElementById('ct-error').style.display = 'none';
   document.getElementById('contact-modal').style.display = 'flex';
+  if (topic === 'enterprise') {
+    const msgEl = document.getElementById('ct-message');
+    if (msgEl && !msgEl.value.trim()) {
+      msgEl.value = 'Enterprise enquiry — I would like to discuss custom pricing, seat count, and SLA for my team. ';
+    }
+  }
   document.getElementById('ct-name').focus();
 }
 

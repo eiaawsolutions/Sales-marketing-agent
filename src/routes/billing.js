@@ -14,24 +14,25 @@ function getStripe() {
 }
 
 // Plan config
+// Lead caps reflect real web-search economics (~RM 0.95 per verified lead).
 const PLANS = {
   starter: {
     name: 'Starter',
     price_myr: 99,
     trial_days: 14,
-    features: '100 leads, 3 campaigns, 50 AI actions/mo',
+    features: '30 AI-verified leads/mo · 3 campaigns · 50 AI actions/mo · 5 voice calls/mo',
   },
   pro: {
     name: 'Pro',
     price_myr: 199,
     trial_days: 14,
-    features: '500 leads, 10 campaigns, 200 AI actions/mo, auto-outreach',
+    features: '70 AI-verified leads/mo · 10 campaigns · 200 AI actions/mo · 20 voice calls/mo · auto-outreach · AI lead gen',
   },
   business: {
     name: 'Business',
     price_myr: 399,
     trial_days: 14,
-    features: 'Unlimited leads & campaigns, 1000 AI actions/mo, team accounts',
+    features: '140 AI-verified leads/mo · unlimited campaigns · 1,000 AI actions/mo · 100 voice calls/mo · priority Sonnet · up to 10 seats',
   },
 };
 

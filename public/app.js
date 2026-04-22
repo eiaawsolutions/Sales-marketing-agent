@@ -3797,6 +3797,7 @@ function showCreateAccountModal() {
             <option value="starter">Starter (RM 99/mo)</option>
             <option value="pro" selected>Pro (RM 199/mo)</option>
             <option value="business">Business (RM 399/mo)</option>
+            <option value="enterprise">Enterprise (custom contract)</option>
           </select>
         </div>
       </div>
@@ -3834,7 +3835,7 @@ async function showEditAccountModal(userId) {
           <select id="f-role">${['user','superadmin'].map(r => `<option value="${r}" ${user.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
         </div>
         <div class="form-group"><label>Subscription Plan</label>
-          <select id="f-plan">${['starter','pro','business'].map(p => `<option value="${p}" ${(user.plan||'starter') === p ? 'selected' : ''}>${p.charAt(0).toUpperCase()+p.slice(1)}${p==='starter'?' (RM 99)':p==='pro'?' (RM 199)':' (RM 399)'}</option>`).join('')}</select>
+          <select id="f-plan">${['starter','pro','business','enterprise'].map(p => { const label = p==='starter'?' (RM 99)':p==='pro'?' (RM 199)':p==='business'?' (RM 399)':' (custom)'; return `<option value="${p}" ${(user.plan||'starter') === p ? 'selected' : ''}>${p.charAt(0).toUpperCase()+p.slice(1)}${label}</option>`; }).join('')}</select>
         </div>
       </div>
       <div class="grid-2">
@@ -4147,8 +4148,9 @@ async function loadSystemOverview() {
     <div class="card">
       <h3>SUBSCRIPTION PLANS — WHAT CLIENTS GET</h3>
       <table>
-        <tr><th>Feature</th><th style="text-align:center;color:var(--text-muted)">Starter<br><small>RM 99/mo</small></th><th style="text-align:center;color:var(--primary)">Pro<br><small>RM 199/mo</small></th><th style="text-align:center;color:var(--success)">Business<br><small>RM 399/mo</small></th></tr>
-        <tr><td>Leads</td><td style="text-align:center">100</td><td style="text-align:center">500</td><td style="text-align:center">Unlimited</td></tr>
+        <tr><th>Feature</th><th style="text-align:center;color:var(--text-muted)">Starter<br><small>RM 99/mo</small></th><th style="text-align:center;color:var(--primary)">Pro<br><small>RM 199/mo</small></th><th style="text-align:center;color:var(--success)">Business<br><small>RM 399/mo</small></th><th style="text-align:center">Enterprise<br><small>Custom</small></th></tr>
+        <tr><td>AI-verified leads / month</td><td style="text-align:center">30</td><td style="text-align:center">70</td><td style="text-align:center">140</td><td style="text-align:center">Custom</td></tr>
+        <tr><td>Stored leads (lifetime)</td><td style="text-align:center">100</td><td style="text-align:center">500</td><td style="text-align:center">Unlimited</td><td style="text-align:center">Unlimited</td></tr>
         <tr><td>Campaigns</td><td style="text-align:center">3</td><td style="text-align:center">10</td><td style="text-align:center">Unlimited</td></tr>
         <tr><td>AI Actions/month</td><td style="text-align:center">50</td><td style="text-align:center">200</td><td style="text-align:center">1,000</td></tr>
         <tr><td>AI Model</td><td style="text-align:center">Haiku (fast)</td><td style="text-align:center">Sonnet</td><td style="text-align:center">Sonnet (priority)</td></tr>

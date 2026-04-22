@@ -187,6 +187,7 @@ router.post('/:id/leads', (req, res) => {
 router.post('/:id/generate-leads', async (req, res) => {
   try {
     checkPlanLimit(req, 'auto_leads');
+    checkPlanLimit(req, 'ai_leads_per_month');
     checkPlanLimit(req, 'ai_action');
     const userId = req.user.role === 'superadmin' ? null : req.user.id;
     const campaign = campaignsService.getById(userId, req.params.id);

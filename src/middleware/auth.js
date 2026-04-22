@@ -102,10 +102,13 @@ export function requireSuperadmin(req, res, next) {
 }
 
 // Plan limits
+// `leads` = lifetime cap on manually-created leads (historical).
+// `ai_leads_per_month` = monthly cap on AI-generated verified leads (new, tied to web-search cost).
 const PLAN_LIMITS = {
-  starter: { leads: 100, campaigns: 3, ai_actions: 50, contact_reveals: 10, model: 'claude-haiku-4-5-20251001', users: 1, auto_outreach: false, auto_leads: false, voice_calls: 5, chatbot: false },
-  pro:     { leads: 500, campaigns: 10, ai_actions: 200, contact_reveals: 50, model: 'claude-sonnet-4-20250514', users: 3, auto_outreach: true, auto_leads: true, voice_calls: 20, chatbot: true },
-  business:{ leads: 99999, campaigns: 99999, ai_actions: 1000, contact_reveals: 200, model: 'claude-sonnet-4-20250514', users: 10, auto_outreach: true, auto_leads: true, voice_calls: 100, chatbot: true },
+  starter:    { leads: 100,   campaigns: 3,     ai_actions: 50,   ai_leads_per_month: 30,   contact_reveals: 10,  model: 'claude-haiku-4-5-20251001',   users: 1,  auto_outreach: false, auto_leads: false, voice_calls: 5,   chatbot: false },
+  pro:        { leads: 500,   campaigns: 10,    ai_actions: 200,  ai_leads_per_month: 70,   contact_reveals: 50,  model: 'claude-sonnet-4-20250514',    users: 3,  auto_outreach: true,  auto_leads: true,  voice_calls: 20,  chatbot: true  },
+  business:   { leads: 99999, campaigns: 99999, ai_actions: 1000, ai_leads_per_month: 140,  contact_reveals: 200, model: 'claude-sonnet-4-20250514',    users: 10, auto_outreach: true,  auto_leads: true,  voice_calls: 100, chatbot: true  },
+  enterprise: { leads: 99999, campaigns: 99999, ai_actions: 99999,ai_leads_per_month: 99999,contact_reveals: 9999,model: 'claude-sonnet-4-20250514',    users: 9999,auto_outreach: true, auto_leads: true,  voice_calls: 9999,chatbot: true  },
 };
 
 // Voice AI add-on pricing
@@ -163,6 +166,18 @@ export function checkPlanLimit(req, resource) {
     case 'auto_leads': {
       if (!limits.auto_leads) {
         throw new Error('Auto-lead generation is available on Pro and Business plans. Upgrade to unlock.');
+      }
+      return true;
+    }
+    case 'ai_leads_per_month': {
+      // Counts verified AI-generated leads this calendar month. Starter gets 30,
+      // Pro 70, Business 140, Enterprise effectively unlimited. Driven by the
+      // real web-search cost of ~RM 0.95 per verified lead.
+      const count = db.prepare(
+        "SELECT COUNT(*) as c FROM leads WHERE user_id = ? AND source = 'ai_generated' AND created_at >= datetime('now', 'start of month')"
+      ).get(userId);
+      if (count.c >= limits.ai_leads_per_month) {
+        throw new Error(`AI lead generation limit reached (${limits.ai_leads_per_month}/month on ${req.user.plan} plan). Upgrade for a higher cap.`);
       }
       return true;
     }
