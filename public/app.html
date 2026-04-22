@@ -151,6 +151,9 @@
     .badge-active { background: rgba(34,197,94,0.2); color: var(--success); }
     .badge-draft { background: rgba(148,163,184,0.2); color: var(--text-muted); }
     .badge-paused { background: rgba(245,158,11,0.2); color: var(--warning); }
+    .badge-stopped { background: rgba(239,68,68,0.2); color: var(--danger); }
+    .badge-completed { background: rgba(99,102,241,0.2); color: var(--purple, #a855f7); }
+    .badge-scheduled { background: rgba(56,189,248,0.2); color: var(--info, #38bdf8); }
 
     /* Buttons */
     .btn {
@@ -541,6 +544,21 @@
       text-align: center;
       display: inline-block;
     }
+    .camp-toggle-inline {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-left: 6px;
+      display: inline-block;
+      transition: transform 0.15s ease;
+    }
+    .camp-toggle-hint {
+      font-size: 12px;
+      font-style: italic;
+      opacity: 0.75;
+      margin-left: 2px;
+    }
+    .camp-header:hover .camp-toggle-inline,
+    .camp-header:hover .camp-toggle-hint { opacity: 1; color: var(--primary); }
 
     .camp-leads table { width: 100%; }
 
@@ -1335,6 +1353,6 @@
   </script>
   <script src="/email-templates.js?v=20260422e"></script>
   <script src="/email-designer.js?v=20260422e"></script>
-  <script src="/app.js?v=20260422e"></script>
+  <script src="/app.js?v=20260422-toggle1"></script>
 </body>
 </html>

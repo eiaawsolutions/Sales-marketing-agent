@@ -34,6 +34,7 @@ const api = {
   async get(url, headers = {}) { return apiRequest(url, { headers }); },
   async post(url, body, headers = {}) { return apiRequest(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }); },
   async put(url, body, headers = {}) { return apiRequest(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }); },
+  async patch(url, body, headers = {}) { return apiRequest(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }); },
   async del(url, headers = {}) { return apiRequest(url, { method: 'DELETE', headers }); },
 };
 // Expose to other script files (email-designer.js)
@@ -1186,6 +1187,8 @@ async function loadCampaigns() {
                 <strong>${c.name}</strong>
                 <span class="badge badge-${c.status}">${c.status}</span>
                 <span class="badge badge-new">${c.type}</span>
+                <span class="camp-toggle-inline" id="camp-toggle-${c.id}">&#9660;</span>
+                <span class="camp-toggle-hint text-muted">click here to expand</span>
               </div>
               <div class="camp-meta text-muted text-sm">
                 ${c.target_audience ? `Target: ${c.target_audience}` : 'No target audience set'}
@@ -1215,9 +1218,9 @@ async function loadCampaigns() {
               <button class="btn btn-sm btn-success" onclick="aiAutoOutreach(${c.id})" title="AI creates personalized outreach for every lead and sends Step 1">
                 Auto-Outreach
               </button>
+              ${renderCampaignStatusControls(c)}
               <button class="btn btn-sm btn-outline" onclick="startCampaignWizard(${c.id})">Edit</button>
               <button class="btn btn-sm btn-danger" onclick="deleteCampaign(${c.id})">X</button>
-              <span class="camp-toggle" id="camp-toggle-${c.id}">&#9660;</span>
             </div>
           </div>
           <div class="camp-leads" id="camp-leads-${c.id}" style="display:none">
@@ -1291,6 +1294,8 @@ async function loadCampaignsGroupedByUser() {
                       <span class="badge badge-${c.status}">${c.status}</span>
                       <span class="badge badge-new">${c.type}</span>
                       ${c.pipeline_status && c.pipeline_status !== 'idle' ? `<span class="badge badge-${c.pipeline_status === 'running' ? 'paused' : c.pipeline_status === 'completed' ? 'qualified' : 'lost'}">${c.pipeline_status}</span>` : ''}
+                      <span class="camp-toggle-inline" id="camp-toggle-${c.id}">&#9660;</span>
+                      <span class="camp-toggle-hint text-muted">click here to expand</span>
                     </div>
                     <div class="camp-meta text-muted text-sm">
                       <strong>${c.lead_count}</strong> lead${c.lead_count !== 1 ? 's' : ''} &middot; Sent: ${c.sent_count || 0} &middot; Opens: ${c.open_count || 0} &middot; Clicks: ${c.click_count || 0} &middot; AI Cost: $${cost.total_cost.toFixed(4)}
@@ -1298,7 +1303,6 @@ async function loadCampaignsGroupedByUser() {
                   </div>
                   <div class="camp-actions flex gap-2" onclick="event.stopPropagation()">
                     <button class="btn btn-sm btn-outline" onclick="startCampaignWizard(${c.id})">Edit</button>
-                    <span class="camp-toggle" id="camp-toggle-${c.id}">&#9660;</span>
                   </div>
                 </div>
                 <div class="camp-leads" id="camp-leads-${c.id}" style="display:none"></div>
@@ -2174,6 +2178,69 @@ async function deleteCampaign(id) {
   if (!confirm('Delete this campaign?')) return;
   await api.del(`/campaigns/${id}`);
   loadCampaigns();
+}
+
+// ===== Campaign status controls (Pause / Resume / Stop) =====
+function renderCampaignStatusControls(c) {
+  const status = (c.status || 'draft').toLowerCase();
+  if (status === 'stopped' || status === 'completed') {
+    return ''; // terminal — no status controls
+  }
+  const buttons = [];
+  if (status === 'active' || status === 'scheduled') {
+    buttons.push(`<button class="btn btn-sm btn-outline" style="color:var(--warning);border-color:var(--warning)" onclick="changeCampaignStatus(${c.id}, 'paused')" title="Pause all activity. You can resume later.">&#10074;&#10074; Pause</button>`);
+  }
+  if (status === 'paused' || status === 'draft') {
+    buttons.push(`<button class="btn btn-sm btn-outline" style="color:var(--success);border-color:var(--success)" onclick="changeCampaignStatus(${c.id}, 'active')" title="Resume sending and automation.">&#9654; ${status === 'paused' ? 'Resume' : 'Activate'}</button>`);
+  }
+  // Stop is available unless terminal — confirm modal handles the safety
+  buttons.push(`<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmStopCampaign(${c.id}, ${JSON.stringify(c.name).replace(/"/g, '&quot;')})" title="Stop permanently. Cannot be reactivated.">&#9632; Stop</button>`);
+  return buttons.join('');
+}
+
+async function changeCampaignStatus(id, next) {
+  const verb = next === 'paused' ? 'pause' : next === 'active' ? 'resume' : next;
+  if (!confirm(`Are you sure you want to ${verb} this campaign?`)) return;
+  try {
+    await api.patch(`/campaigns/${id}/status`, { status: next });
+    showNotification(`Campaign ${next === 'active' ? 'resumed' : next}`, 'success');
+    loadCampaigns();
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+  }
+}
+
+function confirmStopCampaign(id, name) {
+  modal = {
+    title: 'Stop Campaign Permanently?',
+    body: `
+      <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:12px;margin-bottom:16px">
+        <p style="color:var(--danger);font-weight:600;margin:0 0 8px 0">&#9888; This cannot be undone</p>
+        <p class="text-sm text-muted" style="margin:0">All scheduled outreach, follow-ups, and automation for <strong>${esc(name)}</strong> will be cancelled. The campaign cannot be reactivated. To stop temporarily instead, use <strong>Pause</strong>.</p>
+      </div>
+      <div class="form-group">
+        <label>Type <code>STOP</code> to confirm:</label>
+        <input id="f-stop-confirm" type="text" placeholder="STOP" autocomplete="off" autocapitalize="characters">
+      </div>
+    `,
+    saveLabel: 'Stop Campaign',
+    onSave: async () => {
+      const v = (document.getElementById('f-stop-confirm')?.value || '').trim().toUpperCase();
+      if (v !== 'STOP') {
+        showNotification('Type STOP to confirm', 'error');
+        return;
+      }
+      try {
+        await api.patch(`/campaigns/${id}/status`, { status: 'stopped', confirm: 'STOP' });
+        modal = null;
+        showNotification('Campaign stopped permanently', 'success');
+        navigate('campaigns');
+      } catch (e) {
+        showNotification('Error: ' + e.message, 'error');
+      }
+    },
+  };
+  render();
 }
 
 // ========== AI Content ==========
