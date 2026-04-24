@@ -3735,6 +3735,17 @@ async function loadAccounts() {
         </table>
       </div>
 
+      <!-- Database Cleanup -->
+      <div class="card">
+        <h3>DATABASE CLEANUP</h3>
+        <p class="text-muted text-sm" style="margin-bottom:12px">Remove AI-generated leads with pseudo-emails (<code>@noemail.leads.local</code>) — these came from the old AI Web Search path before strict mode and have no reachable email. Safe: targets only <code>source='ai_generated'</code> AND pseudo-email; cascades through campaign_leads, outreach_queue, activities, appointments, pipeline.</p>
+        <div class="flex gap-2">
+          <button class="btn btn-outline" onclick="auditPseudoLeads()">Preview (dry-run)</button>
+          <button class="btn" style="background:var(--danger);color:#fff;border:none" onclick="deletePseudoLeads()">Delete Pseudo-Email AI Leads</button>
+        </div>
+        <div id="cleanup-status" style="margin-top:12px"></div>
+      </div>
+
       <!-- AI API Tracker -->
       <div class="card">
         <h3>AI API USAGE TRACKER</h3>
@@ -4291,6 +4302,52 @@ async function saveAppointment(editId) {
     render();
   } catch (err) {
     notify(err.message, 'error');
+  }
+}
+
+// ========== Database Cleanup (Superadmin) ==========
+// Two-phase guard: GET preview before any DELETE. Uses /api/admin/cleanup/pseudo-leads.
+async function auditPseudoLeads() {
+  const status = document.getElementById('cleanup-status');
+  if (status) status.innerHTML = '<span class="text-muted">Auditing...</span>';
+  try {
+    const r = await api.get('/admin/cleanup/pseudo-leads');
+    const t = r.totals || {};
+    const sample = (r.sample || []).map(s => `<li><code>${esc(s.email)}</code> — ${esc(s.name || '?')} (${esc(s.company || '?')})</li>`).join('');
+    if (status) status.innerHTML = `
+      <div style="padding:12px;background:rgba(245,158,11,0.08);border-radius:var(--radius);border-left:3px solid #f59e0b">
+        <strong>${t.leads || 0} leads</strong> would be deleted, with cascade:
+        <ul style="margin:6px 0 8px 18px;font-size:13px">
+          <li>${t.campaign_leads || 0} campaign attachments</li>
+          <li>${t.outreach_queue || 0} outreach queue items</li>
+          <li>${t.activities || 0} activities</li>
+          <li>${t.appointments || 0} appointments</li>
+          <li>${t.pipeline || 0} pipeline rows</li>
+        </ul>
+        ${sample ? `<div class="text-sm text-muted" style="margin-top:6px">Sample (first 10):</div><ul style="margin:4px 0 0 18px;font-size:12px;color:var(--text-muted)">${sample}</ul>` : ''}
+      </div>`;
+  } catch (e) {
+    if (status) status.innerHTML = `<span style="color:var(--danger)">Audit failed: ${e.message}</span>`;
+  }
+}
+
+async function deletePseudoLeads() {
+  const status = document.getElementById('cleanup-status');
+  // Force the user to look at the audit before deleting.
+  await auditPseudoLeads();
+  if (!confirm('This is irreversible.\n\nDelete every AI-generated lead with a pseudo-email (@noemail.leads.local) AND all their campaign attachments, outreach queue items, activities, appointments, and pipeline rows?\n\nClick OK to proceed.')) return;
+  if (status) status.innerHTML += '<div class="text-muted" style="margin-top:8px">Deleting...</div>';
+  try {
+    const r = await api.post('/admin/cleanup/pseudo-leads', { confirm: true });
+    if (status) status.innerHTML = `
+      <div style="padding:12px;background:rgba(34,197,94,0.08);border-radius:var(--radius);border-left:3px solid #22c55e">
+        <strong style="color:#16a34a">Deleted ${r.deleted} leads</strong> + cascade:
+        ${r.cascade ? `<div class="text-sm text-muted" style="margin-top:6px">campaign_leads: ${r.cascade.campaign_leads} • outreach_queue: ${r.cascade.outreach_queue} • activities: ${r.cascade.activities} • appointments: ${r.cascade.appointments} • pipeline: ${r.cascade.pipeline}</div>` : ''}
+      </div>`;
+    showNotification(`Deleted ${r.deleted} pseudo-email AI leads.`, 'success');
+  } catch (e) {
+    if (status) status.innerHTML = `<span style="color:var(--danger)">Delete failed: ${e.message}</span>`;
+    showNotification('Delete failed: ' + e.message, 'error');
   }
 }
 

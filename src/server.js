@@ -238,6 +238,67 @@ app.get('/api/admin/opex', requireAuth, (req, res) => {
   });
 });
 
+// Cleanup: list/delete pseudo-email AI-generated leads. Two-phase:
+//   GET  → dry-run audit (count + 10 sample rows). Always safe, never writes.
+//   POST → executes the cascade DELETE. Requires { confirm: true } in body.
+// Targets: source='ai_generated' AND email LIKE '%@noemail.leads.local'.
+// Cascade scope: campaign_leads, outreach_queue, activities, appointments, pipeline.
+app.get('/api/admin/cleanup/pseudo-leads', requireAuth, (req, res) => {
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Superadmin only' });
+
+  const where = "source = 'ai_generated' AND email LIKE '%@noemail.leads.local'";
+  const totals = db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM leads WHERE ${where}) AS leads,
+      (SELECT COUNT(*) FROM campaign_leads WHERE lead_id IN (SELECT id FROM leads WHERE ${where})) AS campaign_leads,
+      (SELECT COUNT(*) FROM outreach_queue WHERE lead_id IN (SELECT id FROM leads WHERE ${where})) AS outreach_queue,
+      (SELECT COUNT(*) FROM activities WHERE lead_id IN (SELECT id FROM leads WHERE ${where})) AS activities,
+      (SELECT COUNT(*) FROM appointments WHERE lead_id IN (SELECT id FROM leads WHERE ${where})) AS appointments,
+      (SELECT COUNT(*) FROM pipeline WHERE lead_id IN (SELECT id FROM leads WHERE ${where})) AS pipeline
+  `).get();
+
+  const sample = db.prepare(`
+    SELECT id, name, email, company, user_id, created_at
+    FROM leads WHERE ${where}
+    ORDER BY created_at DESC LIMIT 10
+  `).all();
+
+  res.json({ dryRun: true, criteria: where, totals, sample });
+});
+
+app.post('/api/admin/cleanup/pseudo-leads', requireAuth, (req, res) => {
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Superadmin only' });
+  if (req.body?.confirm !== true) {
+    return res.status(400).json({ error: 'Refusing to delete without { confirm: true }. Run GET first to preview.' });
+  }
+
+  const where = "source = 'ai_generated' AND email LIKE '%@noemail.leads.local'";
+  const ids = db.prepare(`SELECT id FROM leads WHERE ${where}`).all().map(r => r.id);
+  if (!ids.length) return res.json({ deleted: 0, message: 'No matching leads found.' });
+
+  // Build IN clauses with placeholders. SQLite limits parameter count, so chunk if huge.
+  const chunk = (arr, size) => arr.length > size ? [arr.slice(0, size), ...chunk(arr.slice(size), size)] : [arr];
+  const chunks = chunk(ids, 500);
+
+  const result = { leadIds: ids.length, campaign_leads: 0, outreach_queue: 0, activities: 0, appointments: 0, pipeline: 0, leads: 0 };
+
+  const deleteAll = db.transaction(() => {
+    for (const idsChunk of chunks) {
+      const placeholders = idsChunk.map(() => '?').join(',');
+      result.campaign_leads += db.prepare(`DELETE FROM campaign_leads WHERE lead_id IN (${placeholders})`).run(...idsChunk).changes;
+      result.outreach_queue += db.prepare(`DELETE FROM outreach_queue WHERE lead_id IN (${placeholders})`).run(...idsChunk).changes;
+      result.activities    += db.prepare(`DELETE FROM activities WHERE lead_id IN (${placeholders})`).run(...idsChunk).changes;
+      result.appointments  += db.prepare(`DELETE FROM appointments WHERE lead_id IN (${placeholders})`).run(...idsChunk).changes;
+      result.pipeline      += db.prepare(`DELETE FROM pipeline WHERE lead_id IN (${placeholders})`).run(...idsChunk).changes;
+      result.leads         += db.prepare(`DELETE FROM leads WHERE id IN (${placeholders})`).run(...idsChunk).changes;
+    }
+  });
+  deleteAll();
+
+  console.log(`[cleanup] Superadmin ${req.user.id} deleted ${result.leads} pseudo-email AI leads + cascade:`, result);
+  res.json({ deleted: result.leads, cascade: result });
+});
+
 // System metrics (superadmin only) — cached by midnight cron job
 app.get('/api/admin/metrics', requireAuth, async (req, res) => {
   if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Superadmin only' });
