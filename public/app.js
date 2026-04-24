@@ -3735,17 +3735,6 @@ async function loadAccounts() {
         </table>
       </div>
 
-      <!-- Database Cleanup -->
-      <div class="card">
-        <h3>DATABASE CLEANUP</h3>
-        <p class="text-muted text-sm" style="margin-bottom:12px">Remove AI-generated leads with pseudo-emails (<code>@noemail.leads.local</code>) — these came from the old AI Web Search path before strict mode and have no reachable email. Safe: targets only <code>source='ai_generated'</code> AND pseudo-email; cascades through campaign_leads, outreach_queue, activities, appointments, pipeline.</p>
-        <div class="flex gap-2">
-          <button class="btn btn-outline" onclick="auditPseudoLeads()">Preview (dry-run)</button>
-          <button class="btn" style="background:var(--danger);color:#fff;border:none" onclick="deletePseudoLeads()">Delete Pseudo-Email AI Leads</button>
-        </div>
-        <div id="cleanup-status" style="margin-top:12px"></div>
-      </div>
-
       <!-- AI API Tracker -->
       <div class="card">
         <h3>AI API USAGE TRACKER</h3>
@@ -4364,6 +4353,17 @@ async function loadSystemOverview() {
     <div class="toolbar">
       <h2>System Overview</h2>
       ${m.updated_at ? `<small class="text-muted">Metrics updated: ${new Date(m.updated_at).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' })}</small>` : ''}
+    </div>
+
+    <!-- Database Cleanup (superadmin destructive action) -->
+    <div class="card" style="border-left:3px solid var(--danger)">
+      <h3>DATABASE CLEANUP</h3>
+      <p class="text-muted text-sm" style="margin-bottom:12px">Remove AI-generated leads with pseudo-emails (<code>@noemail.leads.local</code>) — these came from the old AI Web Search path before strict mode and have no reachable email. Safe: targets only <code>source='ai_generated'</code> AND pseudo-email; cascades through campaign_leads, outreach_queue, activities, appointments, pipeline.</p>
+      <div class="flex gap-2">
+        <button class="btn btn-outline" onclick="auditPseudoLeads()">Preview (dry-run)</button>
+        <button class="btn" style="background:var(--danger);color:#fff;border:none" onclick="deletePseudoLeads()">Delete Pseudo-Email AI Leads</button>
+      </div>
+      <div id="cleanup-status" style="margin-top:12px"></div>
     </div>
 
     <!-- Pricing & Plans -->
