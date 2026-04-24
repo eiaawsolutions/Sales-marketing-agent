@@ -732,15 +732,31 @@ ${input.ctaUrl || landingUrl ? `IMPORTANT: Include the URL "${input.ctaUrl || la
 }
 
 async function generateLeadsTask(input) {
-  // Apollo is the primary source when configured. When the user has explicitly
-  // connected Apollo we NEVER silently fall back to the AI web-search generator
-  // — that would violate the lead-gen contract (no fabrication, verified-only).
-  // Apollo errors surface to the user so they know to fix the key or broaden ICP.
-  // The AI path is only used when Apollo is not configured at all.
-  if (isApolloConfigured()) {
-    return generateLeadsViaApollo(input);
+  // Apollo is the primary source when configured. Two distinct outcomes:
+  //  - Apollo errors (auth/network/quota) → propagate the error so the user
+  //    knows to fix the key. NEVER silently switch providers on a hard failure.
+  //  - Apollo returns 0 matches → fall back to AI web search as a SECONDARY
+  //    source so the user still gets leads. This preserves the verified-only
+  //    contract: AI fallback runs the same verification gate Apollo would.
+  //    The result clearly labels which provider produced each lead.
+  if (!isApolloConfigured()) {
+    return generateLeadsViaAI(input);
   }
-  return generateLeadsViaAI(input);
+  const apolloResult = await generateLeadsViaApollo(input);
+  const totalProduced = (apolloResult.generated || 0) + (apolloResult.reused || 0);
+  if (totalProduced > 0) return apolloResult;
+
+  // Apollo found nothing — fall back to AI web search. Tag the result so the
+  // pipeline log + UI can show 'Apollo: 0 → AI Web Search: N' transparently.
+  console.log('[generateLeads] Apollo returned 0 matches, falling back to AI web search');
+  const aiResult = await generateLeadsViaAI(input);
+  return {
+    ...aiResult,
+    sourceProvider: 'ai_websearch',
+    fallbackFrom: 'apollo',
+    apolloFilters: apolloResult.apolloFilters,
+    apolloRejected: apolloResult.rejected || 0,
+  };
 }
 
 async function generateLeadsViaAI(input) {

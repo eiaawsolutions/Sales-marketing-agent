@@ -1476,9 +1476,10 @@ async function aiGenerateLeads(campaignId) {
   try {
     const result = await api.post(`/campaigns/${campaignId}/generate-leads`, { count });
     const provider = result?.sourceProvider === 'apollo' ? 'Apollo' : 'AI Web Search';
+    const fallbackNote = result?.fallbackFrom === 'apollo' ? ' (Apollo found 0 → fell back to AI Web Search)' : '';
     const rejectedNote = result?.rejected ? ` (${result.rejected} rejected by verification gate)` : '';
     if (result.generated > 0) {
-      showNotification(`Found ${result.generated} verified leads from ${provider}${rejectedNote}`, 'success');
+      showNotification(`Found ${result.generated} verified leads from ${provider}${fallbackNote}${rejectedNote}`, 'success');
     } else {
       const msg = result?.message || `${provider} returned no leads matching this audience${rejectedNote}. Try broadening titles, seniorities, or location.`;
       showNotification(msg, 'error');
