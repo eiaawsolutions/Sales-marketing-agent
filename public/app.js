@@ -3716,10 +3716,18 @@ async function loadAccounts() {
             <td><span class="badge badge-active">FREE</span></td>
             <td>Free tier — private repo backup, CI minutes</td>
           </tr>
+          <tr>
+            <td><strong>Coding Assistant</strong></td>
+            <td>Claude Code (Anthropic)</td>
+            <td>RM ${(99 * 4.5).toFixed(2)}</td>
+            <td>$99.00</td>
+            <td><span class="badge badge-active">ACTIVE</span></td>
+            <td>Claude Pro — AI pair programmer for the codebase.</td>
+          </tr>
           <tr style="font-weight:700;border-top:2px solid var(--border)">
             <td>TOTAL MONTHLY</td>
             <td></td>
-            <td style="color:var(--warning)">RM ${(22.50 + (aiUsage.thisMonth.cost * 4.5) + ((opex.webSearchCostUsd || 0) * 4.5) + (opex.hasApollo ? (opex.apolloMonthlyUsd || 99) * 4.5 : 0) + (opex.voiceCalls * 0.50 * 4.5) + (opex.hasResend ? opex.emailsSent * 0.002 * 4.5 : 0) + (totalMRR * 0.029 + activeSubscribers.length) + 5).toFixed(2)}</td>
+            <td style="color:var(--warning)">RM ${(22.50 + (aiUsage.thisMonth.cost * 4.5) + ((opex.webSearchCostUsd || 0) * 4.5) + (opex.hasApollo ? (opex.apolloMonthlyUsd || 99) * 4.5 : 0) + (opex.voiceCalls * 0.50 * 4.5) + (opex.hasResend ? opex.emailsSent * 0.002 * 4.5 : 0) + (totalMRR * 0.029 + activeSubscribers.length) + 5 + (99 * 4.5)).toFixed(2)}</td>
             <td></td>
             <td></td>
             <td>Auto-calculated from actual usage</td>
