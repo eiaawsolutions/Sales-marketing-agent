@@ -53,9 +53,9 @@ function logAICost(campaignId, taskType, model, inputTokens, outputTokens, userI
   const totalTokens = inputTokens + outputTokens;
   const cost = calculateCost(model, inputTokens, outputTokens, webSearchRequests);
   db.prepare(`
-    INSERT INTO ai_cost_log (campaign_id, task_type, input_tokens, output_tokens, total_tokens, cost_usd, model, user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(campaignId || null, taskType, inputTokens, outputTokens, totalTokens, cost, model, userId || 1);
+    INSERT INTO ai_cost_log (campaign_id, task_type, input_tokens, output_tokens, total_tokens, cost_usd, model, user_id, web_search_requests)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(campaignId || null, taskType, inputTokens, outputTokens, totalTokens, cost, model, userId || 1, webSearchRequests || 0);
   return { inputTokens, outputTokens, totalTokens, cost, webSearchRequests };
 }
 

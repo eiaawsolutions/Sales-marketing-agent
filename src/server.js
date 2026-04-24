@@ -216,12 +216,25 @@ app.get('/api/admin/opex', requireAuth, (req, res) => {
   // Check which services are configured
   const resendKey = db.prepare("SELECT value FROM settings WHERE key = 'resend_api_key'").get();
   const voiceKey = db.prepare("SELECT value FROM settings WHERE key = 'voice_ai_api_key'").get();
+  const apolloKey = db.prepare("SELECT value FROM settings WHERE key = 'apollo_api_key'").get();
+
+  // Anthropic web_search tool spend this month (split out from AI tokens row).
+  // Each row in ai_cost_log carries cost_usd that already includes web search;
+  // we re-derive the search-only portion via the web_search_requests count.
+  const webSearch = db.prepare(
+    "SELECT COALESCE(SUM(web_search_requests), 0) AS searches FROM ai_cost_log WHERE created_at >= datetime('now','start of month')"
+  ).get();
+  const webSearchesThisMonth = Number(webSearch?.searches || 0);
 
   res.json({
     voiceCalls: voiceCalls.count,
     emailsSent: emailsSent.count,
     hasResend: !!(resendKey?.value && resendKey.value.length > 5),
     hasVoice: !!(voiceKey?.value && voiceKey.value.length > 5),
+    hasApollo: !!(apolloKey?.value && apolloKey.value.length > 5),
+    apolloMonthlyUsd: 99, // EIAAW Apollo plan — Professional seat
+    webSearchesThisMonth,
+    webSearchCostUsd: webSearchesThisMonth * 0.01, // $10 per 1k searches
   });
 });
 

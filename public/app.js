@@ -3527,7 +3527,7 @@ async function loadAccounts() {
     const costData = await api.get('/campaigns/ai-costs').catch(() => ({ overall: { total_cost: 0 } }));
     const aiUsage = await api.get('/admin/ai-usage').catch(() => ({ total: { cost: 0, calls: 0, tokens: 0 }, thisMonth: { cost: 0, calls: 0 }, lastMonth: { cost: 0, calls: 0 }, daily: [], byModel: [], byType: [] }));
     const settingsData = await api.get('/settings').catch(() => ({}));
-    const opex = await api.get('/admin/opex').catch(() => ({ voiceCalls: 0, emailsSent: 0, hasResend: false, hasVoice: false }));
+    const opex = await api.get('/admin/opex').catch(() => ({ voiceCalls: 0, emailsSent: 0, hasResend: false, hasVoice: false, hasApollo: false, apolloMonthlyUsd: 99, webSearchesThisMonth: 0, webSearchCostUsd: 0 }));
     const aiCreditBalance = parseFloat(settingsData.ai_credit_balance || '5.00');
 
     // Calculate revenue & profit
@@ -3653,6 +3653,22 @@ async function loadAccounts() {
             <td>${aiUsage.thisMonth.calls} calls this month. Pay-per-use.</td>
           </tr>
           <tr>
+            <td><strong>AI Web Search</strong></td>
+            <td>Anthropic (web_search tool)</td>
+            <td>RM ${((opex.webSearchCostUsd || 0) * 4.5).toFixed(2)}</td>
+            <td>$${(opex.webSearchCostUsd || 0).toFixed(4)}</td>
+            <td><span class="badge badge-${opex.webSearchesThisMonth > 0 ? 'active' : 'draft'}">THIS MONTH</span></td>
+            <td>${opex.webSearchesThisMonth || 0} searches this month. $0.01 each ($10/1k).</td>
+          </tr>
+          <tr>
+            <td><strong>Lead Database</strong></td>
+            <td>Apollo.io</td>
+            <td>RM ${opex.hasApollo ? ((opex.apolloMonthlyUsd || 99) * 4.5).toFixed(2) : '0.00'}</td>
+            <td>${opex.hasApollo ? '$' + (opex.apolloMonthlyUsd || 99).toFixed(2) : '$0'}</td>
+            <td><span class="badge badge-${opex.hasApollo ? 'active' : 'draft'}">${opex.hasApollo ? 'ACTIVE' : 'NOT SET'}</span></td>
+            <td>${opex.hasApollo ? 'Professional seat — verified people search + enrichment.' : 'Connect Apollo in Settings to source verified leads.'}</td>
+          </tr>
+          <tr>
             <td><strong>Voice Agent</strong></td>
             <td>Retell AI</td>
             <td>RM ${(opex.voiceCalls * 0.50 * 4.5).toFixed(2)}</td>
@@ -3692,10 +3708,18 @@ async function loadAccounts() {
             <td><span class="badge badge-active">FREE</span></td>
             <td>Free tier — DNS, SSL, CDN</td>
           </tr>
+          <tr>
+            <td><strong>Code Hosting</strong></td>
+            <td>GitHub</td>
+            <td>RM 0</td>
+            <td>$0</td>
+            <td><span class="badge badge-active">FREE</span></td>
+            <td>Free tier — private repo backup, CI minutes</td>
+          </tr>
           <tr style="font-weight:700;border-top:2px solid var(--border)">
             <td>TOTAL MONTHLY</td>
             <td></td>
-            <td style="color:var(--warning)">RM ${(22.50 + (aiUsage.thisMonth.cost * 4.5) + (opex.voiceCalls * 0.50 * 4.5) + (opex.hasResend ? opex.emailsSent * 0.002 * 4.5 : 0) + (totalMRR * 0.029 + activeSubscribers.length) + 5).toFixed(2)}</td>
+            <td style="color:var(--warning)">RM ${(22.50 + (aiUsage.thisMonth.cost * 4.5) + ((opex.webSearchCostUsd || 0) * 4.5) + (opex.hasApollo ? (opex.apolloMonthlyUsd || 99) * 4.5 : 0) + (opex.voiceCalls * 0.50 * 4.5) + (opex.hasResend ? opex.emailsSent * 0.002 * 4.5 : 0) + (totalMRR * 0.029 + activeSubscribers.length) + 5).toFixed(2)}</td>
             <td></td>
             <td></td>
             <td>Auto-calculated from actual usage</td>

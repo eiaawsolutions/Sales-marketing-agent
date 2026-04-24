@@ -259,6 +259,10 @@ export function initializeDatabase(db) {
   // Add budget_limit column to campaigns if missing
   try { db.exec('ALTER TABLE campaigns ADD COLUMN budget_limit REAL DEFAULT 0'); } catch (e) { /* already exists */ }
 
+  // Track Anthropic web_search tool usage per call so the OpEx board can split
+  // search spend ($10/1k requests) from token spend.
+  try { db.exec('ALTER TABLE ai_cost_log ADD COLUMN web_search_requests INTEGER DEFAULT 0'); } catch (e) { /* already exists */ }
+
   // Add plan column to users if missing
   try { db.exec("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'starter'"); } catch (e) { /* already exists */ }
   // Set superadmin to business plan
