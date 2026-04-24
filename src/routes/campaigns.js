@@ -132,7 +132,7 @@ router.get('/:id/leads', (req, res) => {
     FROM campaign_leads cl
     JOIN leads l ON cl.lead_id = l.id
     WHERE cl.campaign_id = ?
-    ORDER BY l.score DESC, l.created_at DESC
+    ORDER BY cl.rowid DESC
   `).all(campaignId);
 
   const payload = req.user.role === 'superadmin' ? leads : maskLeads(leads);
