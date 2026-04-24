@@ -35,14 +35,16 @@ export async function launchCampaignPipeline(userId, campaignId) {
     if (campaign.target_audience && existingLeadCount === 0) {
       updateStatus('running', 'Step 1: Generating leads...');
       try {
-        await runAgent(userId, 'generate_leads', {
+        const leadResult = await runAgent(userId, 'generate_leads', {
           campaignId,
           campaignName: campaign.name,
           targetAudience: campaign.target_audience,
           count: 10,
         });
         const newCount = db.prepare('SELECT COUNT(*) as c FROM campaign_leads WHERE campaign_id = ?').get(campaignId).c;
-        updateStatus('running', `Step 1: Generated ${newCount} leads`);
+        const provider = leadResult?.sourceProvider === 'apollo' ? 'Apollo' : 'AI Web Search';
+        const rejectedNote = leadResult?.rejected ? ` (${leadResult.rejected} rejected by verification gate)` : '';
+        updateStatus('running', `Step 1: Generated ${newCount} leads from ${provider}${rejectedNote}`);
       } catch (e) {
         updateStatus('running', `Step 1: Lead generation failed (${e.message}) — continuing with existing leads`);
       }

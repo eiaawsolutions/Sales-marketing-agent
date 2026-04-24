@@ -732,17 +732,13 @@ ${input.ctaUrl || landingUrl ? `IMPORTANT: Include the URL "${input.ctaUrl || la
 }
 
 async function generateLeadsTask(input) {
-  // Apollo is the primary source when configured. The AI web-search path is a
-  // fallback for users who haven't connected Apollo yet.
+  // Apollo is the primary source when configured. When the user has explicitly
+  // connected Apollo we NEVER silently fall back to the AI web-search generator
+  // — that would violate the lead-gen contract (no fabrication, verified-only).
+  // Apollo errors surface to the user so they know to fix the key or broaden ICP.
+  // The AI path is only used when Apollo is not configured at all.
   if (isApolloConfigured()) {
-    try {
-      return await generateLeadsViaApollo(input);
-    } catch (err) {
-      console.error('[generateLeads] Apollo path failed, falling back to AI web-search:', err.message);
-      // Fall through to AI generator only if Apollo throws hard (network/quota/bad key).
-      // If Apollo simply returned 0 verified matches we still return that result — no fake fallback.
-      if (err.status === 401 || err.status === 403) throw new Error(`Apollo auth failed: ${err.message}`);
-    }
+    return generateLeadsViaApollo(input);
   }
   return generateLeadsViaAI(input);
 }

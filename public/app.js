@@ -4,11 +4,16 @@ function esc(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// Render the Source column. Apollo gets a distinct green badge so users see
-// at a glance which leads came from the verified Apollo pipeline vs AI / manual.
+// Render the Source column. Each provenance gets a distinct visual so users
+// can tell at a glance: Apollo (verified+enriched), AI web search (Claude
+// browsing the open web), or manual / imported.
 function renderSourceBadge(source) {
-  if (source === 'apollo') return '<span class="badge" style="background:rgba(46,196,182,0.16);color:#0e7c70;border:1px solid rgba(46,196,182,0.4);font-weight:700">Apollo &#10003;</span>';
-  if (source === 'ai_generated') return '<span class="badge badge-new">AI Found</span>';
+  if (source === 'apollo') {
+    return '<span class="badge" title="Verified by Apollo.io — email_status=verified, audience-matched" style="background:rgba(46,196,182,0.16);color:#0e7c70;border:1px solid rgba(46,196,182,0.45);font-weight:700">Apollo &#10003;</span>';
+  }
+  if (source === 'ai_generated') {
+    return '<span class="badge" title="Sourced by Claude AI web search — verified by source URLs" style="background:rgba(168,85,247,0.12);color:#7c3aed;border:1px solid rgba(168,85,247,0.4);font-weight:700">AI Web Search</span>';
+  }
   return esc(source || '-');
 }
 
@@ -1470,7 +1475,14 @@ async function aiGenerateLeads(campaignId) {
 
   try {
     const result = await api.post(`/campaigns/${campaignId}/generate-leads`, { count });
-    showNotification(`Found ${result.generated} new leads!`, 'success');
+    const provider = result?.sourceProvider === 'apollo' ? 'Apollo' : 'AI Web Search';
+    const rejectedNote = result?.rejected ? ` (${result.rejected} rejected by verification gate)` : '';
+    if (result.generated > 0) {
+      showNotification(`Found ${result.generated} verified leads from ${provider}${rejectedNote}`, 'success');
+    } else {
+      const msg = result?.message || `${provider} returned no leads matching this audience${rejectedNote}. Try broadening titles, seniorities, or location.`;
+      showNotification(msg, 'error');
+    }
 
     // Refresh the leads panel if open
     const panel = document.getElementById(`camp-leads-${campaignId}`);
