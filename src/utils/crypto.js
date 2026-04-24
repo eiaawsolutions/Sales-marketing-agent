@@ -7,7 +7,7 @@ const ENCODING = 'base64';
 const PREFIX = 'enc:'; // Prefix to identify encrypted values
 
 // Sensitive keys that should be encrypted at rest
-export const SENSITIVE_KEYS = ['api_key', 'smtp_pass', 'stripe_secret_key', 'stripe_webhook_secret', 'voice_ai_api_key', 'resend_api_key'];
+export const SENSITIVE_KEYS = ['api_key', 'smtp_pass', 'stripe_secret_key', 'stripe_webhook_secret', 'voice_ai_api_key', 'resend_api_key', 'apollo_api_key'];
 
 function getEncryptionKey() {
   const key = process.env.ENCRYPTION_KEY;

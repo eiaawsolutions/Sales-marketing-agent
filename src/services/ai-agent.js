@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import db from '../db/index.js';
 import { decrypt } from '../utils/crypto.js';
+import { isApolloConfigured, searchPeople, enrichPerson, describeApolloSource, detectHotSignal } from './apollo.js';
 
 function getSettings() {
   const rows = db.prepare('SELECT key, value FROM settings').all();
@@ -731,6 +732,22 @@ ${input.ctaUrl || landingUrl ? `IMPORTANT: Include the URL "${input.ctaUrl || la
 }
 
 async function generateLeadsTask(input) {
+  // Apollo is the primary source when configured. The AI web-search path is a
+  // fallback for users who haven't connected Apollo yet.
+  if (isApolloConfigured()) {
+    try {
+      return await generateLeadsViaApollo(input);
+    } catch (err) {
+      console.error('[generateLeads] Apollo path failed, falling back to AI web-search:', err.message);
+      // Fall through to AI generator only if Apollo throws hard (network/quota/bad key).
+      // If Apollo simply returned 0 verified matches we still return that result — no fake fallback.
+      if (err.status === 401 || err.status === 403) throw new Error(`Apollo auth failed: ${err.message}`);
+    }
+  }
+  return generateLeadsViaAI(input);
+}
+
+async function generateLeadsViaAI(input) {
   const { campaignId, targetAudience, campaignName, count } = input;
   const numLeads = Math.min(count || 5, 15);
   const leadUserId = input._userId || 1;
@@ -964,6 +981,263 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
     reusedLeads: linked,
     rejectedLeads: rejected,
     campaignId,
+    sourceProvider: 'ai_websearch',
+  };
+}
+
+// ============================================================================
+// Apollo lead-generation path (primary when apollo_api_key is set in Settings).
+// Flow:
+//   1. AI translates campaign target_audience into Apollo search filters.
+//   2. POST /mixed_people/search with contact_email_status=['verified'] only.
+//   3. POST /people/match per person to reveal verified email + employment history.
+//   4. Verification gate: must have verified email + linkedin/website + audience match.
+//   5. Persist with source='apollo' and source-detail folded into notes.
+// ============================================================================
+
+async function translateAudienceToApolloFilters(targetAudience, campaignName, count) {
+  // One small Claude call to convert free-text ICP into Apollo's structured filters.
+  // We use Claude's JSON-only mode with a tight schema so the AI can't hallucinate fields.
+  const prompt = `Convert this campaign target audience into Apollo.io people-search filters.
+
+Campaign: "${campaignName || 'untitled'}"
+Target audience description: "${targetAudience}"
+Requested results: ${count}
+
+Apollo.io accepts these filters. Use ONLY values that map directly to what's described in the target audience above. Do NOT invent constraints the user did not request — leave fields empty if the target audience does not specify them.
+
+Return JSON of EXACTLY this shape:
+{
+  "person_titles": ["array of job titles to match — map from the audience role description"],
+  "person_seniorities": ["one or more of: owner, founder, c_suite, partner, vp, head, director, manager, senior, entry, intern — leave empty if audience does not imply seniority"],
+  "person_locations": ["array of city/state/country strings where the PERSON lives — extract from audience description; leave empty if no location given"],
+  "organization_locations": ["array of city/state/country strings where the COMPANY is HQ'd — usually mirrors person_locations for B2B; leave empty if no location given"],
+  "organization_industries": ["array of industry keywords like 'saas', 'fintech', 'healthcare', 'manufacturing'"],
+  "organization_num_employees_ranges": ["array of headcount ranges like '1,10', '11,50', '51,200', '201,500', '501,1000', '1001,5000', '5001,10000', '10001+' — only include if audience implies company size"],
+  "q_keywords": "free text keyword to refine results, or empty string"
+}
+
+Examples:
+- Audience "SaaS founders in Malaysia" → person_titles=["Founder","CEO","Co-Founder"], person_seniorities=["founder","owner","c_suite"], organization_locations=["Malaysia"], organization_industries=["saas"], q_keywords=""
+- Audience "Heads of Marketing at fintech companies in Singapore with 50-500 employees" → person_titles=["Head of Marketing","VP Marketing","CMO","Marketing Director"], person_seniorities=["head","vp","c_suite","director"], organization_locations=["Singapore"], organization_industries=["fintech","financial services"], organization_num_employees_ranges=["51,200","201,500"]
+- Audience "Restaurant owners in Kuala Lumpur" → person_titles=["Owner","Founder","Managing Director"], person_seniorities=["owner","founder"], organization_locations=["Kuala Lumpur, Malaysia"], organization_industries=["restaurants","food and beverages","hospitality"]
+
+Be specific. If the audience says "directors" don't return generic "manager" — match the exact level. If it says a city, put the city not the country. NEVER include a location the user didn't ask for.`;
+  return chatJSON(prompt, '', { maxTokens: 1024 });
+}
+
+async function verifyAudienceMatch(person, enriched, targetAudience) {
+  // Cheap Claude call to confirm the Apollo person actually matches the audience
+  // description (Apollo filters are coarse — this is the 100%-match enforcement).
+  const summary = {
+    name: enriched?.name || person.name,
+    title: enriched?.title || person.title,
+    headline: enriched?.headline || person.headline,
+    company: enriched?.organization?.name || person.organization?.name,
+    industry: enriched?.organization?.industry || person.organization?.industry,
+    seniority: enriched?.seniority || person.seniority,
+    location: [enriched?.city || person.city, enriched?.state || person.state, enriched?.country || person.country].filter(Boolean).join(', '),
+    company_size: enriched?.organization?.estimated_num_employees || person.organization?.estimated_num_employees,
+  };
+  try {
+    const result = await chatJSON(
+      `Does this person 100% match the target audience? Return JSON {"match": true|false, "reason": "one short sentence"}.
+
+Target audience: "${targetAudience}"
+
+Person:
+${JSON.stringify(summary, null, 2)}
+
+Strict rules:
+- Match must be ROLE + LOCATION + INDUSTRY/COMPANY-TYPE if specified.
+- A "marketing manager" does NOT match "head of marketing" — seniority matters.
+- A person in Singapore does NOT match "Malaysia-based" audience.
+- A SaaS founder does NOT match "restaurant owner".
+- When in doubt, return false.`,
+      '',
+      { maxTokens: 256 }
+    );
+    return { match: !!result.match, reason: result.reason || '' };
+  } catch (_) {
+    // If verification fails (API error), be conservative and reject.
+    return { match: false, reason: 'audience verification failed' };
+  }
+}
+
+async function generateLeadsViaApollo(input) {
+  const { campaignId, targetAudience, campaignName, count } = input;
+  const numLeads = Math.min(count || 5, 15);
+  const leadUserId = input._userId || 1;
+
+  if (!targetAudience || !targetAudience.trim()) {
+    throw new Error('Target audience is required for Apollo lead generation. Set the target_audience on the campaign.');
+  }
+
+  const userLeads = db.prepare('SELECT id, email FROM leads WHERE user_id = ?').all(leadUserId);
+  const userEmailToId = new Map(userLeads.map(r => [r.email.toLowerCase(), r.id]));
+
+  // Step A — translate the free-text audience into Apollo filters.
+  const filters = await translateAudienceToApolloFilters(targetAudience, campaignName, numLeads);
+
+  // Step B — search Apollo. Over-fetch by 3x because the verification gate will
+  // discard a lot (audience-mismatch, missing email, low confidence).
+  const search = await searchPeople({
+    ...filters,
+    per_page: Math.min(numLeads * 3, 50),
+    page: 1,
+    contact_email_status: ['verified'],
+  });
+  const candidates = Array.isArray(search?.people) ? search.people : (Array.isArray(search?.contacts) ? search.contacts : []);
+
+  if (!candidates.length) {
+    return {
+      generated: 0,
+      reused: 0,
+      rejected: 0,
+      leads: [],
+      reusedLeads: [],
+      rejectedLeads: [],
+      campaignId,
+      sourceProvider: 'apollo',
+      apolloFilters: filters,
+      message: 'Apollo found no people matching this audience. Try broadening titles, seniorities, or location.',
+    };
+  }
+
+  const insertLead = db.prepare(`
+    INSERT INTO leads (user_id, name, email, company, title, phone, source, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertCampaignLead = db.prepare(
+    'INSERT OR IGNORE INTO campaign_leads (campaign_id, lead_id) VALUES (?, ?)'
+  );
+
+  const created = [];
+  const linked = [];
+  const rejected = [];
+  const seenInBatch = new Set();
+
+  for (const person of candidates) {
+    if (created.length + linked.length >= numLeads) break;
+
+    // Step C — enrich to get the actual email + employment history.
+    let enriched;
+    try {
+      const enrichRes = await enrichPerson({
+        id: person.id,
+        first_name: person.first_name,
+        last_name: person.last_name,
+        organization_name: person.organization?.name,
+        domain: person.organization?.primary_domain || person.organization?.website_url?.replace(/^https?:\/\//, '').split('/')[0],
+        linkedin_url: person.linkedin_url,
+      });
+      enriched = enrichRes?.person || enrichRes?.matches?.[0] || enrichRes;
+    } catch (e) {
+      rejected.push({ name: person.name, reason: `enrichment failed: ${e.message}` });
+      continue;
+    }
+
+    const realEmail = (enriched?.email || person.email || '').toLowerCase().trim();
+    const emailStatus = enriched?.email_status || person.email_status || '';
+    const linkedinUrl = enriched?.linkedin_url || person.linkedin_url || '';
+    const websiteUrl = enriched?.organization?.website_url || person.organization?.website_url || '';
+
+    // Server-side verification gate — same contract as the AI path.
+    if (!realEmail || emailStatus !== 'verified') {
+      rejected.push({ name: enriched?.name || person.name, reason: `email not verified (status: ${emailStatus || 'none'})` });
+      continue;
+    }
+    if (!/^https?:\/\//i.test(linkedinUrl) && !/^https?:\/\//i.test(websiteUrl)) {
+      rejected.push({ name: enriched?.name || person.name, reason: 'no LinkedIn or company website' });
+      continue;
+    }
+    if (seenInBatch.has(realEmail)) continue;
+    seenInBatch.add(realEmail);
+
+    // Step D — audience-match verification (the "100% match" requirement).
+    const verdict = await verifyAudienceMatch(person, enriched, targetAudience);
+    if (!verdict.match) {
+      rejected.push({ name: enriched?.name || person.name, email: realEmail, reason: `audience mismatch: ${verdict.reason}` });
+      continue;
+    }
+
+    const hotSignal = detectHotSignal(enriched);
+    const sourceDetail = describeApolloSource({ ...person, ...enriched });
+    const orgName = enriched?.organization?.name || person.organization?.name || '';
+    const personTitle = enriched?.title || person.title || '';
+    const personPhone = enriched?.phone_numbers?.[0]?.sanitized_number || enriched?.phone_numbers?.[0]?.raw_number || '';
+
+    const notes = [
+      `Fit: ${verdict.reason || 'matches campaign audience'}`,
+      `Lead type: ${hotSignal ? 'Hot' : 'Cold'} (confidence: High — Apollo verified)`,
+      `Apollo source: ${sourceDetail}`,
+      linkedinUrl ? `Profile: ${linkedinUrl}` : '',
+      websiteUrl ? `Website: ${websiteUrl}` : '',
+      hotSignal ? `Buying signal: ${hotSignal}` : '',
+      `Verification: Apollo email_status=verified`,
+    ].filter(Boolean).join('\n');
+
+    const existingId = userEmailToId.get(realEmail);
+    if (existingId) {
+      if (campaignId) insertCampaignLead.run(campaignId, existingId);
+      linked.push({ id: existingId, email: realEmail, reused: true });
+      continue;
+    }
+
+    const res = insertLead.run(
+      leadUserId,
+      enriched?.name || person.name,
+      realEmail,
+      orgName,
+      personTitle,
+      personPhone,
+      'apollo',
+      notes
+    );
+    const leadId = res.lastInsertRowid;
+    userEmailToId.set(realEmail, leadId);
+    if (campaignId) insertCampaignLead.run(campaignId, leadId);
+
+    db.prepare(
+      'INSERT INTO activities (lead_id, type, description) VALUES (?, ?, ?)'
+    ).run(
+      leadId,
+      'ai_action',
+      `Apollo sourced verified ${hotSignal ? 'HOT' : 'cold'} lead for campaign: ${campaignName || 'Unknown'} — ${sourceDetail}`
+    );
+
+    created.push({
+      id: leadId,
+      name: enriched?.name || person.name,
+      email: realEmail,
+      company: orgName,
+      title: personTitle,
+      lead_type: hotSignal ? 'Hot' : 'Cold',
+      confidence_score: 'High',
+      source: 'apollo',
+      apollo_source_detail: sourceDetail,
+      buying_signal: hotSignal || '',
+      notes,
+    });
+
+    // Be polite to Apollo — small gap between enrichment calls.
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  if (rejected.length) {
+    console.log(`[generateLeads/apollo] Rejected ${rejected.length} candidates:`, rejected);
+  }
+
+  return {
+    generated: created.length,
+    reused: linked.length,
+    rejected: rejected.length,
+    leads: created,
+    reusedLeads: linked,
+    rejectedLeads: rejected,
+    campaignId,
+    sourceProvider: 'apollo',
+    apolloFilters: filters,
   };
 }
 

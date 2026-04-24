@@ -4,6 +4,14 @@ function esc(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Render the Source column. Apollo gets a distinct green badge so users see
+// at a glance which leads came from the verified Apollo pipeline vs AI / manual.
+function renderSourceBadge(source) {
+  if (source === 'apollo') return '<span class="badge" style="background:rgba(46,196,182,0.16);color:#0e7c70;border:1px solid rgba(46,196,182,0.4);font-weight:700">Apollo &#10003;</span>';
+  if (source === 'ai_generated') return '<span class="badge badge-new">AI Found</span>';
+  return esc(source || '-');
+}
+
 // ========== Auth State ==========
 let authToken = sessionStorage.getItem('auth_token') || null;
 let currentUser = null;
@@ -628,7 +636,7 @@ async function loadLeads() {
               </td>
               <td><span id="lead-phone-${l.id}">${l._masked ? `<span class="text-muted">${l.phone ? esc(l.phone) : '-'}</span>` : esc(l.phone || '-')}</span></td>
               <td>${esc(l.company || '-')}</td>
-              <td>${l.source === 'ai_generated' ? '<span class="badge badge-new">AI Found</span>' : esc(l.source)}</td>
+              <td>${renderSourceBadge(l.source)}</td>
               <td>
                 <div style="display:flex;align-items:center;gap:8px">
                   <div class="score-bar" style="width:50px"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
@@ -680,7 +688,7 @@ async function showLeadModal(id) {
         <div class="form-group"><label>Phone</label><input id="f-phone" value="${lead.phone || ''}"></div>
         <div class="form-group"><label>Source</label>
           <select id="f-source">
-            ${['manual','website','linkedin','referral','ad','event','cold_outreach'].map(s => `<option value="${s}" ${lead.source === s ? 'selected' : ''}>${s}</option>`).join('')}
+            ${['manual','website','linkedin','referral','ad','event','cold_outreach','apollo','ai_generated'].map(s => `<option value="${s}" ${lead.source === s ? 'selected' : ''}>${s}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -1399,7 +1407,7 @@ async function toggleCampaignLeads(id) {
                     ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" onclick="revealContact(${l.id}, ${id})">Reveal</button>` : ''}
                   </td>
                   <td>${esc(l.company || '-')}</td>
-                  <td>${l.source === 'ai_generated' ? '<span class="badge badge-new">AI Found</span>' : esc(l.source)}</td>
+                  <td>${renderSourceBadge(l.source)}</td>
                   <td>
                     <div style="display:flex;align-items:center;gap:6px">
                       <div class="score-bar" style="width:40px"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
@@ -4774,6 +4782,28 @@ async function loadSettings() {
       </div>
 
       <div class="card">
+        <h3>Lead Generation (Apollo)</h3>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="width:12px;height:12px;border-radius:50%;background:${settings._apollo_key_set ? 'var(--success)' : 'var(--danger)'};display:inline-block"></span>
+          <span class="text-sm">${settings._apollo_key_set ? 'Apollo API key is configured — leads sourced from Apollo (verified + enriched)' : 'No Apollo key set — falls back to AI web-search lead generator'}</span>
+        </div>
+        <p class="text-muted text-sm mb-4">Connect <a href="https://app.apollo.io/#/settings/integrations/api" target="_blank" style="color:var(--primary)">Apollo.io</a> for verified, enriched, hot leads that 100% match your campaign target audience and locations. Apollo finds real people with real verified emails — no AI guessing.</p>
+        <div class="form-group">
+          <label>Apollo API Key ${settings._apollo_key_set ? '<span style="color:var(--success)">&#10003; set</span>' : ''}</label>
+          <div class="flex gap-2">
+            <input id="s-apollo-key" type="password" value="" placeholder="${settings._apollo_key_set ? 'Apollo key saved — enter new to change' : 'Paste Apollo API key'}">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('s-apollo-key').type = document.getElementById('s-apollo-key').type === 'password' ? 'text' : 'password'">Show</button>
+          </div>
+          <small class="text-muted">Get your key from <a href="https://app.apollo.io/#/settings/integrations/api" target="_blank" style="color:var(--primary)">Apollo &rarr; Settings &rarr; Integrations &rarr; API</a>. Use a master key so people search + enrichment both work.</small>
+        </div>
+        <div class="flex gap-2" style="margin-top:12px">
+          <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+          <button class="btn btn-outline" onclick="testApolloConnection()">Test Apollo Connection</button>
+        </div>
+        <div id="apollo-status" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
         <h3>Email / SMTP Configuration</h3>
         <div class="grid-2">
           <div class="form-group">
@@ -5098,6 +5128,7 @@ async function saveSettings() {
     voice_ai_api_key: document.getElementById('s-voice-key')?.value || '',
     voice_ai_agent_id: gv('s-voice-agent') || '',
     voice_phone_number: gv('s-voice-phone') || '',
+    apollo_api_key: document.getElementById('s-apollo-key')?.value || '',
   };
 
   try {
@@ -5106,6 +5137,27 @@ async function saveSettings() {
     loadSettings();
   } catch (e) {
     showNotification('Error saving: ' + e.message, 'error');
+  }
+}
+
+async function testApolloConnection() {
+  const statusEl = document.getElementById('apollo-status');
+  if (statusEl) statusEl.innerHTML = '<span class="text-muted">Pinging Apollo...</span>';
+  try {
+    // Save the key first so the test endpoint can read it
+    const apolloKey = document.getElementById('s-apollo-key')?.value || '';
+    if (apolloKey && !apolloKey.includes('•')) {
+      await api.put('/settings', { apollo_api_key: apolloKey });
+    }
+    const result = await api.post('/settings/test-apollo', {});
+    if (result.success) {
+      const total = result.total_entries != null ? ` (Apollo index: ${result.total_entries.toLocaleString()} matching CEOs found)` : '';
+      if (statusEl) statusEl.innerHTML = `<span style="color:var(--success)">&#10003; Connected to Apollo${total}</span>`;
+    } else {
+      if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">Failed: ${result.error || 'Unknown error'}</span>`;
+    }
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">Error: ${e.message}</span>`;
   }
 }
 
