@@ -770,6 +770,7 @@ async function generateLeadsViaAI(input) {
   const userEmailToId = new Map(userLeads.map(r => [r.email.toLowerCase(), r.id]));
   const existingEmails = Array.from(userEmailToId.keys());
 
+  // Capture the search count so we can enforce "the model actually browsed" after the call.
   const result = await chatJSON(
     `You are a cross-market lead generation and verification engine designed to generate HIGH-QUALITY, VERIFIED leads for B2B, B2C, and B2B2C campaigns.
 
@@ -785,12 +786,13 @@ You have access to a live web_search tool. You MUST use it to find real people a
 ## 🎯 OBJECTIVE
 Generate a list of qualified leads based on the campaign input provided, ensuring every lead is backed by evidence you actually found on the open web.
 
-## 🔒 NON-NEGOTIABLE RULES
+## 🔒 NON-NEGOTIABLE RULES (STRICT MODE)
 1. DO NOT fabricate, assume, or infer data without evidence.
 2. Every lead MUST have a verifiable digital footprint you retrieved via web_search.
-3. Emails, phone numbers, or personal data MUST NOT be guessed. Return empty string "" if not publicly listed — NEVER invent a pattern like first.last@company.com.
+3. Emails, phone numbers, or personal data MUST NOT be guessed. NEVER invent a pattern like first.last@company.com.
 4. If verification is weak or unclear → DISCARD the lead.
-5. Fewer high-quality leads are better than many unverified ones.
+5. **REAL EMAIL REQUIRED**: Only return leads where you can cite a REAL public email address found on a real web page (company team page, speaker bio, conference page, news article, public directory). Leads without a public email MUST BE DISCARDED — do not return them at all. The system will REJECT every lead with no email.
+6. Returning ZERO leads is the correct answer when no qualifying public emails exist. Returning fewer real leads is ALWAYS better than returning more weak ones.
 
 ## 🌐 SUPPORTED LEAD TYPES
 - B2B — Founders, Directors, Heads of Marketing / Growth / Digital / Sales, other decision makers
@@ -840,7 +842,7 @@ Each lead object MUST have these fields (use empty string "" — never a guess �
 - "company": Company / platform name (or "" if not applicable)
 - "geography": City / country
 - "lead_type": "Hot" | "Cold"
-- "email": Verified email only; otherwise "" (NEVER guess patterns like first.last@company.com)
+- "email": REAL public email address verified on a real web page — REQUIRED. Do NOT return the lead at all if you cannot find a real public email. NEVER guess patterns like first.last@company.com.
 - "phone": Publicly listed phone only; otherwise ""
 - "other_contact": Any additional verified contact channel, or ""
 - "linkedin_url": LinkedIn or primary profile URL (or "")
@@ -860,6 +862,21 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
     { useWebSearch: true, webSearchMaxUses: 4, maxTokens: 8192 }
   );
 
+  // STRICT: refuse to accept any lead if the model didn't actually browse the web.
+  // _lastUsage.webSearchRequests is set inside chat() from response.usage.server_tool_use.
+  // If it's 0, the model answered from training data — those leads are unverifiable.
+  const searchesRan = _lastUsage?.webSearchRequests || 0;
+  if (searchesRan === 0) {
+    console.log('[generateLeads/ai] Rejecting batch — model did not call web_search (possible training-data answer)');
+    return {
+      generated: 0, reused: 0, rejected: 0,
+      leads: [], reusedLeads: [], rejectedLeads: [],
+      campaignId,
+      sourceProvider: 'ai_websearch',
+      message: 'AI Web Search returned leads without actually browsing the web — rejected to prevent hallucinated data. Try again, broaden the audience, or rely on Apollo.',
+    };
+  }
+
   const leads = Array.isArray(result.leads) ? result.leads : [];
   const created = [];
   const linked = [];           // existing user-owned leads attached to this campaign
@@ -877,18 +894,29 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
   const seenInBatch = new Set();
   const rejected = [];
 
-  // Verification gate — enforces the "accuracy > volume" contract server-side so
-  // weak leads never reach the DB even if the model ignores the prompt.
+  // STRICT verification gate — enforces the "real people, real sources, real emails"
+  // contract server-side so weak leads NEVER reach the DB even if the model ignores
+  // the prompt. Returns { ok, reason } so we can surface why each lead was rejected.
   function isVerified(lead) {
     const sources = Array.isArray(lead.verification_sources) ? lead.verification_sources : [];
     const hasSource = sources.some(s => typeof s === 'string' && /^https?:\/\//i.test(s));
     const hasProfile = typeof lead.linkedin_url === 'string' && /^https?:\/\//i.test(lead.linkedin_url);
     const hasSite = typeof lead.company_website === 'string' && /^https?:\/\//i.test(lead.company_website);
     const confidence = String(lead.confidence_score || '').toLowerCase();
-    if (confidence === 'low') return false;
-    if (!hasSource) return false;
-    if (!hasProfile && !hasSite) return false;
-    return true;
+    const email = String(lead.email || '').trim().toLowerCase();
+
+    if (confidence === 'low') return { ok: false, reason: 'low confidence' };
+    if (!hasSource) return { ok: false, reason: 'no verification_sources URL' };
+    if (!hasProfile && !hasSite) return { ok: false, reason: 'no linkedin_url or company_website' };
+
+    // STRICT: real public email is REQUIRED. No pseudo-emails, no missing emails.
+    if (!email) return { ok: false, reason: 'no public email found' };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: 'malformed email' };
+    if (email.endsWith('@noemail.leads.local')) return { ok: false, reason: 'pseudo-email (no real public email)' };
+    if (/^(test|admin|info|contact|hello|sales|support|noreply|no-reply)@/.test(email)) {
+      return { ok: false, reason: `generic mailbox (${email}) — need a person's email, not a role address` };
+    }
+    return { ok: true };
   }
 
   function buildNotes(lead) {
@@ -908,41 +936,23 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
     return lines.join('\n');
   }
 
-  // When a verified lead has no public email, build a stable pseudo-email so the
-  // UNIQUE(leads.email) constraint holds and dedup still works. The pseudo-email
-  // is derived from the LinkedIn URL (preferred) or slugified name@company so the
-  // same person lands in the same row on re-runs. Real emails added later should
-  // overwrite the pseudo via an update path.
-  function pseudoEmailFor(lead) {
-    const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'unknown';
-    if (lead.linkedin_url) {
-      const m = /linkedin\.com\/in\/([^/?#]+)/i.exec(lead.linkedin_url);
-      if (m && m[1]) return `${slug(m[1])}@noemail.leads.local`;
-    }
-    const namePart = slug(lead.name);
-    const companyPart = slug(lead.company) || 'unknown';
-    return `${namePart}.${companyPart}@noemail.leads.local`;
-  }
-
   const addLeads = db.transaction((leadsToAdd) => {
     for (const lead of leadsToAdd) {
-      if (!isVerified(lead)) {
-        rejected.push({ name: lead.name, email: lead.email, reason: 'failed verification gate' });
+      const verdict = isVerified(lead);
+      if (!verdict.ok) {
+        rejected.push({ name: lead.name, email: lead.email || '', reason: verdict.reason });
         continue;
       }
 
-      const realEmail = lead.email?.toLowerCase() || '';
-      const email = realEmail || pseudoEmailFor(lead);
+      // STRICT: only real public emails get this far. No pseudo-emails.
+      const email = lead.email.toLowerCase().trim();
 
-      // In-batch dedup (real email OR pseudo key)
       if (seenInBatch.has(email)) {
         skippedInBatch.push(email);
         continue;
       }
       seenInBatch.add(email);
 
-      // Lead already exists under this user — attach the existing row to the campaign
-      // instead of skipping. This is the master-database reuse pattern.
       const existingId = userEmailToId.get(email);
       if (existingId) {
         if (campaignId) insertCampaignLead.run(campaignId, existingId);
@@ -952,9 +962,6 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
 
       const notes = buildNotes(lead);
 
-      // New lead — insert into leads table (becomes part of user's master database).
-      // Use the real email when available; otherwise store the pseudo-email so the
-      // NOT NULL / UNIQUE constraints are satisfied and future enrichment can update it.
       const res = insertLead.run(
         leadUserId, lead.name, email, lead.company, lead.title,
         lead.phone, 'ai_generated', notes

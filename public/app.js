@@ -1477,11 +1477,16 @@ async function aiGenerateLeads(campaignId) {
     const result = await api.post(`/campaigns/${campaignId}/generate-leads`, { count });
     const provider = result?.sourceProvider === 'apollo' ? 'Apollo' : 'AI Web Search';
     const fallbackNote = result?.fallbackFrom === 'apollo' ? ' (Apollo found 0 → fell back to AI Web Search)' : '';
-    const rejectedNote = result?.rejected ? ` (${result.rejected} rejected by verification gate)` : '';
+    // Surface up to 2 rejection reasons so the user understands WHY the strict gate dropped leads.
+    let rejectedNote = '';
+    if (result?.rejected) {
+      const reasons = (result.rejectedLeads || []).slice(0, 2).map(r => `${r.name || '?'}: ${r.reason}`).join('; ');
+      rejectedNote = ` (${result.rejected} rejected by strict gate${reasons ? ` — ${reasons}` : ''})`;
+    }
     if (result.generated > 0) {
       showNotification(`Found ${result.generated} verified leads from ${provider}${fallbackNote}${rejectedNote}`, 'success');
     } else {
-      const msg = result?.message || `${provider} returned no leads matching this audience${rejectedNote}. Try broadening titles, seniorities, or location.`;
+      const msg = result?.message || `${provider} returned no leads matching this audience${rejectedNote}. Strict mode requires real public emails — try broadening titles, seniorities, or location.`;
       showNotification(msg, 'error');
     }
 
