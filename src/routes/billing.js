@@ -448,23 +448,34 @@ router.get('/success', async (req, res) => {
   }
 });
 
-// POST /api/billing/webhook — Stripe webhook for subscription events
+// POST /api/billing/webhook — Stripe webhook for subscription events.
+// `req.body` is a raw Buffer here (see the express.raw mount in server.js for
+// this exact path). Signature verification is MANDATORY: refusing to verify
+// when the secret is unset is the only safe default, otherwise an
+// unauthenticated attacker can POST a synthetic checkout.session.completed and
+// upgrade any user's plan.
 router.post('/webhook', async (req, res) => {
   try {
-    let event = req.body;
-
-    // Verify Stripe signature if webhook secret is configured
-    const webhookSecret = db.prepare("SELECT value FROM settings WHERE key = 'stripe_webhook_secret'").get()?.value
+    const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = decrypt(db.prepare("SELECT value FROM settings WHERE key = 'stripe_webhook_secret'").get()?.value)
       || process.env.STRIPE_WEBHOOK_SECRET;
-    if (webhookSecret && req.headers['stripe-signature']) {
-      try {
-        const stripe = getStripe();
-        event = stripe.webhooks.constructEvent(
-          JSON.stringify(req.body), req.headers['stripe-signature'], webhookSecret
-        );
-      } catch (sigErr) {
-        return res.status(401).json({ error: 'Invalid webhook signature' });
-      }
+
+    if (!webhookSecret) {
+      console.error('[stripe-webhook] Refusing request: STRIPE_WEBHOOK_SECRET is not configured. Set it in Settings or env before exposing this endpoint.');
+      return res.status(503).json({ error: 'Webhook signing secret not configured' });
+    }
+    if (!sig) {
+      return res.status(400).json({ error: 'Missing stripe-signature header' });
+    }
+
+    let event;
+    try {
+      const stripe = getStripe();
+      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    } catch (sigErr) {
+      console.error('[stripe-webhook] Signature verification failed:', sigErr.message);
+      return res.status(401).json({ error: 'Invalid webhook signature' });
     }
 
     switch (event.type) {

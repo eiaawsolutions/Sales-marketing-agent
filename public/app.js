@@ -3289,7 +3289,7 @@ function renderChatPage() {
     <div class="chat-container">
       <div class="chat-messages" id="chat-messages">
         ${chatMessages.length ? chatMessages.map(m => `
-          <div class="chat-msg ${m.role}">${m.text}</div>
+          <div class="chat-msg ${m.role}">${esc(m.text)}</div>
         `).join('') : `
           <div class="empty">
             <h3 style="margin-bottom:8px">Chat with your AI Sales Assistant</h3>
@@ -3332,7 +3332,9 @@ async function sendChat(text) {
 function renderChatMessages() {
   const el = document.getElementById('chat-messages');
   if (!el) return;
-  el.innerHTML = chatMessages.map(m => `<div class="chat-msg ${m.role}">${m.text}</div>`).join('');
+  // esc() the model + user text so prompt-injected HTML can't execute under
+  // the app origin. Same hardening as the public landing chatbot.
+  el.innerHTML = chatMessages.map(m => `<div class="chat-msg ${m.role}">${esc(m.text)}</div>`).join('');
   el.scrollTop = el.scrollHeight;
 }
 

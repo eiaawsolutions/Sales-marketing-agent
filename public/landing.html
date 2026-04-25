@@ -1783,8 +1783,26 @@ async function sendChatbotMsg() {
   input.value = '';
 
   const messages = document.getElementById('chatbot-messages');
-  messages.innerHTML += `<div style="background:var(--primary);color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:8px;margin-left:auto;max-width:85%;text-align:right">${msg}</div>`;
-  messages.innerHTML += `<div id="chatbot-typing" style="color:var(--text-muted);font-size:12px;padding:4px 14px;animation:pulse 1s infinite">Typing...</div>`;
+  // Build user / typing / assistant bubbles via createElement + textContent
+  // so prompt-injected HTML in either the user input OR the model reply
+  // can never become live DOM. The previous innerHTML-concatenation lets a
+  // poisoned reply (e.g. "<img src=x onerror=...>") execute under the page
+  // origin — stored XSS for every visitor.
+  function chatBubble(role, text) {
+    const div = document.createElement('div');
+    const base = 'border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:8px;max-width:85%;line-height:1.5;white-space:pre-wrap';
+    if (role === 'user') div.style.cssText = base + ';background:var(--primary);color:#fff;margin-left:auto;text-align:right';
+    else if (role === 'error') div.style.cssText = base + ';background:var(--surface);color:var(--danger)';
+    else div.style.cssText = base + ';background:var(--surface);color:var(--text)';
+    div.textContent = text;
+    return div;
+  }
+  messages.appendChild(chatBubble('user', msg));
+  const typing = document.createElement('div');
+  typing.id = 'chatbot-typing';
+  typing.style.cssText = 'color:var(--text-muted);font-size:12px;padding:4px 14px;animation:pulse 1s infinite';
+  typing.textContent = 'Typing...';
+  messages.appendChild(typing);
   messages.scrollTop = messages.scrollHeight;
 
   try {
@@ -1794,10 +1812,11 @@ async function sendChatbotMsg() {
     }).then(r => r.json());
 
     document.getElementById('chatbot-typing')?.remove();
-    messages.innerHTML += `<div style="background:var(--surface);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);margin-bottom:8px;max-width:85%;white-space:pre-wrap;line-height:1.5">${res.response || res.error}</div>`;
+    const reply = (typeof res?.response === 'string' && res.response) || (typeof res?.error === 'string' && res.error) || '';
+    messages.appendChild(chatBubble('assistant', reply));
   } catch (e) {
     document.getElementById('chatbot-typing')?.remove();
-    messages.innerHTML += `<div style="background:var(--surface);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--danger);margin-bottom:8px">Something went wrong. Email us at eiaawsolutions@gmail.com</div>`;
+    messages.appendChild(chatBubble('error', 'Something went wrong. Email us at eiaawsolutions@gmail.com'));
   }
   messages.scrollTop = messages.scrollHeight;
 }

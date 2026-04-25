@@ -9,10 +9,20 @@ const PREFIX = 'enc:'; // Prefix to identify encrypted values
 // Sensitive keys that should be encrypted at rest
 export const SENSITIVE_KEYS = ['api_key', 'smtp_pass', 'stripe_secret_key', 'stripe_webhook_secret', 'voice_ai_api_key', 'resend_api_key', 'apollo_api_key'];
 
+// Refuse to silently fall back to plaintext storage when ENCRYPTION_KEY is
+// missing in production. The previous behaviour saved API keys / SMTP creds /
+// Stripe secrets unencrypted into settings.value while the UI still rendered
+// them as masked, so an operator had no way to know secrets were sitting in
+// the clear. Dev/test still get the silent-disable path so local work doesn't
+// require setting a key.
 function getEncryptionKey() {
   const key = process.env.ENCRYPTION_KEY;
-  if (!key) return null; // Encryption disabled if no key set
-  // Derive a 32-byte key from whatever string is provided
+  if (!key) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('ENCRYPTION_KEY is required in production. Refusing to start without a key — every API key and SMTP credential would be stored as plaintext.');
+    }
+    return null;
+  }
   return crypto.createHash('sha256').update(key).digest();
 }
 

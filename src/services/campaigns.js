@@ -1,5 +1,6 @@
 import db from '../db/index.js';
 import { sendEmail } from '../utils/email.js';
+import { signTracking } from '../utils/tracking-token.js';
 
 export const campaignsService = {
   getAll(userId, filters = {}) {
@@ -171,6 +172,10 @@ export function appendFormCta(html, formId, campaignId, leadId, baseUrl) {
 export function injectTracking(html, campaignId, leadId, baseUrl) {
   if (!html || !campaignId || !leadId) return html;
   const base = baseUrl || 'https://sa.eiaawsolutions.com';
+  // Bind the (campaign, lead) pair to a short HMAC. The tracking endpoints
+  // refuse the request without a valid token, so external scrapers / bots
+  // can't pollute analytics or score by guessing IDs.
+  const tk = signTracking(campaignId, leadId);
 
   // Rewrite <a href="https://..."> to go through click tracker (skip mailto: and # anchors)
   let tracked = html.replace(
@@ -178,12 +183,12 @@ export function injectTracking(html, campaignId, leadId, baseUrl) {
     (match, url) => {
       // Don't track our own tracking URLs
       if (url.includes('/api/tracking/')) return match;
-      return `href="${base}/api/tracking/click/${campaignId}/${leadId}?url=${encodeURIComponent(url)}"`;
+      return `href="${base}/api/tracking/click/${campaignId}/${leadId}?t=${tk}&url=${encodeURIComponent(url)}"`;
     }
   );
 
   // Add tracking pixel at the end
-  const pixel = `<img src="${base}/api/tracking/open/${campaignId}/${leadId}" width="1" height="1" style="display:none;width:1px;height:1px" alt="" />`;
+  const pixel = `<img src="${base}/api/tracking/open/${campaignId}/${leadId}?t=${tk}" width="1" height="1" style="display:none;width:1px;height:1px" alt="" />`;
   if (tracked.includes('</body>')) {
     tracked = tracked.replace('</body>', pixel + '</body>');
   } else {

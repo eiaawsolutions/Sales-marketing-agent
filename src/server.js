@@ -52,6 +52,13 @@ app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || ['https://sa.eiaawsolutions.com', 'https://sales-marketing-agent-production.up.railway.app', 'http://localhost:3000'],
   credentials: true,
 }));
+
+// Stripe webhook MUST receive the raw body — Stripe signs the byte stream and
+// `JSON.stringify(req.body)` after a JSON parse re-orders keys / changes
+// whitespace, breaking signature verification. Mount the raw body parser ONLY
+// for the webhook path, before the global express.json() so every other route
+// still gets the parsed body.
+app.use('/api/billing/webhook', express.raw({ type: 'application/json', limit: '1mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 // Protect proposal.html — admin only (redirect to landing if not authenticated)
@@ -91,6 +98,11 @@ app.use((req, res, next) => {
 // Rate limiting (validate:false to avoid IPv6 errors on Railway)
 app.use('/api', rateLimit({ windowMs: 60000, max: 120, message: { error: 'Too many requests. Please slow down.' }, validate: false }));
 app.use('/api/auth/login', rateLimit({ windowMs: 900000, max: 10, message: { error: 'Too many login attempts. Try again in 15 minutes.' }, validate: false }));
+// Username enumeration + email-flood prevention: per-IP cap on the unauthenticated
+// account-discovery endpoints. Pair with the in-route 60-second per-user throttle
+// already in /resend-verification and /forgot-password.
+app.use('/api/auth/lookup-email', rateLimit({ windowMs: 900000, max: 20, message: { error: 'Too many lookups. Try again later.' }, validate: false }));
+app.use('/api/auth/forgot-password', rateLimit({ windowMs: 900000, max: 5, message: { error: 'Too many password-reset requests. Try again later.' }, validate: false }));
 // Per-user AI rate limiting
 app.use('/api/agent', rateLimit({
   windowMs: 60000, max: 10, validate: false,

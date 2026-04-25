@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import db from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { checkPlanLimit, VOICE_ADDONS } from '../middleware/auth.js';
@@ -715,7 +716,11 @@ router.post('/call', async (req, res) => {
     const { leadId, campaignId, script } = req.body;
     if (!leadId) return res.status(400).json({ error: 'Lead ID required' });
 
-    const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+    // Cross-tenant guard: a paid outbound call must only fire against a lead
+    // the caller owns (or any lead, if superadmin).
+    const lead = req.user.role === 'superadmin'
+      ? db.prepare('SELECT * FROM leads WHERE id = ?').get(leadId)
+      : db.prepare('SELECT * FROM leads WHERE id = ? AND user_id = ?').get(leadId, req.user.id);
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
     if (!lead.phone) return res.status(400).json({ error: 'Lead has no phone number. Add a phone number first.' });
 
@@ -805,8 +810,9 @@ router.post('/generate-link', async (req, res) => {
     const { agentId } = getVoiceConfig();
     if (!agentId) return res.status(400).json({ error: 'Voice agent not set up. Run Auto-Setup in Settings first.' });
 
-    // Generate a unique token
-    const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    // CSPRNG-backed token; the previous Math.random()+Date.now() seed was
+    // predictable enough for a determined attacker to guess adjacent tokens.
+    const token = crypto.randomBytes(24).toString('hex');
 
     // Store with 24h expiry
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -823,7 +829,10 @@ router.post('/generate-link', async (req, res) => {
     let leadPhone = '';
     let shareMessage = `Hi! I'd like to have a quick chat about how we can help your business. Click here to talk to our AI assistant: ${callUrl}`;
     if (leadId) {
-      const lead = db.prepare('SELECT name, company, email, phone FROM leads WHERE id = ?').get(leadId);
+      // Cross-tenant guard before reading the lead PII into the share message.
+      const lead = req.user.role === 'superadmin'
+        ? db.prepare('SELECT name, company, email, phone FROM leads WHERE id = ?').get(leadId)
+        : db.prepare('SELECT name, company, email, phone FROM leads WHERE id = ? AND user_id = ?').get(leadId, req.user.id);
       if (lead) {
         leadName = lead.name;
         leadEmail = lead.email || '';
@@ -891,7 +900,12 @@ router.post('/web-call', async (req, res) => {
     let description = 'Web call';
 
     if (leadId) {
-      const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+      // Ownership check: a logged-in user must not be able to initiate a paid
+      // Retell call against another tenant's lead (cost transfer + harassment).
+      // Superadmin can call any lead.
+      const lead = req.user.role === 'superadmin'
+        ? db.prepare('SELECT * FROM leads WHERE id = ?').get(leadId)
+        : db.prepare('SELECT * FROM leads WHERE id = ? AND user_id = ?').get(leadId, req.user.id);
       if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
       const stage = lead.status || 'new';
@@ -960,6 +974,13 @@ router.post('/auto-call', async (req, res) => {
 
     const { campaignId } = req.body;
     if (!campaignId) return res.status(400).json({ error: 'Campaign ID required' });
+
+    // Cross-tenant guard: a campaign owner can only auto-call leads in
+    // campaigns they own. Superadmin can call any campaign.
+    const campaign = req.user.role === 'superadmin'
+      ? db.prepare('SELECT id FROM campaigns WHERE id = ?').get(campaignId)
+      : db.prepare('SELECT id FROM campaigns WHERE id = ? AND user_id = ?').get(campaignId, req.user.id);
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
 
     const { apiKey, agentId, phoneNumber } = getVoiceConfig();
     if (!apiKey || !agentId) return res.status(400).json({ error: 'Voice AI not fully configured.' });

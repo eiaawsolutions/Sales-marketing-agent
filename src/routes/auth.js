@@ -386,19 +386,27 @@ router.post('/reset-password', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
-// POST /api/auth/lookup-email — get masked email for a username (for forgot password)
+// POST /api/auth/lookup-email — masked-only hint for the forgot-password flow.
+// Returns the SAME response shape whether or not the username exists, so the
+// endpoint cannot be used as a username-enumeration oracle. The previous
+// version returned `{ email: null }` for misses and `{ email: masked, full: email }`
+// for hits — both the shape difference and the `full` field were enumeration
+// + PII leaks.
 router.post('/lookup-email', (req, res) => {
   const { username } = req.body;
-  if (!username) return res.json({ email: null });
+  if (!username || typeof username !== 'string') {
+    return res.json({ email: null, hint: 'If this account exists, a verification code can be sent.' });
+  }
 
   const user = db.prepare('SELECT email FROM users WHERE username = ?').get(username);
-  if (!user) return res.json({ email: null });
+  if (!user || !user.email) {
+    return res.json({ email: null, hint: 'If this account exists, a verification code can be sent.' });
+  }
 
-  // Return masked email: a****s@gmail.com
-  const email = user.email;
-  const [local, domain] = email.split('@');
+  const [local, domain] = user.email.split('@');
   const masked = local.charAt(0) + '*'.repeat(Math.max(local.length - 2, 1)) + local.charAt(local.length - 1) + '@' + domain;
-  res.json({ email: masked, full: email });
+  // No `full` field — the unmasked address never leaves the server.
+  res.json({ email: masked, hint: 'If this account exists, a verification code can be sent.' });
 });
 
 // POST /api/auth/forgot-password — send password reset email
