@@ -58,7 +58,14 @@ async function sendViaResend(apiKey, { to, subject, html, from, attachments, ica
   });
 
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || `Resend error ${res.status}`);
+  if (!res.ok) {
+    // Surface the full Resend error so deliverability problems (unverified
+    // domain, sandbox-only address, rate limit, daily cap) are visible in
+    // logs instead of bubbling up as a generic "Resend error 4xx".
+    console.error('[Resend] send failed:', res.status, JSON.stringify(data), 'from:', fromEmail, 'to:', to, 'subject:', subject);
+    throw new Error(data.message || `Resend error ${res.status}`);
+  }
+  console.log('[Resend] sent id=' + data.id, 'from:', fromEmail, 'to:', to, 'subject:', subject);
   return { method: 'resend', id: data.id };
 }
 
