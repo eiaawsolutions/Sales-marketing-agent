@@ -101,9 +101,6 @@ router.post('/webhook', async (req, res) => {
 // POST /api/voice/tool-callback — Retell tool callback dispatcher
 router.post('/tool-callback', async (req, res) => {
   try {
-    // Log the full payload for debugging
-    console.log('[tool-callback] Full payload:', JSON.stringify(req.body, null, 2));
-
     // Retell sends: { tool_call_id, name, args, call } or { tool_name, arguments, call_id, metadata }
     const toolName = req.body.name || req.body.tool_name || req.body.tool_call_name || '';
     const args = req.body.args || req.body.arguments || {};
@@ -112,7 +109,15 @@ router.post('/tool-callback', async (req, res) => {
     const leadId = metadata.lead_id ? parseInt(metadata.lead_id) : null;
     const userId = metadata.user_id ? parseInt(metadata.user_id) : 1;
 
-    console.log(`[tool-callback] Tool: "${toolName}", Lead: ${leadId}, Args:`, JSON.stringify(args));
+    // Log the dispatch with PII-bounded args (truncate, no full transcripts).
+    // Previously dumped JSON.stringify(req.body, null, 2) — full call objects
+    // include transcript + lead PII and Railway logs are project-readable.
+    const argSummary = Object.keys(args).slice(0, 8).map(k => {
+      const v = args[k];
+      const s = typeof v === 'string' ? v : JSON.stringify(v ?? '');
+      return `${k}=${s.slice(0, 60)}${s.length > 60 ? '…' : ''}`;
+    }).join(' ');
+    console.log(`[tool-callback] tool=${toolName} call=${callId} lead=${leadId} user=${userId} args[${argSummary}]`);
 
     if (toolName === 'schedule_meeting') {
       return handleScheduleMeeting(args, callId, leadId, userId, res);
@@ -216,7 +221,8 @@ async function handleSendDemoLink(args, callId, leadId, userId, res) {
   }
 
   const baseUrl = db.prepare("SELECT value FROM settings WHERE key = 'app_base_url'").get()?.value || '';
-  const demoToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  // CSPRNG token; the previous Math.random() + timestamp seed was guessable.
+  const demoToken = crypto.randomBytes(24).toString('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
   db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
     .run(`demo_link_${demoToken}`, JSON.stringify({ leadId, userId, expiresAt }));
@@ -456,8 +462,8 @@ router.post('/public-session', async (req, res) => {
     const { apiKey, agentId } = getVoiceConfig();
     if (!apiKey || !agentId) return res.status(400).json({ error: 'Voice agent not configured.' });
 
-    // Generate token for this visitor
-    const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    // CSPRNG visitor token.
+    const token = crypto.randomBytes(24).toString('hex');
     const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // 2 hours
 
     const linkData = { leadId: null, userId: 1, expiresAt, source: req.body.source || 'landing' };

@@ -53,6 +53,11 @@ router.get('/:id/activities', (req, res) => {
 });
 
 router.post('/:id/activities', (req, res) => {
+  // Ownership check: a logged-in user cannot inject activities into another
+  // tenant's lead. Superadmin can write to any.
+  const userIdScope = req.user.role === 'superadmin' ? null : req.user.id;
+  const lead = leadsService.getById(userIdScope, req.params.id);
+  if (!lead) return res.status(404).json({ error: 'Lead not found' });
   const activity = leadsService.addActivity(req.user.id, req.params.id, req.body);
   res.status(201).json(activity);
 });

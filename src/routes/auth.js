@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import db from '../db/index.js';
 import { hashPassword, verifyPassword, generateToken, requireAuth, getPlanLimits } from '../middleware/auth.js';
 import {
@@ -22,6 +23,22 @@ import {
 import { sendEmail } from '../utils/email.js';
 
 const router = Router();
+
+// CSPRNG-backed human-friendly code (no 0/O/1/I) for emailed verification.
+// crypto.randomBytes guarantees uniform distribution; rejection-sampling
+// ensures the modulo doesn't bias the alphabet.
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 chars
+function randomCode(len) {
+  const out = [];
+  while (out.length < len) {
+    const buf = crypto.randomBytes(len * 2);
+    for (let i = 0; i < buf.length && out.length < len; i++) {
+      const b = buf[i];
+      if (b < 256 - (256 % 32)) out.push(CODE_ALPHABET[b % 32]);
+    }
+  }
+  return out.join('');
+}
 
 // Shared helper: create a session + fire notifications. Returns response payload.
 function issueSessionPayload(user, req) {
@@ -62,6 +79,12 @@ function issueSessionPayload(user, req) {
   };
 }
 
+// Per-username lockout: cap failed attempts at LOCKOUT_THRESHOLD, then block
+// for LOCKOUT_MS. Independent of IP so a residential proxy pool can't bypass
+// it. Successful login resets the counter.
+const LOCKOUT_THRESHOLD = 10;
+const LOCKOUT_MS = 15 * 60 * 1000;
+
 // POST /api/auth/login
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
@@ -72,22 +95,45 @@ router.post('/login', (req, res) => {
 
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user) {
+    // Generic message — never reveal whether the username exists.
     return res.status(401).json({ error: 'Invalid username or password' });
+  }
+
+  // Honor an active lockout before doing the bcrypt compare. Bcrypt is the
+  // most expensive thing in this handler, so this also limits CPU burn.
+  if (user.locked_until) {
+    const lockedUntil = new Date(user.locked_until + 'Z').getTime();
+    if (Date.now() < lockedUntil) {
+      const wait = Math.ceil((lockedUntil - Date.now()) / 1000);
+      return res.status(429).json({ error: `Account temporarily locked. Try again in ${wait}s.` });
+    }
   }
 
   const passResult = verifyPassword(password, user.password_hash);
   if (!passResult) {
+    // Bump the per-username counter and lock when threshold is hit.
+    const next = (user.failed_login_count || 0) + 1;
+    if (next >= LOCKOUT_THRESHOLD) {
+      const lockedUntil = new Date(Date.now() + LOCKOUT_MS).toISOString().slice(0, 19).replace('T', ' ');
+      db.prepare('UPDATE users SET failed_login_count = ?, locked_until = ? WHERE id = ?')
+        .run(next, lockedUntil, user.id);
+    } else {
+      db.prepare('UPDATE users SET failed_login_count = ? WHERE id = ?').run(next, user.id);
+    }
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
-  if (passResult === 'upgrade') {
-    const newHash = hashPassword(password);
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, user.id);
+  // Successful auth: clear the lockout state.
+  if (user.failed_login_count > 0 || user.locked_until) {
+    db.prepare('UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE id = ?').run(user.id);
   }
 
   if (user.status === 'suspended') {
     return res.status(403).json({ error: 'Account suspended. Contact your administrator.' });
   }
+
+  // (Legacy SHA256 → bcrypt auto-upgrade path removed; verifyPassword now
+  // refuses non-bcrypt hashes outright.)
 
   // Path A: MFA already enabled → issue challenge, require TOTP
   if (user.mfa_enabled) {
@@ -496,7 +542,10 @@ router.post('/resend-verification', requireAuth, async (req, res) => {
     }
   }
 
-  const verifyCode = Math.random().toString(36).slice(-8).toUpperCase();
+  // CSPRNG-backed 8-char A–Z2-9 code (~41 bits, no ambiguous chars). Math.random
+  // is NOT a CSPRNG and would let an attacker who triggers a target's resend
+  // predict adjacent codes.
+  const verifyCode = randomCode(8);
   db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
     .run(`verify_code_${user.id}`, verifyCode);
   db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")

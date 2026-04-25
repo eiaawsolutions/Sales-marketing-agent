@@ -51,13 +51,26 @@ router.post('/public/:id/submit', publicSubmitLimiter, (req, res) => {
       }
     }
 
-    const campaignId = req.body?.campaign_id ? parseInt(req.body.campaign_id) : null;
-    const leadId = req.body?.lead_id ? parseInt(req.body.lead_id) : null;
+    // Attacker can pass any campaign_id / lead_id in the public submit body.
+    // Only honour the value when it actually belongs to the SAME tenant as
+    // the form (form.user_id). Otherwise drop the reference silently — the
+    // submission is still recorded, just without the attacker-supplied join,
+    // so analytics and automation can't be polluted across tenants.
+    let campaignId = req.body?.campaign_id ? parseInt(req.body.campaign_id) : null;
+    let leadId = req.body?.lead_id ? parseInt(req.body.lead_id) : null;
+    if (Number.isFinite(campaignId)) {
+      const c = db.prepare('SELECT user_id FROM campaigns WHERE id = ?').get(campaignId);
+      if (!c || c.user_id !== form.user_id) campaignId = null;
+    } else campaignId = null;
+    if (Number.isFinite(leadId)) {
+      const l = db.prepare('SELECT user_id FROM leads WHERE id = ?').get(leadId);
+      if (!l || l.user_id !== form.user_id) leadId = null;
+    } else leadId = null;
 
     formsService.recordSubmission({
       formId,
-      campaignId: Number.isFinite(campaignId) ? campaignId : null,
-      leadId: Number.isFinite(leadId) ? leadId : null,
+      campaignId,
+      leadId,
       data: cleaned,
       ip: req.ip,
       userAgent: req.headers['user-agent'] || '',

@@ -5664,9 +5664,29 @@ async function init() {
   }
 
   // Handle post-signup redirect from Stripe
-  if (params.get('welcome') === '1' && params.get('token')) {
-    authToken = params.get('token');
-    sessionStorage.setItem('auth_token', authToken);
+  // New signup arrives at /app?welcome=1 with the session token in an
+  // httpOnly cookie (set by /api/billing/success). Exchange the cookie
+  // for the actual token + temp password — both burn after this single
+  // call so a forwarded link or replayed cookie can't replay either.
+  // Falls back to the legacy ?token= flow for any in-flight signup that
+  // started before the fix shipped.
+  if (params.get('welcome') === '1') {
+    if (params.get('token')) {
+      authToken = params.get('token');
+      sessionStorage.setItem('auth_token', authToken);
+    } else {
+      try {
+        const r = await fetch('/api/billing/welcome-token', { credentials: 'include' });
+        if (r.ok) {
+          const data = await r.json();
+          if (data.token) {
+            authToken = data.token;
+            sessionStorage.setItem('auth_token', authToken);
+            if (data.tempPassword) sessionStorage.setItem('welcome_temp_pass', data.tempPassword);
+          }
+        }
+      } catch (_) { /* ignore — user can still log in manually */ }
+    }
     window.history.replaceState({}, '', '/app');
   }
 
@@ -5707,9 +5727,15 @@ async function init() {
 
   // Show welcome modal for new signups
   if (params.get('welcome') === '1' && currentUser) {
-    // Fetch temp password securely (one-time retrieval)
-    const tempData = await api.get('/auth/temp-password').catch(() => ({}));
-    const tempPass = tempData?.tempPassword;
+    // The temp password may already be in sessionStorage from the cookie
+    // exchange above (single-use). Fall back to the legacy /auth/temp-password
+    // endpoint for any older flow.
+    let tempPass = sessionStorage.getItem('welcome_temp_pass');
+    sessionStorage.removeItem('welcome_temp_pass');
+    if (!tempPass) {
+      const tempData = await api.get('/auth/temp-password').catch(() => ({}));
+      tempPass = tempData?.tempPassword;
+    }
     modal = {
       title: 'Welcome to EIAAW SalesAgent!',
       body: `

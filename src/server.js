@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -60,6 +61,7 @@ app.use(cors({
 // still gets the parsed body.
 app.use('/api/billing/webhook', express.raw({ type: 'application/json', limit: '1mb' }));
 app.use(express.json({ limit: '1mb' }));
+app.use(cookieParser());
 
 // Protect proposal.html — admin only (redirect to landing if not authenticated)
 app.get('/proposal.html', (req, res, next) => {
@@ -119,6 +121,15 @@ app.use('/api/agent', rateLimit({
   message: { error: 'AI rate limit reached (10/min per user). Wait a moment.' },
 }));
 app.use('/api/campaigns/*/send', rateLimit({ windowMs: 60000, max: 3, message: { error: 'Send rate limit — max 3 per minute.' }, validate: false }));
+// Paid-action endpoints: every Retell voice call costs ~$0.50, every Stripe
+// checkout-session creation hits a paid API. Tight per-IP caps add a brake
+// on top of the per-plan voice/checkout limits already enforced in-route.
+app.use(['/api/voice/web-call', '/api/voice/call', '/api/voice/auto-call', '/api/voice/generate-link'],
+  rateLimit({ windowMs: 60000, max: 5, message: { error: 'Voice call rate limit — max 5 per minute per IP.' }, validate: false }));
+app.use('/api/voice/public-session',
+  rateLimit({ windowMs: 60000, max: 3, message: { error: 'Too many call sessions. Wait a moment.' }, validate: false }));
+app.use(['/api/billing/checkout', '/api/billing/upgrade-checkout', '/api/billing/buy-reveals', '/api/billing/buy-ai-credits'],
+  rateLimit({ windowMs: 60000, max: 6, message: { error: 'Checkout rate limit — slow down.' }, validate: false }));
 
 // Health check (no auth)
 app.get('/api/health', (req, res) => {

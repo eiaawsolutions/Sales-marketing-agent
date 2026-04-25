@@ -8,15 +8,16 @@ export function hashPassword(password) {
   return bcrypt.hashSync(password, BCRYPT_ROUNDS);
 }
 
+// Bcrypt-only verifier. The previous SHA256 fallback "auto-upgrade" path was a
+// downgrade-attack surface: every never-logged-in legacy account was crackable
+// from rainbow tables in seconds. If a legacy SHA256 row still exists in the
+// DB it is now refused; the user must request a password reset, which forces
+// a bcrypt rehash. (No legacy rows are expected — confirmed via the schema
+// review — but the defensive refusal is the safer default.)
 export function verifyPassword(password, hash) {
-  // Support both bcrypt and legacy SHA256 hashes (auto-upgrade)
-  if (hash.startsWith('$2a$') || hash.startsWith('$2b$')) {
+  if (typeof hash !== 'string') return false;
+  if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$')) {
     return bcrypt.compareSync(password, hash);
-  }
-  // Legacy SHA256 — check and signal upgrade needed
-  const sha256 = crypto.createHash('sha256').update(password).digest('hex');
-  if (sha256 === hash) {
-    return 'upgrade'; // Signal to upgrade hash
   }
   return false;
 }

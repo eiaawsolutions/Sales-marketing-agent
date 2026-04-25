@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import Stripe from 'stripe';
 import db from '../db/index.js';
 import { hashPassword, generateToken, getPlanLimits, requireAuth } from '../middleware/auth.js';
@@ -6,6 +7,26 @@ import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
 
 const router = Router();
+
+// CSPRNG password / verify-code generators. Math.random() is not a CSPRNG —
+// the 36-char base alphabet has only ~36 possible output classes per char
+// from a predictable seed, so adjacent values are guessable.
+const PWD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function randomFromAlphabet(alphabet, len) {
+  const N = alphabet.length;
+  const safe = 256 - (256 % N);
+  const out = [];
+  while (out.length < len) {
+    const buf = crypto.randomBytes(len * 2);
+    for (let i = 0; i < buf.length && out.length < len; i++) {
+      if (buf[i] < safe) out.push(alphabet[buf[i] % N]);
+    }
+  }
+  return out.join('');
+}
+const randomTempPassword = () => randomFromAlphabet(PWD_ALPHABET, 12);
+const randomVerifyCode = () => randomFromAlphabet(CODE_ALPHABET, 8);
 
 function getStripe() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'stripe_secret_key'").get();
@@ -366,15 +387,15 @@ router.get('/success', async (req, res) => {
       return res.redirect('/app?signup=exists');
     }
 
-    // Generate random password and create account
-    const tempPassword = Math.random().toString(36).slice(-10);
+    // CSPRNG temp password — Math.random was previously seeded predictably.
+    const tempPassword = randomTempPassword();
     const hash = hashPassword(tempPassword);
 
     const trialEnd = new Date();
     trialEnd.setDate(trialEnd.getDate() + (PLANS[plan]?.trial_days || 14));
 
-    // Generate email verification code
-    const verifyCode = Math.random().toString(36).slice(-8).toUpperCase();
+    // CSPRNG verification code (no ambiguous chars).
+    const verifyCode = randomVerifyCode();
 
     const result = db.prepare(`
       INSERT INTO users (username, email, password_hash, role, display_name, plan, budget_limit, monthly_system_cost, status, email_verified)
@@ -440,12 +461,39 @@ router.get('/success', async (req, res) => {
     db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
       .run(`temp_pass_${token}`, tempPassword);
 
-    // Redirect with token only — password retrieved securely via API
-    res.redirect(`/app?welcome=1&token=${token}`);
+    // The session token used to ride along in the URL (?token=...), which
+    // leaks via referrer headers, browser history, and any analytics that
+    // capture URLs. Move it to an httpOnly + Secure + SameSite=Lax cookie
+    // that the SPA reads via a one-time GET /api/billing/welcome-token
+    // exchange. The URL only carries the welcome flag, no secret.
+    res.cookie('eiaaw_welcome', token, {
+      httpOnly: true,
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      sameSite: 'lax',
+      maxAge: 5 * 60 * 1000, // 5 minutes — enough for the redirect + first GET
+      path: '/',
+    });
+    res.redirect('/app?welcome=1');
   } catch (err) {
     console.error('Billing success error:', err);
     res.redirect('/?error=setup_failed');
   }
+});
+
+// GET /api/billing/welcome-token — one-time exchange of the cookie for the
+// real session token + temp password. The cookie is cleared on the way out
+// so a forwarded link / replayed cookie cannot re-fetch the secrets.
+router.get('/welcome-token', (req, res) => {
+  const token = req.cookies?.eiaaw_welcome;
+  if (!token) return res.status(404).json({ error: 'No welcome token' });
+  // Always clear the cookie — replay protection.
+  res.clearCookie('eiaaw_welcome', { path: '/' });
+  const session = db.prepare("SELECT user_id, expires_at FROM sessions WHERE token = ?").get(token);
+  if (!session) return res.status(404).json({ error: 'Welcome session expired' });
+  const tempRow = db.prepare("SELECT value FROM settings WHERE key = ?").get(`temp_pass_${token}`);
+  // Burn the temp-pass row too so the password can be retrieved exactly once.
+  db.prepare("DELETE FROM settings WHERE key = ?").run(`temp_pass_${token}`);
+  res.json({ token, tempPassword: tempRow?.value || null });
 });
 
 // POST /api/billing/webhook — Stripe webhook for subscription events.
