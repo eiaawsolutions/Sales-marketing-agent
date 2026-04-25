@@ -132,6 +132,18 @@
     td { padding: 10px 12px; border-bottom: 1px solid rgba(71,85,105,0.3); font-size: 14px; }
     tr:hover td { background: rgba(31,168,150,0.05); }
 
+    /* Generic horizontal-scroll wrapper for any table that hasn't been
+       restructured into a stacked mobile layout yet. Keeps the table from
+       blowing the card width and prevents the page from becoming horizontally
+       scrollable on phones. */
+    .table-wrap {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .table-wrap > table { min-width: 560px; }
+
     /* Badges */
     .badge {
       display: inline-block;
@@ -303,6 +315,8 @@
     .gap-4 { gap: 16px; }
     .flex-1 { flex: 1; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     .mb-4 { margin-bottom: 16px; }
     .text-muted { color: var(--text-muted); }
     .text-sm { font-size: 13px; }
@@ -1109,7 +1123,16 @@
       .main { margin-left: 0; margin-top: 52px; margin-bottom: 56px; padding: 12px; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
       .grid-2 { grid-template-columns: 1fr; }
-      .pipeline-board { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr 1fr; }
+      .grid-4 { grid-template-columns: 1fr 1fr; }
+      /* The pipeline board is a 6-column kanban. On phone we keep it as a
+         horizontal scroller (preserves the board metaphor) instead of
+         stacking everything to a vertical ladder. */
+      .pipeline-board {
+        grid-template-columns: repeat(6, minmax(220px, 1fr));
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
       .wizard-type-grid { grid-template-columns: 1fr; }
       .wizard-progress { flex-wrap: wrap; gap: 4px; }
       .wizard-step-line { min-width: 20px; }
@@ -1125,6 +1148,7 @@
     }
     @media (max-width: 480px) {
       .stats-grid { grid-template-columns: 1fr; }
+      .grid-3, .grid-4 { grid-template-columns: 1fr; }
     }
 
     /* ===== Email Designer ===== */
@@ -1436,6 +1460,6 @@
   </script>
   <script src="/email-templates.js?v=20260422e"></script>
   <script src="/email-designer.js?v=20260422e"></script>
-  <script src="/app.js?v=20260425-table-compact-mobile"></script>
+  <script src="/app.js?v=20260425-pra-prb"></script>
 </body>
 </html>

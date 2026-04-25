@@ -512,12 +512,26 @@ function renderPage() {
     case 'accounts': return '<div id="page" class="loading">Loading accounts...</div>';
     case 'system-overview': return '<div id="page" class="loading">Loading overview...</div>';
     case 'system-logic': return '<div id="page" class="loading">Loading...</div>';
-    case 'proposal': window.open(`/proposal.html?token=${authToken}`, '_blank'); currentPage = 'dashboard'; return renderPage();
+    case 'proposal':
+      if (currentUser?.role !== 'superadmin') { currentPage = 'dashboard'; return renderPage(); }
+      window.open(`/proposal.html?token=${authToken}`, '_blank');
+      currentPage = 'dashboard';
+      return renderPage();
     default: return '<div>Page not found</div>';
   }
 }
 
+// Pages that should only load for superadmins. Sidebar already hides the
+// nav items, but we also gate the route so a non-admin who guesses the URL,
+// pastes ?p=settings, or pokes at navigate() in the console gets bounced to
+// the dashboard instead of a half-rendered page that the API will then 403.
+const SUPERADMIN_ROUTES = new Set(['settings', 'accounts', 'system-overview', 'system-logic', 'proposal']);
+
 async function afterRender() {
+  if (SUPERADMIN_ROUTES.has(currentPage) && currentUser?.role !== 'superadmin') {
+    showNotification('Admin access required', 'error');
+    return navigate('dashboard');
+  }
   switch (currentPage) {
     case 'dashboard': return loadDashboard();
     case 'leads': return loadLeads();
@@ -563,6 +577,7 @@ async function loadDashboard() {
       <div class="grid-2">
         <div class="card">
           <h3>Top Leads by Score</h3>
+          <div class="table-wrap">
           <table>
             <tr><th>Name</th><th>Company</th><th>Score</th><th>Status</th></tr>
             ${data.topLeads.map(l => `
@@ -579,6 +594,7 @@ async function loadDashboard() {
               </tr>
             `).join('') || '<tr><td colspan="4" class="empty">No leads yet</td></tr>'}
           </table>
+          </div>
         </div>
 
         <div class="card">
@@ -3451,7 +3467,7 @@ async function loadBilling() {
       <div class="card" style="margin-bottom:16px">
         <h3 style="margin:0 0 4px 0;text-transform:none;letter-spacing:0">Need More Contact Reveals?</h3>
         <p class="text-muted text-sm" style="margin-bottom:16px">Add extra reveal credits to your account. Credits carry over until used.</p>
-        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="grid-3">
           ${Object.entries(revealAddons).map(([key, addon]) => `
             <div class="card" style="text-align:center">
               <div style="font-size:22px;font-weight:800;color:var(--text)">${addon.credits}</div>
@@ -3467,7 +3483,7 @@ async function loadBilling() {
       <div class="card" style="margin-bottom:16px">
         <h3 style="margin:0 0 4px 0;text-transform:none;letter-spacing:0">Need More AI Actions?</h3>
         <p class="text-muted text-sm" style="margin-bottom:16px">Top up your AI action credits without upgrading your plan. Credits stack on top of your plan's monthly limit and carry over until used.</p>
-        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="grid-3">
           ${Object.entries(aiCreditAddons).map(([key, addon]) => `
             <div class="card" style="text-align:center;border:1px solid rgba(124,58,237,0.15);background:linear-gradient(135deg,rgba(124,58,237,0.04),transparent)">
               <div style="font-size:22px;font-weight:800;color:var(--text)">${addon.credits}</div>
@@ -3488,7 +3504,7 @@ async function loadBilling() {
       <!-- Plan Comparison -->
       <div id="plan-cards">
         <h3 style="margin-bottom:12px;text-transform:none;letter-spacing:0">Subscription Plans</h3>
-        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="grid-3">
           ${planOrder.map(key => {
             const p = plans[key];
             const isCurrent = key === data.plan;
@@ -3608,7 +3624,7 @@ async function loadAccounts() {
       </div>
 
       <!-- Plan Breakdown -->
-      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="grid-3">
         <div class="stat-card">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
@@ -3667,6 +3683,7 @@ async function loadAccounts() {
       <!-- Operating Expenses -->
       <div class="card">
         <h3>OPERATING EXPENSES (MONTHLY)</h3>
+        <div class="table-wrap">
         <table>
           <tr><th>Expense</th><th>Provider</th><th>Cost (MYR)</th><th>Cost (USD)</th><th>Status</th><th>Notes</th></tr>
           <tr>
@@ -3766,12 +3783,13 @@ async function loadAccounts() {
             <td>Auto-calculated from actual usage</td>
           </tr>
         </table>
+        </div>
       </div>
 
       <!-- AI API Tracker -->
       <div class="card">
         <h3>AI API USAGE TRACKER</h3>
-        <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+        <div class="grid-4" style="margin-bottom:16px">
           <div class="stat-card">
             <div class="stat-value yellow">$${aiUsage.total.cost.toFixed(4)}</div>
             <div class="stat-label">Total AI Spend (all time)</div>
@@ -3946,6 +3964,7 @@ async function loadAccounts() {
       <!-- All Users Table -->
       <div class="card">
         <h3>ALL ACCOUNTS</h3>
+        <div class="table-wrap">
         <table>
           <tr><th>User</th><th>Plan</th><th>Status</th><th>Earns</th><th>AI Cost</th><th>Profit</th><th>Leads</th><th>Campaigns</th><th>Actions</th></tr>
           ${users.map(u => {
@@ -3971,6 +3990,7 @@ async function loadAccounts() {
             </tr>
           `; }).join('')}
         </table>
+        </div>
       </div>
     `;
   } catch (e) {
@@ -4402,6 +4422,7 @@ async function loadSystemOverview() {
     <!-- Pricing & Plans -->
     <div class="card">
       <h3>SUBSCRIPTION PLANS — WHAT CLIENTS GET</h3>
+      <div class="table-wrap">
       <table>
         <tr><th>Feature</th><th style="text-align:center;color:var(--text-muted)">Starter<br><small>RM 99/mo</small></th><th style="text-align:center;color:var(--primary)">Pro<br><small>RM 199/mo</small></th><th style="text-align:center;color:var(--success)">Business<br><small>RM 399/mo</small></th><th style="text-align:center">Enterprise<br><small>Custom</small></th></tr>
         <tr><td>AI-verified leads / month</td><td style="text-align:center">30</td><td style="text-align:center">70</td><td style="text-align:center">140</td><td style="text-align:center">Custom</td></tr>
@@ -4427,17 +4448,20 @@ async function loadSystemOverview() {
         <tr><td>Pipeline AI Analysis</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
         <tr><td>14-Day Free Trial</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
       </table>
+      </div>
     </div>
 
     <!-- Revenue Target -->
     <div class="card">
       <h3>REVENUE TARGET — RM 10,000/MONTH NET PROFIT</h3>
+      <div class="table-wrap">
       <table>
         <tr><th>Scenario</th><th>Users</th><th>MRR</th><th>AI Cost</th><th>Infra</th><th>Net Profit</th></tr>
         <tr><td>All Starter</td><td>115</td><td>RM 11,385</td><td>RM 1,380</td><td>RM 300</td><td style="color:var(--success)"><strong>RM 9,705</strong></td></tr>
         <tr style="background:rgba(46,196,182,0.05)"><td><strong>Mixed (recommended)</strong></td><td><strong>65</strong></td><td><strong>RM 11,935</strong></td><td><strong>RM 1,185</strong></td><td><strong>RM 300</strong></td><td style="color:var(--success)"><strong>RM 10,450</strong></td></tr>
         <tr><td>All Pro</td><td>58</td><td>RM 11,542</td><td>RM 1,044</td><td>RM 300</td><td style="color:var(--success)"><strong>RM 10,198</strong></td></tr>
       </table>
+      </div>
       <div style="margin-top:12px;font-size:13px;color:var(--text-muted)">
         Mixed = 30 Starter + 25 Pro + 10 Business. AI cost ~RM 9-18/user/mo (Sonnet avg). Infra = Railway + domain.
       </div>
@@ -4446,6 +4470,7 @@ async function loadSystemOverview() {
     <!-- Revenue Ramp -->
     <div class="card">
       <h3>REVENUE RAMP PROJECTION</h3>
+      <div class="table-wrap">
       <table>
         <tr><th>Month</th><th>Users</th><th>MRR</th><th>Costs</th><th>Net Profit</th></tr>
         <tr><td>Month 1</td><td>5</td><td>RM 750</td><td>RM 350</td><td>RM 400</td></tr>
@@ -4456,6 +4481,7 @@ async function loadSystemOverview() {
         <tr><td>Month 6</td><td>65</td><td>RM 10,500</td><td>RM 1,350</td><td style="color:var(--success)"><strong>RM 9,150</strong></td></tr>
         <tr style="background:rgba(46,196,182,0.05)"><td><strong>Month 7</strong></td><td><strong>75</strong></td><td><strong>RM 12,000</strong></td><td><strong>RM 1,500</strong></td><td style="color:var(--success)"><strong>RM 10,500 &#10003;</strong></td></tr>
       </table>
+      </div>
     </div>
 
     <!-- Super Sales Agent Skills -->
@@ -4486,6 +4512,7 @@ async function loadSystemOverview() {
     <!-- Competitive Advantage -->
     <div class="card">
       <h3>COMPETITIVE ADVANTAGE VS MARKET</h3>
+      <div class="table-wrap">
       <table>
         <tr><th>Feature</th><th style="text-align:center;color:var(--primary)">EIAAW SalesAgent</th><th style="text-align:center">HubSpot</th><th style="text-align:center">Apollo.io</th><th style="text-align:center">Instantly.ai</th></tr>
         <tr><td>AI Lead Generation</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003; Built-in</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center">DB only</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
@@ -4499,11 +4526,13 @@ async function loadSystemOverview() {
         <tr><td>Cold Call Script Generator</td><td style="text-align:center;color:var(--primary);font-weight:700">&#10003;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td><td style="text-align:center;color:var(--text-muted)">&#10007;</td></tr>
         <tr style="font-weight:700"><td>Starting Price</td><td style="text-align:center;color:var(--primary)">RM 99/mo</td><td style="text-align:center">Free-RM 3,600</td><td style="text-align:center">Free-$99</td><td style="text-align:center">$30-$77</td></tr>
       </table>
+      </div>
     </div>
 
     <!-- Unit Economics -->
     <div class="card">
       <h3>UNIT ECONOMICS — COST PER USER</h3>
+      <div class="table-wrap">
       <table>
         <tr><th>Cost Item</th><th>Per User/Month</th><th>Notes</th></tr>
         <tr><td>AI API (Sonnet avg)</td><td>${m.avgCostPerUser > 0 ? `RM ${(m.avgCostPerUser * 4.5).toFixed(2)} ($${m.avgCostPerUser.toFixed(2)})` : 'RM 9-18 ($2-4)'}</td><td>${m.avgCostPerUser > 0 ? 'Actual avg this month' : '50-200 AI actions'}</td></tr>
@@ -4513,11 +4542,13 @@ async function loadSystemOverview() {
         <tr style="font-weight:700"><td>Total Cost/User</td><td>RM 13-32</td><td></td></tr>
         <tr style="font-weight:700;color:var(--success)"><td>Gross Margin</td><td>75-87%</td><td>At RM 99-399 pricing</td></tr>
       </table>
+      </div>
     </div>
 
     <!-- AI Cost Per Action -->
     <div class="card">
       <h3>AI COST PER ACTION ${m.aiCostByType?.length > 0 ? '<span class="badge badge-active" style="font-size:10px;margin-left:8px">LIVE DATA</span>' : '(ESTIMATES)'}</h3>
+      <div class="table-wrap">
       <table>
         <tr><th>Action</th><th>Avg Input Tokens</th><th>Avg Output Tokens</th><th>Avg Cost (USD)</th>${m.aiCostByType?.length > 0 ? '<th>Samples</th>' : ''}</tr>
         ${m.aiCostByType?.length > 0 ? m.aiCostByType.map(t => `
@@ -4537,6 +4568,7 @@ async function loadSystemOverview() {
         <tr><td>Voice Agent Call (Retell)</td><td colspan="2" style="text-align:center">External — Retell AI</td><td>~$0.50/call</td>${m.aiCostByType?.length > 0 ? '<td>—</td>' : ''}</tr>
         <tr><td>Landing Chatbot Response</td><td>~800</td><td>~200</td><td>$0.005</td>${m.aiCostByType?.length > 0 ? '<td>—</td>' : ''}</tr>
       </table>
+      </div>
       ${m.avgCostPerUser > 0 ? `<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">Avg AI cost per active user this month: <strong style="color:var(--warning)">$${m.avgCostPerUser.toFixed(4)}</strong></div>` : ''}
     </div>
 
@@ -4703,7 +4735,7 @@ async function loadSystemOverview() {
       <!-- Summary -->
       <div style="background:rgba(46,196,182,0.08);border:1.5px solid var(--primary);border-radius:10px;padding:24px">
         <h4 style="font-size:16px;margin-bottom:12px;color:var(--primary)">Recommended Asking Price</h4>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="grid-3" style="margin-bottom:16px">
           <div style="text-align:center">
             <div style="font-size:12px;color:var(--text-muted)">MINIMUM (asset value)</div>
             <div style="font-size:24px;font-weight:800;color:var(--warning)">RM 200,000</div>
@@ -5838,7 +5870,7 @@ function renderFormBuilder() {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+    <div class="grid-2" style="align-items:start">
       <!-- LEFT: editor -->
       <div style="display:flex;flex-direction:column;gap:16px">
         <div class="card" style="padding:16px">
