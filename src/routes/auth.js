@@ -19,6 +19,7 @@ import {
   consumeMfaChallenge,
   adminMfaRequired,
 } from '../services/auth-security.js';
+import { sendEmail } from '../utils/email.js';
 
 const router = Router();
 
@@ -415,41 +416,28 @@ router.post('/forgot-password', async (req, res) => {
     db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
       .run(`reset_token_${resetToken}`, JSON.stringify({ userId: user.id, expires: Date.now() + 3600000 }));
 
-    // Send reset email
-    const nodemailer = (await import('nodemailer')).default;
-    const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value;
-    const smtpPort = db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || '587';
-    const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value;
-    const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value;
-    const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value;
-
-    if (smtpUser && smtpHost) {
-      const baseUrl = req.headers.origin || `https://${req.headers.host}`;
-      const resetUrl = `${baseUrl}/app?reset=${resetToken}`;
-      const transporter = nodemailer.createTransport({
-        host: smtpHost, port: parseInt(smtpPort), secure: parseInt(smtpPort) === 465,
-        auth: { user: smtpUser, pass: smtpPass },
-      });
-
-      await transporter.sendMail({
-        from: fromEmail || smtpUser,
-        to: user.email,
-        subject: 'Password Reset — EIAAW SalesAgent',
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto">
-            <h1 style="color:#2ec4b6">Password Reset</h1>
-            <p>Hi ${user.display_name || user.username},</p>
-            <p>We received a request to reset your password. Click the link below to set a new password:</p>
-            <p style="margin:24px 0">
-              <a href="${resetUrl}" style="background:#2ec4b6;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Reset My Password</a>
-            </p>
-            <p style="color:#999;font-size:13px">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
-            <hr style="margin:24px 0">
-            <p style="color:#999;font-size:12px">EIAAW SalesAgent AI<br><a href="https://eiaawsolutions.com">eiaawsolutions.com</a></p>
-          </div>
-        `,
-      });
-    }
+    // Same fix as /resend-verification: route through sendEmail() so the
+    // password-reset mail uses the same Resend → SMTP chain. The previous
+    // hand-rolled SMTP path silently swallowed BadCredentials errors here.
+    const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+    const resetUrl = `${baseUrl}/app?reset=${resetToken}`;
+    await sendEmail({
+      to: user.email,
+      subject: 'Password Reset — EIAAW SalesAgent',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto">
+          <h1 style="color:#2ec4b6">Password Reset</h1>
+          <p>Hi ${user.display_name || user.username},</p>
+          <p>We received a request to reset your password. Click the link below to set a new password:</p>
+          <p style="margin:24px 0">
+            <a href="${resetUrl}" style="background:#2ec4b6;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Reset My Password</a>
+          </p>
+          <p style="color:#999;font-size:13px">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
+          <hr style="margin:24px 0">
+          <p style="color:#999;font-size:12px">EIAAW SalesAgent AI<br><a href="https://eiaawsolutions.com">eiaawsolutions.com</a></p>
+        </div>
+      `,
+    });
   } catch (e) {
     console.error('Password reset email failed:', e.message);
   }
@@ -507,24 +495,14 @@ router.post('/resend-verification', requireAuth, async (req, res) => {
     .run(throttleKey, String(Date.now()));
 
   try {
-    const nodemailer = (await import('nodemailer')).default;
-    const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value;
-    const smtpPort = db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || '587';
-    const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value;
-    const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value;
-    const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value;
-
-    if (!smtpUser || !smtpHost) {
-      return res.status(500).json({ error: 'Email service not configured. Contact support.' });
-    }
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost, port: parseInt(smtpPort), secure: parseInt(smtpPort) === 465,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
-
-    await transporter.sendMail({
-      from: fromEmail || smtpUser,
+    // Route through the shared sendEmail() utility so verification mail uses
+    // the same Resend → SMTP fallback chain that outreach + appointment mails
+    // already use successfully on Railway. The hand-rolled SMTP path that
+    // lived here before read smtp_pass from settings WITHOUT decrypting it
+    // (smtp_pass is in SENSITIVE_KEYS so it is stored AES-encrypted), which
+    // produced "535 BadCredentials" against Gmail and meant verification
+    // codes never reached anyone whose smtp_pass was set via the Settings UI.
+    await sendEmail({
       to: user.email,
       subject: 'Your EIAAW SalesAgent verification code',
       html: `
