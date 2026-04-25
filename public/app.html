@@ -92,7 +92,12 @@
     .nav-item:hover { background: var(--surface2); color: var(--text); }
     .nav-item.active { color: var(--primary); background: var(--primary-light); border-right: 3px solid var(--primary); }
 
-    .main { margin-left: 240px; flex: 1; padding: 24px; }
+    /* min-width:0 escapes the flex `min-width:auto` trap. Without it any
+       descendant with `white-space:nowrap` (campaign target_audience meta
+       line, long lead names, raw URLs in notes) blows .main wider than the
+       viewport, causing horizontal page scroll and breaking ellipsis on the
+       offending text itself. */
+    .main { margin-left: 240px; flex: 1; min-width: 0; padding: 24px; }
 
     /* Cards */
     .card {
@@ -543,13 +548,33 @@
       padding: 14px 18px;
       cursor: pointer;
       gap: 16px;
+      flex-wrap: wrap;
+      overflow: hidden;
     }
 
-    .camp-info { flex: 1; min-width: 0; }
+    /* The header row is a flex container [info | actions]. Both children
+       must be allowed to shrink for ellipsis to work. min-width:0 unlocks
+       shrinking past content; max-width caps how much horizontal space the
+       chrome can occupy on ultra-wide screens so a single 8KB target_audience
+       string can't push the actions off the right edge. */
+    .camp-info { flex: 1 1 auto; min-width: 0; max-width: 100%; }
     .camp-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-    .camp-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .camp-meta {
+      display: block;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
 
-    .camp-actions { flex-shrink: 0; align-items: center; }
+    .camp-actions {
+      flex: 0 1 auto;
+      flex-shrink: 0;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: 100%;
+    }
     .camp-toggle {
       font-size: 12px;
       color: var(--text-muted);
@@ -664,7 +689,10 @@
       align-items: center;
       gap: 12px;
       margin-top: 6px;
+      flex-wrap: wrap;
+      max-width: 100%;
     }
+    .camp-cost-row > * { min-width: 0; }
 
     .camp-budget-bar {
       height: 4px;
@@ -1460,6 +1488,6 @@
   </script>
   <script src="/email-templates.js?v=20260422e"></script>
   <script src="/email-designer.js?v=20260422e"></script>
-  <script src="/app.js?v=20260425-pra-prb"></script>
+  <script src="/app.js?v=20260425-main-minwidth"></script>
 </body>
 </html>
