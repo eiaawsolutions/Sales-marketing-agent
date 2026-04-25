@@ -962,11 +962,30 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
 
       const notes = buildNotes(lead);
 
-      const res = insertLead.run(
-        leadUserId, lead.name, email, lead.company, lead.title,
-        lead.phone, 'ai_generated', notes
-      );
-      const leadId = res.lastInsertRowid;
+      // leads.email is globally UNIQUE — see the matching guard in the Apollo
+      // path. If another user already owns this email, take ownership rather
+      // than crashing the whole batch.
+      let leadId;
+      try {
+        const res = insertLead.run(
+          leadUserId, lead.name, email, lead.company, lead.title,
+          lead.phone, 'ai_generated', notes
+        );
+        leadId = res.lastInsertRowid;
+      } catch (e) {
+        if (!String(e.message || '').includes('UNIQUE')) throw e;
+        const stranded = db.prepare('SELECT id, user_id FROM leads WHERE LOWER(email) = ?').get(email);
+        if (!stranded) throw e;
+        leadId = stranded.id;
+        db.prepare(`
+          UPDATE leads
+             SET user_id = ?, name = ?, company = ?, title = ?, phone = ?,
+                 source = 'ai_generated', notes = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?
+        `).run(leadUserId, lead.name, lead.company, lead.title, lead.phone, notes, leadId);
+        console.log(`[generateLeads/ai] Re-owned existing lead ${leadId} (${email}) from user ${stranded.user_id} → ${leadUserId}`);
+      }
+
       userEmailToId.set(email, leadId);
 
       if (campaignId) insertCampaignLead.run(campaignId, leadId);
@@ -1203,17 +1222,49 @@ async function generateLeadsViaApollo(input) {
       continue;
     }
 
-    const res = insertLead.run(
-      leadUserId,
-      enriched?.name || person.name,
-      realEmail,
-      orgName,
-      personTitle,
-      personPhone,
-      'apollo',
-      notes
-    );
-    const leadId = res.lastInsertRowid;
+    // The leads.email column is GLOBALLY unique. If the email already exists
+    // under another user (e.g., admin from a prior run before per-user dedup
+    // was tightened), a plain INSERT throws a UNIQUE constraint error and the
+    // whole loop dies — the user sees zero new leads even though Apollo
+    // returned valid candidates. Fix: take ownership of the existing row,
+    // refresh its data with what Apollo just verified, and link it to the
+    // current campaign. This matches the /campaigns/_diagnose/lead-ownership
+    // backfill philosophy: the lead belongs to whoever is actively sourcing it.
+    let leadId;
+    try {
+      const res = insertLead.run(
+        leadUserId,
+        enriched?.name || person.name,
+        realEmail,
+        orgName,
+        personTitle,
+        personPhone,
+        'apollo',
+        notes
+      );
+      leadId = res.lastInsertRowid;
+    } catch (e) {
+      if (!String(e.message || '').includes('UNIQUE')) throw e;
+      const stranded = db.prepare('SELECT id, user_id FROM leads WHERE LOWER(email) = ?').get(realEmail);
+      if (!stranded) throw e;
+      leadId = stranded.id;
+      db.prepare(`
+        UPDATE leads
+           SET user_id = ?, name = ?, company = ?, title = ?, phone = ?,
+               source = 'apollo', notes = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?
+      `).run(
+        leadUserId,
+        enriched?.name || person.name,
+        orgName,
+        personTitle,
+        personPhone,
+        notes,
+        leadId,
+      );
+      console.log(`[generateLeads/apollo] Re-owned existing lead ${leadId} (${realEmail}) from user ${stranded.user_id} → ${leadUserId}`);
+    }
+
     userEmailToId.set(realEmail, leadId);
     if (campaignId) insertCampaignLead.run(campaignId, leadId);
 

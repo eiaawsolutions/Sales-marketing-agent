@@ -560,7 +560,11 @@
     .camp-header:hover .camp-toggle-inline,
     .camp-header:hover .camp-toggle-hint { opacity: 1; color: var(--primary); }
 
-    .camp-leads table { width: 100%; }
+    /* Inner campaign-leads table: let the inline min-width drive sizing.
+       Forcing width:100% used to stretch 8 short columns across the whole
+       card, leaving Name/Email cells visually marooned in whitespace. */
+    .camp-leads table { width: auto; }
+    .camp-leads td, .camp-leads th { white-space: nowrap; }
 
     .camp-cost-row {
       display: flex;
@@ -1353,6 +1357,6 @@
   </script>
   <script src="/email-templates.js?v=20260422e"></script>
   <script src="/email-designer.js?v=20260422e"></script>
-  <script src="/app.js?v=20260425-cleanup2"></script>
+  <script src="/app.js?v=20260425-camp-table-fix"></script>
 </body>
 </html>
