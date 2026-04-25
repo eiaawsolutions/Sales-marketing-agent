@@ -623,43 +623,60 @@ async function loadLeads() {
         </div>
       </div>
       <div class="card">
+        <div class="camp-leads-table-wrap">
         <table>
-          <tr><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Campaigns</th><th>Performance</th><th>Actions</th></tr>
+          <colgroup>
+            <col style="width:13%">
+            <col style="width:16%">
+            <col style="width:9%">
+            <col style="width:12%">
+            <col style="width:8%">
+            <col style="width:8%">
+            <col style="width:8%">
+            <col style="width:11%">
+            <col style="width:7%">
+            <col style="width:8%">
+          </colgroup>
+          <tr>
+            <th>Name</th><th>Email</th><th>Phone</th><th>Company</th>
+            <th>Source</th><th>Score</th><th>Status</th>
+            <th>Campaigns</th><th>Perf.</th><th>Actions</th>
+          </tr>
           ${leads.map(l => {
             const camps = Array.isArray(l.campaigns) ? l.campaigns : [];
             const campsHtml = camps.length
-              ? camps.slice(0, 3).map(c =>
-                  `<span class="badge badge-new" title="In campaign: ${esc(c.name)}" style="cursor:pointer;margin-right:4px;margin-bottom:4px;display:inline-block;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" onclick="navigate('campaigns'); setTimeout(()=>toggleCampaignLeads(${c.id}), 120)">${esc(c.name)}</span>`
-                ).join('') + (camps.length > 3 ? `<span class="text-muted text-sm" title="${esc(camps.slice(3).map(c=>c.name).join(', '))}">+${camps.length - 3}</span>` : '')
+              ? camps.slice(0, 2).map(c =>
+                  `<span class="badge badge-new" title="In campaign: ${esc(c.name)}" style="cursor:pointer;margin-right:4px;margin-bottom:2px;display:inline-block;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" onclick="navigate('campaigns'); setTimeout(()=>toggleCampaignLeads(${c.id}), 120)">${esc(c.name)}</span>`
+                ).join('') + (camps.length > 2 ? `<span class="text-muted text-sm" title="${esc(camps.slice(2).map(c=>c.name).join(', '))}">+${camps.length - 2}</span>` : '')
               : '<span class="text-muted text-sm">&mdash;</span>';
             return `
             <tr>
-              <td><strong><span id="lead-name-${l.id}">${esc(l.name)}</span></strong></td>
-              <td>
+              <td data-label="Name" title="${esc(l.name)}"><strong><span id="lead-name-${l.id}">${esc(l.name)}</span></strong></td>
+              <td data-label="Email" title="${esc(l.email)}">
                 <span id="lead-email-${l.id}">${l._masked ? `<span class="text-muted">${esc(l.email)}</span>` : esc(l.email)}</span>
                 ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" id="reveal-btn-${l.id}" onclick="revealContact(${l.id})">Reveal</button>` : ''}
               </td>
-              <td><span id="lead-phone-${l.id}">${l._masked ? `<span class="text-muted">${l.phone ? esc(l.phone) : '-'}</span>` : esc(l.phone || '-')}</span></td>
-              <td>${esc(l.company || '-')}</td>
-              <td>${renderSourceBadge(l.source)}</td>
-              <td>
-                <div style="display:flex;align-items:center;gap:8px">
-                  <div class="score-bar" style="width:50px"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
+              <td data-label="Phone"><span id="lead-phone-${l.id}">${l._masked ? `<span class="text-muted">${l.phone ? esc(l.phone) : '-'}</span>` : esc(l.phone || '-')}</span></td>
+              <td data-label="Company" title="${esc(l.company || '')}">${esc(l.company || '-')}</td>
+              <td data-label="Source">${renderSourceBadge(l.source)}</td>
+              <td data-label="Score">
+                <div style="display:inline-flex;align-items:center;gap:6px">
+                  <div class="score-bar" style="width:40px;flex-shrink:0"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
                   ${l.score}
                 </div>
               </td>
-              <td><span class="badge badge-${l.status}">${l.status}</span></td>
-              <td style="min-width:140px;max-width:260px">${campsHtml}</td>
-              <td>
-                <span style="color:${l.open_count > 0 ? 'var(--success)' : 'var(--text-muted)'}">${l.open_count || 0} open${l.open_count !== 1 ? 's' : ''}</span>,
-                <span style="color:${l.click_count > 0 ? 'var(--primary)' : 'var(--text-muted)'}">${l.click_count || 0} click${l.click_count !== 1 ? 's' : ''}</span>
+              <td data-label="Status"><span class="badge badge-${l.status}">${l.status}</span></td>
+              <td data-label="Campaigns" class="wrap">${campsHtml}</td>
+              <td data-label="Perf.">
+                <span style="color:${l.open_count > 0 ? 'var(--success)' : 'var(--text-muted)'}">${l.open_count || 0}o</span>
+                <span style="color:${l.click_count > 0 ? 'var(--primary)' : 'var(--text-muted)'}">${l.click_count || 0}c</span>
               </td>
-              <td>
-                <div class="flex gap-2">
-                  <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id})">AI Score</button>
-                  <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id})">Qualify</button>
-                  <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id})">Outreach</button>
-                  <button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="shareCallLink(${l.id})">&#128279; Call Link</button>
+              <td data-label="Actions" class="actions-cell">
+                <div class="flex gap-1" style="flex-wrap:wrap">
+                  <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id})">Score</button>
+                  <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id})">Qual.</button>
+                  <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id})">Out.</button>
+                  <button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="shareCallLink(${l.id})">Call</button>
                   ${currentUser?.role === 'superadmin' ? `<button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>
                   <button class="btn btn-sm btn-danger" onclick="deleteLead(${l.id})">X</button>` : ''}
                 </div>
@@ -667,6 +684,7 @@ async function loadLeads() {
             </tr>
           `; }).join('') || '<tr><td colspan="10" class="empty">No leads yet. Add your first lead!</td></tr>'}
         </table>
+        </div>
       </div>
     `;
   } catch (e) {
@@ -1397,39 +1415,54 @@ async function toggleCampaignLeads(id) {
             </div>
           </div>
           ${leads.length > 0 ? `
-            <div style="overflow-x:auto">
-            <table style="font-size:13px;min-width:960px">
-              <tr><th>Name</th><th>Email</th><th>Company</th><th>Source</th><th>Score</th><th>Status</th><th>Performance</th><th>Actions</th></tr>
+            <div class="camp-leads-table-wrap">
+            <table>
+              <colgroup>
+                <col style="width:14%">
+                <col style="width:18%">
+                <col style="width:14%">
+                <col style="width:9%">
+                <col style="width:9%">
+                <col style="width:8%">
+                <col style="width:10%">
+                <col style="width:18%">
+              </colgroup>
+              <tr>
+                <th>Name</th><th>Email</th><th>Company</th>
+                <th class="nowrap">Source</th><th class="nowrap">Score</th>
+                <th class="nowrap">Status</th><th class="nowrap">Perf.</th>
+                <th>Actions</th>
+              </tr>
               ${leads.map(l => {
                 const cs = l.campaign_status || 'pending';
                 const openCount = l.open_count || 0;
                 const clickCount = l.click_count || 0;
                 return `
                 <tr id="cl-row-${id}-${l.id}">
-                  <td><strong><span id="cl-name-${id}-${l.id}">${esc(l.name)}</span></strong></td>
-                  <td>
+                  <td data-label="Name" title="${esc(l.name)}"><strong><span id="cl-name-${id}-${l.id}">${esc(l.name)}</span></strong></td>
+                  <td data-label="Email" title="${esc(l.email)}">
                     <span id="cl-email-${id}-${l.id}">${l._masked ? `<span class="text-muted">${esc(l.email)}</span>` : esc(l.email)}</span>
                     ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" onclick="revealContact(${l.id}, ${id})">Reveal</button>` : ''}
                   </td>
-                  <td>${esc(l.company || '-')}</td>
-                  <td>${renderSourceBadge(l.source)}</td>
-                  <td>
-                    <div style="display:flex;align-items:center;gap:6px">
-                      <div class="score-bar" style="width:40px"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
+                  <td data-label="Company" title="${esc(l.company || '')}">${esc(l.company || '-')}</td>
+                  <td data-label="Source">${renderSourceBadge(l.source)}</td>
+                  <td data-label="Score">
+                    <div style="display:inline-flex;align-items:center;gap:6px">
+                      <div class="score-bar" style="width:32px;flex-shrink:0"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
                       ${l.score}
                     </div>
                   </td>
-                  <td><span class="badge badge-${cs}">${cs}</span></td>
-                  <td>
-                    <span style="color:${openCount > 0 ? 'var(--success)' : 'var(--text-muted)'}">${openCount} open${openCount !== 1 ? 's' : ''}</span>,
-                    <span style="color:${clickCount > 0 ? 'var(--primary)' : 'var(--text-muted)'}">${clickCount} click${clickCount !== 1 ? 's' : ''}</span>
+                  <td data-label="Status"><span class="badge badge-${cs}">${cs}</span></td>
+                  <td data-label="Perf.">
+                    <span style="color:${openCount > 0 ? 'var(--success)' : 'var(--text-muted)'}">${openCount}o</span>
+                    <span style="color:${clickCount > 0 ? 'var(--primary)' : 'var(--text-muted)'}">${clickCount}c</span>
                   </td>
-                  <td>
-                    <div class="flex gap-2" style="flex-wrap:wrap">
+                  <td data-label="Actions" class="actions-cell">
+                    <div class="flex gap-1" style="flex-wrap:wrap">
                       <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id}, ${id})" title="Re-score with BANT reasoning">Score</button>
                       <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id}, ${id})" title="Qualify lead">Qualify</button>
-                      <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id}, ${id})" title="Write outreach for this lead">Outreach</button>
-                      <button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="shareCallLink(${l.id})" title="Share voice call link">&#128279; Call</button>
+                      <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id}, ${id})" title="Write outreach">Out.</button>
+                      <button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="shareCallLink(${l.id})" title="Share voice call link">Call</button>
                       ${currentUser?.role === 'superadmin' ? `<button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>` : ''}
                     </div>
                   </td>
