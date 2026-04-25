@@ -359,6 +359,41 @@ export function initializeDatabase(db) {
   // Form creator: attach a form to a campaign
   try { db.exec("ALTER TABLE campaigns ADD COLUMN form_id INTEGER"); } catch (e) { /* exists */ }
 
+  // Idempotent ownership repair. Old generator paths inserted leads with
+  // user_id defaulted to 1 (admin) when the campaign actually belongs to
+  // another user — Marc/Arseniy from the Eiaaw signups campaign are the
+  // canonical example. The leads land in campaign_leads but never appear
+  // on the campaign owner's /leads page because that page filters by
+  // leads.user_id. Re-own them to whoever owns the campaign — but only
+  // when ALL the lead's campaigns share a single owner that is NOT the
+  // current lead.user_id. Multi-owner shared leads are left alone (we
+  // can't pick a winner). Safe to run on every boot: re-owned rows then
+  // satisfy the equality predicate and are skipped on subsequent runs.
+  try {
+    const fix = db.prepare(`
+      UPDATE leads
+         SET user_id = (
+           SELECT c.user_id FROM campaigns c
+           JOIN campaign_leads cl ON cl.campaign_id = c.id
+           WHERE cl.lead_id = leads.id
+           LIMIT 1
+         ),
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id IN (
+         SELECT l.id
+           FROM leads l
+           JOIN campaign_leads cl ON cl.lead_id = l.id
+           JOIN campaigns c ON c.id = cl.campaign_id
+          GROUP BY l.id
+         HAVING COUNT(DISTINCT c.user_id) = 1
+            AND MIN(c.user_id) != l.user_id
+       )
+    `).run();
+    if (fix.changes > 0) {
+      console.log(`[migration] Re-owned ${fix.changes} campaign-attached leads to their campaign owner`);
+    }
+  } catch (e) { console.error('Lead ownership backfill error:', e.message); }
+
   // Base URL setting
   db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('base_url', 'https://sa.eiaawsolutions.com')").run();
 
