@@ -47,6 +47,10 @@ app.use(helmet({
     },
   },
   crossOriginEmbedderPolicy: false,
+  // Allow social-media + AI-engine crawlers to fetch og:image and other public assets
+  // from a different origin (Twitter cards, Facebook, LinkedIn, Slack, etc.).
+  // Default `same-origin` would 403 cross-origin scrapers fetching /media/*.jpg.
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 app.use(cors({
@@ -72,7 +76,25 @@ app.get('/proposal.html', (req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: 0, etag: true }));
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  maxAge: 0,
+  etag: true,
+  // Correct MIME types for SEO/AI-discovery files. express.static defaults are
+  // mostly fine but `.webmanifest` and the LLM/AI text files need explicit types
+  // so crawlers and PWA installers don't reject them.
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.webmanifest')) {
+      res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+    } else if (filePath.endsWith('llms.txt') || filePath.endsWith('llms-full.txt') || filePath.endsWith('ai.txt') || filePath.endsWith('humans.txt') || filePath.endsWith('robots.txt') || filePath.endsWith('security.txt')) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      // Encourage caching with revalidation
+      res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+    } else if (filePath.endsWith('sitemap.xml')) {
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+    }
+  },
+}));
 
 // Trust proxy for Railway/reverse proxy
 app.set('trust proxy', 1);

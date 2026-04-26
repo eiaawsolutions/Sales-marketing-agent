@@ -1,0 +1,22 @@
+{
+  "name": "EIAAW AI Sales Agent",
+  "short_name": "EIAAW Sales",
+  "description": "AI sales agent that generates verified leads, scores them with reasoning, writes personalised outreach, and talks to prospects by voice. From RM 99/month.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF7F2",
+  "theme_color": "#11766A",
+  "lang": "en-MY",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "sales", "marketing"],
+  "icons": [
+    {
+      "src": "/brand/shield.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

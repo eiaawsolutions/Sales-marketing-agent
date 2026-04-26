@@ -1,0 +1,122 @@
+# EIAAW AI Sales Agent — robots policy
+# Production: https://sa.eiaawsolutions.com
+# Last reviewed: 2026-04-26
+
+# ---------- Search-engine crawlers ----------
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+# ---------- AI / LLM training + grounding crawlers ----------
+# This is a marketing site. We WANT AI engines to cite us — opt in explicitly.
+
+# OpenAI — model training crawler
+User-agent: GPTBot
+Allow: /
+
+# OpenAI — ChatGPT real-time browsing (citations)
+User-agent: ChatGPT-User
+Allow: /
+
+# OpenAI — SearchGPT crawler
+User-agent: OAI-SearchBot
+Allow: /
+
+# Anthropic — Claude crawlers
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+# Google — opt in to Bard / Vertex AI / Gemini grounding (separate from Search)
+User-agent: Google-Extended
+Allow: /
+
+# Google — AI Overviews / SGE grounding
+User-agent: Google-CloudVertexBot
+Allow: /
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+# Meta AI
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+# Apple Intelligence
+User-agent: Applebot-Extended
+Allow: /
+
+# Common Crawl (feeds many open-source LLMs)
+User-agent: CCBot
+Allow: /
+
+# You.com / Brave Search / Mistral / Cohere / DeepSeek
+User-agent: YouBot
+Allow: /
+
+User-agent: Bravebot
+Allow: /
+
+User-agent: MistralAI-User
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: DeepSeekBot
+Allow: /
+
+# Diffbot (used by many AI grounding stacks)
+User-agent: Diffbot
+Allow: /
+
+# ---------- Default policy ----------
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /app
+Disallow: /app/
+Disallow: /f/
+Disallow: /proposal.html
+
+# ---------- Sitemap ----------
+Sitemap: https://sa.eiaawsolutions.com/sitemap.xml
+
+# ---------- AI usage notice ----------
+# Citation-friendly. See /llms.txt and /ai.txt for AI-engine guidance.
+# Public marketing content may be cited with attribution to "EIAAW AI Sales Agent".

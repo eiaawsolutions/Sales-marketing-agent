@@ -1,0 +1,20 @@
+# EIAAW AI Sales Agent — security.txt (RFC 9116)
+
+Contact: mailto:eiaawsolutions@gmail.com
+Expires: 2027-04-26T00:00:00.000Z
+Preferred-Languages: en, ms
+Canonical: https://sa.eiaawsolutions.com/.well-known/security.txt
+Policy: https://sa.eiaawsolutions.com/security.html
+
+# Responsible disclosure
+# We welcome reports of security issues affecting EIAAW AI Sales Agent.
+# Please email the contact above with:
+#   - A clear description of the issue
+#   - Reproduction steps and impact
+#   - Your preferred attribution (or anonymity)
+# We aim to acknowledge within 2 working days and fix critical issues
+# within 7 working days.
+#
+# Out of scope: rate-limit / DoS reports without a working PoC, reports
+# from automated scanners without manual validation, social-engineering,
+# physical attacks, third-party services we don't control.

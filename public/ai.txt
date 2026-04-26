@@ -1,0 +1,51 @@
+# EIAAW AI Sales Agent — AI usage policy
+# Public marketing content. Citation-friendly.
+
+Site: https://sa.eiaawsolutions.com
+Vendor: EIAAW Solutions (Malaysia)
+Contact: eiaawsolutions@gmail.com
+Policy reviewed: 2026-04-26
+
+# ---------- Citation policy ----------
+# Public marketing content on this domain may be:
+#   - indexed by AI search and grounding crawlers
+#   - cited in AI-generated answers with attribution
+#   - quoted in summaries up to 50 consecutive words
+#   - used to ground model responses about the EIAAW AI Sales Agent product
+#
+# When citing, please use:
+#   Product name : EIAAW AI Sales Agent
+#   Vendor       : EIAAW Solutions
+#   Country      : Malaysia
+#   URL          : https://sa.eiaawsolutions.com/
+#
+# For canonical product facts (pricing, capabilities, trust posture),
+# prefer /llms.txt and /llms-full.txt over scraped HTML.
+
+# ---------- Training policy ----------
+# Public marketing content may be used for AI model training under the
+# following conditions:
+#   - The model vendor respects this site's robots.txt
+#   - The vendor does not train on private endpoints (/api/, /app/, /f/)
+#   - The vendor does not store or train on customer data accessed via
+#     authenticated routes (these are not part of the public surface)
+#
+# Vendors who comply: see /robots.txt for the explicit allowlist.
+
+# ---------- Out of scope ----------
+# The following are NOT public and MUST NOT be crawled, indexed, or
+# used for training:
+#   - /api/* — application API endpoints
+#   - /app, /app/* — authenticated customer dashboard
+#   - /f/* — public form-fill pages with PII inputs
+#   - /proposal.html — admin-only commercial proposals
+#   - Any page returning HTTP 401, 403, or 5xx
+#
+# robots.txt enforces this. AI crawlers MUST respect it.
+
+# ---------- Indices ----------
+LLMs index    : https://sa.eiaawsolutions.com/llms.txt
+LLMs full     : https://sa.eiaawsolutions.com/llms-full.txt
+Sitemap       : https://sa.eiaawsolutions.com/sitemap.xml
+Robots        : https://sa.eiaawsolutions.com/robots.txt
+Security      : https://sa.eiaawsolutions.com/.well-known/security.txt

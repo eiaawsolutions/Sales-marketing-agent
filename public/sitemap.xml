@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://sa.eiaawsolutions.com/</loc>
+    <lastmod>2026-04-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://sa.eiaawsolutions.com/media/hero.jpg</image:loc>
+      <image:title>EIAAW AI Sales Agent — AI that generates leads, writes outreach, and talks to prospects</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://sa.eiaawsolutions.com/media/leadgen.jpg</image:loc>
+      <image:title>AI Lead Generation</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://sa.eiaawsolutions.com/media/scoring.jpg</image:loc>
+      <image:title>AI Lead Scoring with reasoning</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://sa.eiaawsolutions.com/media/outreach.jpg</image:loc>
+      <image:title>AI Email Outreach Sequences</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://sa.eiaawsolutions.com/media/voice.jpg</image:loc>
+      <image:title>AI Voice Agent</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://sa.eiaawsolutions.com/media/pipeline.jpg</image:loc>
+      <image:title>Sales Pipeline + CRM</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://sa.eiaawsolutions.com/media/content.jpg</image:loc>
+      <image:title>AI Marketing Content Creation</image:title>
+    </image:image>
+  </url>
+
+  <url>
+    <loc>https://sa.eiaawsolutions.com/demo.html</loc>
+    <lastmod>2026-04-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://sa.eiaawsolutions.com/call.html</loc>
+    <lastmod>2026-04-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://sa.eiaawsolutions.com/security.html</loc>
+    <lastmod>2026-04-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://sa.eiaawsolutions.com/privacy.html</loc>
+    <lastmod>2026-04-26</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+
+  <url>
+    <loc>https://sa.eiaawsolutions.com/terms.html</loc>
+    <lastmod>2026-04-26</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+</urlset>

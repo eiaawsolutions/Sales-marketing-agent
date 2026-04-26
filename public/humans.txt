@@ -1,0 +1,23 @@
+# humans.txt — the people behind EIAAW AI Sales Agent
+
+/* TEAM */
+EIAAW Solutions
+Site: https://eiaawsolutions.com
+Sales Agent: https://sa.eiaawsolutions.com
+Ads Agency: https://ads.eiaawsolutions.com
+Contact: eiaawsolutions@gmail.com
+Location: Malaysia
+
+/* THANKS */
+Anthropic — Claude foundation models
+Retell AI — voice infrastructure
+Resend — email delivery
+Stripe — billing
+Railway — production hosting
+
+/* SITE */
+Last update: 2026-04-26
+Standards: HTML5, ES2022, CSS3
+Components: vanilla (no SPA framework)
+Editor: VS Code + Claude Code
+Made with: care, not vibes
