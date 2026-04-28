@@ -501,6 +501,45 @@ router.post('/public-session', async (req, res) => {
   }
 });
 
+// POST /api/voice/refresh-prompt-with-token — token-gated variant of the
+// authenticated /refresh-prompt below. Lets ops/CI push the current
+// SALES_AGENT_PROMPT to the live Retell LLM without a browser session.
+//
+// The Bearer token must match env VOICE_REFRESH_TOKEN. If the env is unset
+// the route 503s by design — there is no implicit open path. The
+// authenticated /refresh-prompt route (below requireAuth) still works for
+// human superadmins; this is the unattended-ops sibling.
+router.post('/refresh-prompt-with-token', async (req, res) => {
+  try {
+    const expected = process.env.VOICE_REFRESH_TOKEN;
+    if (!expected) return res.status(503).json({ error: 'VOICE_REFRESH_TOKEN not configured.' });
+    const auth = req.headers['authorization'] || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!token || token !== expected) return res.status(401).json({ error: 'Invalid token.' });
+
+    const { apiKey } = getVoiceConfig();
+    if (!apiKey) return res.status(400).json({ error: 'Retell API key not configured.' });
+
+    const llmRow = db.prepare("SELECT value FROM settings WHERE key = 'voice_retell_llm_id'").get();
+    const llmId = llmRow?.value;
+    if (!llmId) return res.status(404).json({ error: 'No voice_retell_llm_id in settings. Run /api/voice/setup first.' });
+
+    const updated = await retellAPI(apiKey, `/update-retell-llm/${llmId}`, 'PATCH', {
+      general_prompt: SALES_AGENT_PROMPT,
+    });
+
+    res.json({
+      success: true,
+      llmId: updated.llm_id || llmId,
+      lastModified: updated.last_modification_timestamp || null,
+      promptChars: SALES_AGENT_PROMPT.length,
+      message: 'Prompt refreshed via token. New calls use the updated prompt; in-flight calls keep the old.',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Authenticated routes ---
 router.use(requireAuth);
 
