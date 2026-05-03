@@ -215,7 +215,7 @@ export function initializeDatabase(db) {
   if (count.c === 0) {
     const insert = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
     insert.run('ai_provider', 'anthropic');
-    insert.run('ai_model', 'claude-sonnet-4-20250514');
+    insert.run('ai_model', 'claude-sonnet-4-6');
     insert.run('api_key', '');
     insert.run('smtp_host', 'smtp.gmail.com');
     insert.run('smtp_port', '587');
