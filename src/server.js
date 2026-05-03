@@ -10,6 +10,7 @@ import { config } from './config/index.js';
 import db from './db/index.js';
 import { requireAuth } from './middleware/auth.js';
 import { decrypt } from './utils/crypto.js';
+import { sendEmail } from './utils/email.js';
 import authRouter from './routes/auth.js';
 import billingRouter from './routes/billing.js';
 import usersRouter from './routes/users.js';
@@ -186,46 +187,33 @@ app.post('/api/contact', async (req, res) => {
   try {
     const { name, email, phone, company, message } = req.body;
     if (!name || !email || !message) return res.status(400).json({ error: 'Name, email, and message are required.' });
-    // Validate email format
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address.' });
 
-    const nodemailer = (await import('nodemailer')).default;
-    const smtpHost = db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get()?.value || process.env.SMTP_HOST;
-    const smtpPort = db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || process.env.SMTP_PORT || '587';
-    const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value || process.env.SMTP_USER;
-    const smtpPass = decrypt(db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value) || process.env.SMTP_PASS;
-    const fromEmail = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value || process.env.FROM_EMAIL;
+    const subject = `[SalesAgent Enquiry] ${escHtml(name)} — ${escHtml(company || 'Individual')}`;
+    const html = `
+      <h2>New Enquiry from SalesAgent Landing Page</h2>
+      <table style="border-collapse:collapse;width:100%;max-width:500px">
+        <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Name</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(name)}</td></tr>
+        <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Email</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(email)}</td></tr>
+        <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Phone</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(phone || 'Not provided')}</td></tr>
+        <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Company</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(company || 'Not provided')}</td></tr>
+      </table>
+      <h3 style="margin-top:20px">Message</h3>
+      <p style="background:#f5f5f5;padding:16px;border-radius:8px;white-space:pre-wrap">${escHtml(message)}</p>
+      <hr style="margin-top:24px">
+      <p style="color:#999;font-size:12px">Sent from EIAAW SalesAgent landing page</p>
+    `;
 
-    if (smtpUser && smtpHost) {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost, port: parseInt(smtpPort), secure: parseInt(smtpPort) === 465,
-        auth: { user: smtpUser, pass: smtpPass },
-      });
-
-      await transporter.sendMail({
-        from: fromEmail || smtpUser,
-        to: 'eiaawsolutions@gmail.com',
-        replyTo: email,
-        subject: `[SalesAgent Enquiry] ${escHtml(name)} — ${escHtml(company || 'Individual')}`,
-        html: `
-          <h2>New Enquiry from SalesAgent Landing Page</h2>
-          <table style="border-collapse:collapse;width:100%;max-width:500px">
-            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Name</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(name)}</td></tr>
-            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Email</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(email)}</td></tr>
-            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Phone</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(phone || 'Not provided')}</td></tr>
-            <tr><td style="padding:8px;font-weight:bold;border-bottom:1px solid #ddd">Company</td><td style="padding:8px;border-bottom:1px solid #ddd">${escHtml(company || 'Not provided')}</td></tr>
-          </table>
-          <h3 style="margin-top:20px">Message</h3>
-          <p style="background:#f5f5f5;padding:16px;border-radius:8px;white-space:pre-wrap">${escHtml(message)}</p>
-          <hr style="margin-top:24px">
-          <p style="color:#999;font-size:12px">Sent from EIAAW SalesAgent landing page</p>
-        `,
-      });
+    try {
+      const result = await sendEmail({ to: 'eiaawsolutions@gmail.com', subject, html, replyTo: email });
+      console.log('[contact] sent via', result.method, result.id ? '(id=' + result.id + ')' : '', 'from:', email);
+    } catch (sendErr) {
+      console.error('[contact] send failed:', sendErr.message, '— enquiry was NOT delivered. From:', email, 'Subject:', subject);
     }
 
     res.json({ success: true });
   } catch (err) {
-    console.error('Contact form error:', err.message);
+    console.error('[contact] handler error:', err.message);
     res.json({ success: true }); // Don't reveal email errors to user
   }
 });

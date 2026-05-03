@@ -7,22 +7,27 @@ import { decrypt } from './crypto.js';
  * 1. Resend API (if resend_api_key is configured) — works on Railway, no SMTP needed
  * 2. SMTP (Gmail, etc.) — fallback, may be blocked on some cloud providers
  */
-export async function sendEmail({ to, subject, html, from, attachments, icalEvent }) {
-  // Try Resend first
+export async function sendEmail({ to, subject, html, from, replyTo, attachments, icalEvent }) {
+  // Try Resend first — DB row wins over env so the in-app Settings UI keeps working,
+  // but env var (RESEND_API_KEY) acts as a fresh-install / Railway-only fallback.
   const resendRow = db.prepare("SELECT value FROM settings WHERE key = 'resend_api_key'").get();
-  const resendKey = resendRow?.value ? decrypt(resendRow.value) : '';
+  const dbResendKey = resendRow?.value ? decrypt(resendRow.value) : '';
+  const envResendKey = process.env.RESEND_API_KEY || '';
+  const resendKey = (dbResendKey && dbResendKey.length > 5 && !dbResendKey.includes('•'))
+    ? dbResendKey
+    : envResendKey;
 
   if (resendKey && resendKey.length > 5 && !resendKey.includes('•')) {
-    console.log('Sending email via Resend to:', to);
-    return sendViaResend(resendKey, { to, subject, html, from, attachments, icalEvent });
+    console.log('Sending email via Resend to:', to, '(source:', dbResendKey ? 'db' : 'env', ')');
+    return sendViaResend(resendKey, { to, subject, html, from, replyTo, attachments, icalEvent });
   }
 
   // Fall back to SMTP
   console.log('Sending email via SMTP to:', to, '(Resend key:', resendKey ? 'present but invalid' : 'not configured', ')');
-  return sendViaSMTP({ to, subject, html, from, attachments, icalEvent });
+  return sendViaSMTP({ to, subject, html, from, replyTo, attachments, icalEvent });
 }
 
-async function sendViaResend(apiKey, { to, subject, html, from, attachments, icalEvent }) {
+async function sendViaResend(apiKey, { to, subject, html, from, replyTo, attachments, icalEvent }) {
   const configuredFrom = from || db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value || '';
 
   // Resend requires a verified domain. Free email providers (gmail, yahoo, etc.) can't be used.
@@ -36,6 +41,7 @@ async function sendViaResend(apiKey, { to, subject, html, from, attachments, ica
   }
 
   const payload = { from: fromEmail, to: [to], subject, html };
+  if (replyTo) payload.reply_to = replyTo;
 
   // Add .ics calendar invite as attachment for Resend
   if (icalEvent?.content) {
@@ -69,7 +75,7 @@ async function sendViaResend(apiKey, { to, subject, html, from, attachments, ica
   return { method: 'resend', id: data.id };
 }
 
-async function sendViaSMTP({ to, subject, html, from, attachments, icalEvent }) {
+async function sendViaSMTP({ to, subject, html, from, replyTo, attachments, icalEvent }) {
   // smtp_pass is in SENSITIVE_KEYS and stored AES-encrypted. Decrypt before
   // handing to nodemailer or every send dies with "535 BadCredentials".
   // Fall back to env vars (SMTP_USER / SMTP_PASS / etc.) when settings are
@@ -93,6 +99,7 @@ async function sendViaSMTP({ to, subject, html, from, attachments, icalEvent }) 
   });
 
   const mailOpts = { from: fromEmail, to, subject, html };
+  if (replyTo) mailOpts.replyTo = replyTo;
   if (icalEvent) mailOpts.icalEvent = icalEvent;
   if (attachments) mailOpts.attachments = attachments;
 
