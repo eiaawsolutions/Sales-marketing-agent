@@ -404,15 +404,10 @@ export function initializeDatabase(db) {
   // Base URL setting
   db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('base_url', 'https://sa.eiaawsolutions.com')").run();
 
-  // Seed default superadmin
-  const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
-  if (userCount.c === 0) {
-    const hash = bcrypt.hashSync('Sys@dm1n$', 10);
-    db.prepare(
-      `INSERT INTO users (username, email, password_hash, role, display_name, budget_limit)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run('admin', 'admin@localhost', hash, 'superadmin', 'Super Admin', 0);
-  }
+  // No auto-seed superadmin. Every account — including the founder — must
+  // go through Stripe Checkout. After signup, promote to superadmin via a
+  // one-time SQL UPDATE. An empty users table is the correct steady state
+  // for a freshly purged production DB; the public signup flow will fill it.
 
   // Seed system logic from codebase on every startup (auto-update)
   seedSystemLogic(db);

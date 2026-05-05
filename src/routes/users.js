@@ -21,32 +21,16 @@ router.get('/', (req, res) => {
   res.json(users);
 });
 
-// POST /api/users — create user
+// POST /api/users — DISABLED.
+// All accounts MUST go through Stripe Checkout (POST /api/billing/checkout →
+// /api/billing/success). Direct creation bypasses billing, leaves no Stripe
+// customer/subscription record, and breaks the verification-first signup
+// contract. Comp accounts: issue a 100% Stripe coupon and have the user run
+// the public signup flow with it.
 router.post('/', (req, res) => {
-  const { username, email, password, role, display_name, budget_limit, monthly_system_cost, plan } = req.body;
-
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: 'Username, email, and password required' });
-  }
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  }
-
-  try {
-    const hash = hashPassword(password);
-    const result = db.prepare(`
-      INSERT INTO users (username, email, password_hash, role, display_name, budget_limit, monthly_system_cost, plan)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(username, email, hash, role || 'user', display_name || username, budget_limit || 0, monthly_system_cost || 0, plan || 'starter');
-
-    const user = db.prepare('SELECT id, username, email, role, display_name, budget_limit, monthly_system_cost, status, created_at FROM users WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json(user);
-  } catch (err) {
-    if (err.message.includes('UNIQUE')) {
-      return res.status(400).json({ error: 'Username or email already exists' });
-    }
-    res.status(400).json({ error: err.message });
-  }
+  return res.status(410).json({
+    error: 'Direct account creation is disabled. All accounts must sign up via Stripe Checkout at /#pricing. For comp accounts, issue a 100% off Stripe coupon.',
+  });
 });
 
 // GET /api/users/:id — user detail

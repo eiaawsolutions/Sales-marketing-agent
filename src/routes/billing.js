@@ -344,7 +344,9 @@ router.post('/checkout', async (req, res) => {
         .run(`stripe_price_${plan}`, priceId);
     }
 
-    // Create checkout session with trial
+    // Create checkout session with trial.
+    // allow_promotion_codes lets the customer enter coupon codes (e.g.
+    // FOUNDER_HQ for the founder comp) on the Stripe-hosted checkout page.
     const baseUrl = req.headers.origin || `https://${req.headers.host}`;
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -355,6 +357,7 @@ router.post('/checkout', async (req, res) => {
         metadata: { plan, username, displayName: displayName || username },
       },
       line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
       success_url: `${baseUrl}/api/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/#pricing`,
       metadata: { plan, username, email, displayName: displayName || username },

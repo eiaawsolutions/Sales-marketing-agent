@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
@@ -104,7 +105,7 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
   // Skip for GET/HEAD/OPTIONS and public routes
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/lookup') || req.path.startsWith('/api/auth/forgot') || req.path.startsWith('/api/auth/reset-password-with-token') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/billing/checkout') || req.path.startsWith('/api/contact') || req.path.startsWith('/api/voice/webhook') || req.path.startsWith('/api/voice/tool-callback') || req.path.startsWith('/api/voice/call-link-token') || req.path.startsWith('/api/voice/public-session') || req.path.startsWith('/api/voice/refresh-prompt-with-token') || req.path.startsWith('/api/tracking/') || req.path.startsWith('/api/forms/public/')) return next();
+  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/lookup') || req.path.startsWith('/api/auth/forgot') || req.path.startsWith('/api/auth/reset-password-with-token') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/billing/checkout') || req.path.startsWith('/api/contact') || req.path.startsWith('/api/voice/webhook') || req.path.startsWith('/api/voice/tool-callback') || req.path.startsWith('/api/voice/call-link-token') || req.path.startsWith('/api/voice/public-session') || req.path.startsWith('/api/voice/refresh-prompt-with-token') || req.path.startsWith('/api/tracking/') || req.path.startsWith('/api/forms/public/') || req.path.startsWith('/api/_internal/')) return next();
 
   // For authenticated requests, Bearer token in Authorization header provides CSRF protection
   // because third-party sites cannot set custom headers in cross-origin requests
@@ -162,6 +163,101 @@ app.get('/api/health', (req, res) => {
   } catch (e) {
     res.status(503).json({ status: 'error', error: e.message });
   }
+});
+
+// One-shot production purge — wipes ALL user-scoped data so the DB starts
+// fresh with Stripe Checkout as the only account-creation path.
+//
+// Activation: requires BOTH (1) a PURGE_TOKEN env var on the server (long
+// random string) AND (2) the same value passed in the X-Purge-Token request
+// header. After the purge runs once, unset PURGE_TOKEN and redeploy so the
+// route returns 404 again.
+//
+// IRREVERSIBLE. Authorized by founder 2026-05-06.
+app.post('/api/_internal/purge-and-reset', (req, res) => {
+  const expected = process.env.PURGE_TOKEN || '';
+  const received = req.headers['x-purge-token'] || '';
+  if (!expected || expected.length < 32) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  // Constant-time compare so a timing oracle can't leak the token char-by-char.
+  const a = Buffer.from(expected);
+  const b = Buffer.from(received);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  const userTables = [
+    'sessions', 'outreach_queue', 'campaign_leads', 'ai_cost_log',
+    'agent_tasks', 'generated_content', 'activities', 'appointments',
+    'pipeline', 'campaigns', 'leads', 'forms', 'form_submissions', 'users',
+  ];
+  const userScopedSettingsLike = [
+    'stripe_customer_%', 'stripe_subscription_%', 'verify_code_%',
+    'temp_pass_%', 'trial_end_%', 'reveal_addon_%', 'reveal_granted_%',
+    'ai_addon_%', 'ai_credit_granted_%',
+  ];
+
+  const counts = { before: {}, deleted: {}, settings_keys_deleted: 0 };
+  for (const t of userTables) {
+    try { counts.before[t] = db.prepare(`SELECT COUNT(*) AS c FROM ${t}`).get().c; }
+    catch (_) { counts.before[t] = 'missing'; }
+  }
+
+  const tx = db.transaction(() => {
+    for (const t of userTables) {
+      try {
+        const r = db.prepare(`DELETE FROM ${t}`).run();
+        counts.deleted[t] = r.changes;
+      } catch (e) {
+        counts.deleted[t] = `error: ${e.message}`;
+        throw e;
+      }
+    }
+    for (const t of userTables) {
+      try { db.prepare("DELETE FROM sqlite_sequence WHERE name = ?").run(t); } catch (_) {}
+    }
+    for (const pat of userScopedSettingsLike) {
+      const r = db.prepare('DELETE FROM settings WHERE key LIKE ?').run(pat);
+      counts.settings_keys_deleted += r.changes;
+    }
+  });
+
+  try {
+    tx();
+    console.log('[purge-and-reset] EXECUTED:', JSON.stringify(counts));
+    res.json({
+      ok: true,
+      message: 'Purge complete. Now: (1) unset PURGE_TOKEN env, (2) redeploy, (3) sign up via /#pricing with FOUNDER_HQ coupon.',
+      counts,
+    });
+  } catch (e) {
+    console.error('[purge-and-reset] FAILED:', e.message);
+    res.status(500).json({ ok: false, error: e.message, counts });
+  }
+});
+
+// One-shot founder promotion — promote the freshly-signed-up account to
+// superadmin. Same token-gated pattern as the purge route. Also sets
+// email_verified=1 so the founder skips the email-verify step.
+//
+// Body: { email: "eiaawsolutions@gmail.com" }
+app.post('/api/_internal/promote-founder', express.json(), (req, res) => {
+  const expected = process.env.PURGE_TOKEN || '';
+  const received = req.headers['x-purge-token'] || '';
+  if (!expected || expected.length < 32) return res.status(404).json({ error: 'Not found' });
+  const a = Buffer.from(expected);
+  const b = Buffer.from(received);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  const email = (req.body?.email || '').toLowerCase().trim();
+  if (!email) return res.status(400).json({ error: 'email required' });
+  const user = db.prepare('SELECT id, role FROM users WHERE email = ?').get(email);
+  if (!user) return res.status(404).json({ error: `No user with email ${email}` });
+  db.prepare("UPDATE users SET role = 'superadmin', email_verified = 1, plan = 'business', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
+  console.log(`[promote-founder] User ${email} (id=${user.id}) promoted to superadmin`);
+  res.json({ ok: true, message: `User ${email} promoted to superadmin (plan=business).`, userId: user.id });
 });
 
 // Sanitize errors — never leak DB schema or internal details

@@ -1,6 +1,15 @@
 import db from './index.js';
 
-console.log('Seeding database...');
+// Refuse to run against production. This script wipes leads/campaigns/pipeline
+// and seeds fake data — useful in dev, catastrophic in prod. The signup-only
+// architecture means production data is owned by paying customers and must
+// not be touched by demo seeds.
+if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production') {
+  console.error('seed.js refused: NODE_ENV is production. Demo seed data must not run against the live DB.');
+  process.exit(1);
+}
+
+console.log('Seeding database (development mode)...');
 
 // Clear existing data
 db.exec('DELETE FROM activities');
