@@ -187,10 +187,26 @@ app.post('/api/_internal/purge-and-reset', (req, res) => {
     return res.status(404).json({ error: 'Not found' });
   }
 
+  // FK-safe topological order. Children before parents:
+  //   form_submissions → forms → users
+  //   sessions, ai_cost_log, outreach_queue, campaign_leads, activities,
+  //   generated_content, appointments, pipeline → campaigns/leads/users
+  //   campaigns, leads, agent_tasks, users have no outbound FKs
   const userTables = [
-    'sessions', 'outreach_queue', 'campaign_leads', 'ai_cost_log',
-    'agent_tasks', 'generated_content', 'activities', 'appointments',
-    'pipeline', 'campaigns', 'leads', 'forms', 'form_submissions', 'users',
+    'form_submissions',
+    'forms',
+    'sessions',
+    'ai_cost_log',
+    'generated_content',
+    'outreach_queue',
+    'campaign_leads',
+    'appointments',
+    'activities',
+    'pipeline',
+    'campaigns',
+    'leads',
+    'agent_tasks',
+    'users',
   ];
   const userScopedSettingsLike = [
     'stripe_customer_%', 'stripe_subscription_%', 'verify_code_%',
