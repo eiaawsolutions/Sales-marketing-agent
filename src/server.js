@@ -309,12 +309,27 @@ app.post('/api/_internal/create-founder-coupon', express.json(), async (req, res
       if (existingPromo.data.length) {
         promo = existingPromo.data[0];
       } else {
-        promo = await stripe.promotionCodes.create({
-          coupon: COUPON_ID,
-          code: COUPON_ID,
-          active: true,
-          metadata: { purpose: 'founder' },
+        // Use raw fetch — the SDK helper has been flaky on this call.
+        const params = new URLSearchParams();
+        params.append('coupon', COUPON_ID);
+        params.append('code', COUPON_ID);
+        params.append('active', 'true');
+        params.append('metadata[purpose]', 'founder');
+        const r = await fetch('https://api.stripe.com/v1/promotion_codes', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
         });
+        const text = await r.text();
+        let body;
+        try { body = JSON.parse(text); } catch (_) { body = { raw: text }; }
+        if (!r.ok) {
+          throw new Error(`Stripe ${r.status}: ${body.error?.message || text}`);
+        }
+        promo = body;
       }
     } catch (e) {
       promoError = e.message;
