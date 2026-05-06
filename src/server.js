@@ -253,6 +253,74 @@ app.post('/api/_internal/purge-and-reset', (req, res) => {
   }
 });
 
+// One-shot Stripe coupon creator — creates FOUNDER_HQ (100% off, forever)
+// using the Stripe key from settings or env. Same token gate. Idempotent:
+// returns the existing coupon if it already exists.
+app.post('/api/_internal/create-founder-coupon', express.json(), async (req, res) => {
+  const expected = process.env.PURGE_TOKEN || '';
+  const received = req.headers['x-purge-token'] || '';
+  if (!expected || expected.length < 32) return res.status(404).json({ error: 'Not found' });
+  const a = Buffer.from(expected);
+  const b = Buffer.from(received);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    const Stripe = (await import('stripe')).default;
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'stripe_secret_key'").get();
+    const key = row?.value ? decrypt(row.value) : process.env.STRIPE_SECRET_KEY;
+    if (!key) return res.status(500).json({ error: 'No Stripe key configured' });
+    const stripe = new Stripe(key);
+    const COUPON_ID = 'FOUNDER_HQ';
+
+    try {
+      const existing = await stripe.coupons.retrieve(COUPON_ID);
+      return res.json({ ok: true, message: 'Coupon already exists', coupon: existing });
+    } catch (e) {
+      if (e.code !== 'resource_missing') throw e;
+    }
+
+    const coupon = await stripe.coupons.create({
+      id: COUPON_ID,
+      name: 'EIAAW Founder Comp',
+      percent_off: 100,
+      duration: 'forever',
+      metadata: {
+        purpose: 'founder',
+        authorized_by: 'amos',
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    // Also create a promotion code for the same coupon — Stripe Checkout's
+    // "allow_promotion_codes" UI accepts promotion code IDs (human-readable
+    // text), not raw coupon IDs. Without this, the customer literally
+    // cannot type FOUNDER_HQ in the checkout box.
+    let promo;
+    try {
+      const existingPromo = await stripe.promotionCodes.list({ code: COUPON_ID, limit: 1 });
+      if (existingPromo.data.length) {
+        promo = existingPromo.data[0];
+      } else {
+        promo = await stripe.promotionCodes.create({
+          coupon: COUPON_ID,
+          code: COUPON_ID,
+          active: true,
+          metadata: { purpose: 'founder' },
+        });
+      }
+    } catch (e) {
+      console.error('[create-founder-coupon] promo code creation failed:', e.message);
+    }
+
+    res.json({ ok: true, message: 'FOUNDER_HQ coupon + promo code created', coupon, promo });
+  } catch (err) {
+    console.error('[create-founder-coupon] failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // One-shot founder promotion — promote the freshly-signed-up account to
 // superadmin. Same token-gated pattern as the purge route. Also sets
 // email_verified=1 so the founder skips the email-verify step.
