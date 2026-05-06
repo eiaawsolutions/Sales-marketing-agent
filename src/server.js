@@ -274,30 +274,36 @@ app.post('/api/_internal/create-founder-coupon', express.json(), async (req, res
     const stripe = new Stripe(key);
     const COUPON_ID = 'FOUNDER_HQ';
 
+    let coupon;
     try {
-      const existing = await stripe.coupons.retrieve(COUPON_ID);
-      return res.json({ ok: true, message: 'Coupon already exists', coupon: existing });
+      coupon = await stripe.coupons.retrieve(COUPON_ID);
     } catch (e) {
       if (e.code !== 'resource_missing') throw e;
     }
+    // If coupon doesn't exist yet, fall through to creation block below.
+    // If coupon exists, we still want to ensure the matching promo code
+    // exists, so DON'T early-return here.
 
-    const coupon = await stripe.coupons.create({
-      id: COUPON_ID,
-      name: 'EIAAW Founder Comp',
-      percent_off: 100,
-      duration: 'forever',
-      metadata: {
-        purpose: 'founder',
-        authorized_by: 'amos',
-        created_at: new Date().toISOString(),
-      },
-    });
+    if (!coupon) {
+      coupon = await stripe.coupons.create({
+        id: COUPON_ID,
+        name: 'EIAAW Founder Comp',
+        percent_off: 100,
+        duration: 'forever',
+        metadata: {
+          purpose: 'founder',
+          authorized_by: 'amos',
+          created_at: new Date().toISOString(),
+        },
+      });
+    }
 
     // Also create a promotion code for the same coupon — Stripe Checkout's
     // "allow_promotion_codes" UI accepts promotion code IDs (human-readable
     // text), not raw coupon IDs. Without this, the customer literally
     // cannot type FOUNDER_HQ in the checkout box.
     let promo;
+    let promoError;
     try {
       const existingPromo = await stripe.promotionCodes.list({ code: COUPON_ID, limit: 1 });
       if (existingPromo.data.length) {
@@ -311,10 +317,17 @@ app.post('/api/_internal/create-founder-coupon', express.json(), async (req, res
         });
       }
     } catch (e) {
+      promoError = e.message;
       console.error('[create-founder-coupon] promo code creation failed:', e.message);
     }
 
-    res.json({ ok: true, message: 'FOUNDER_HQ coupon + promo code created', coupon, promo });
+    res.json({
+      ok: true,
+      message: promo ? 'FOUNDER_HQ coupon + promo code created' : 'Coupon created but promo code failed — see promoError',
+      coupon,
+      promo: promo || null,
+      promoError: promoError || null,
+    });
   } catch (err) {
     console.error('[create-founder-coupon] failed:', err.message);
     res.status(500).json({ error: err.message });
