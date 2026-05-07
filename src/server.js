@@ -349,6 +349,45 @@ app.post('/api/_internal/create-founder-coupon', express.json(), async (req, res
   }
 });
 
+// One-shot founder unlock + password reset. Token-gated. Clears the
+// account-lockout counter, deletes any active rate-limit state implicitly
+// (rate-limit is in-memory per process, so a redeploy clears it anyway),
+// and resets the password to a value provided in the body. Used when the
+// founder gets locked out of their own account during initial setup.
+//
+// Body: { email, newPassword }
+app.post('/api/_internal/founder-reset', express.json(), async (req, res) => {
+  const expected = process.env.PURGE_TOKEN || '';
+  const received = req.headers['x-purge-token'] || '';
+  if (!expected || expected.length < 32) return res.status(404).json({ error: 'Not found' });
+  const a = Buffer.from(expected);
+  const b = Buffer.from(received);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  const email = (req.body?.email || '').toLowerCase().trim();
+  const newPassword = req.body?.newPassword || '';
+  if (!email || !newPassword || newPassword.length < 8) {
+    return res.status(400).json({ error: 'email and newPassword (>=8 chars) required' });
+  }
+  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  if (!user) return res.status(404).json({ error: `No user with email ${email}` });
+  const { hashPassword } = await import('./middleware/auth.js');
+  const hash = hashPassword(newPassword);
+  db.prepare(`
+    UPDATE users
+       SET password_hash = ?,
+           failed_login_count = 0,
+           locked_until = NULL,
+           updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?
+  `).run(hash, user.id);
+  // Kill any old sessions so the new password takes effect cleanly.
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+  console.log(`[founder-reset] User ${email} (id=${user.id}) password reset + lockout cleared`);
+  res.json({ ok: true, message: `Password reset for ${email}. Old sessions cleared. Lockout counter zeroed.`, userId: user.id });
+});
+
 // One-shot founder promotion — promote the freshly-signed-up account to
 // superadmin. Same token-gated pattern as the purge route. Also sets
 // email_verified=1 so the founder skips the email-verify step.
