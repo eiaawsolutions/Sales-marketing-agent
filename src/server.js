@@ -349,6 +349,27 @@ app.post('/api/_internal/create-founder-coupon', express.json(), async (req, res
   }
 });
 
+// Read-only probe — returns row counts without modifying anything. Use this
+// instead of /api/_internal/purge-and-reset to check state.
+app.get('/api/_internal/state', (req, res) => {
+  const expected = process.env.PURGE_TOKEN || '';
+  const received = req.headers['x-purge-token'] || '';
+  if (!expected || expected.length < 32) return res.status(404).json({ error: 'Not found' });
+  const a = Buffer.from(expected);
+  const b = Buffer.from(received);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  const tables = ['users', 'sessions', 'leads', 'campaigns', 'pipeline', 'forms', 'form_submissions', 'activities', 'appointments', 'ai_cost_log', 'agent_tasks', 'generated_content', 'outreach_queue', 'campaign_leads'];
+  const counts = {};
+  for (const t of tables) {
+    try { counts[t] = db.prepare(`SELECT COUNT(*) AS c FROM ${t}`).get().c; }
+    catch (_) { counts[t] = 'missing'; }
+  }
+  const users = db.prepare('SELECT id, username, email, role, plan, status, email_verified, created_at FROM users').all();
+  res.json({ counts, users });
+});
+
 // One-shot founder unlock + password reset. Token-gated. Clears the
 // account-lockout counter, deletes any active rate-limit state implicitly
 // (rate-limit is in-memory per process, so a redeploy clears it anyway),
