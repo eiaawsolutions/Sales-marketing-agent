@@ -370,13 +370,12 @@ app.get('/api/_internal/state', (req, res) => {
   res.json({ counts, users });
 });
 
-// One-shot founder unlock + password reset. Token-gated. Clears the
-// account-lockout counter, deletes any active rate-limit state implicitly
-// (rate-limit is in-memory per process, so a redeploy clears it anyway),
-// and resets the password to a value provided in the body. Used when the
-// founder gets locked out of their own account during initial setup.
+// One-shot founder unlock + password reset + magic-login token.
+// Token-gated. Clears the account-lockout counter, optionally resets the
+// password, and ALWAYS issues a fresh 24h session token returned in the
+// response so the founder can log in without typing the password.
 //
-// Body: { email, newPassword }
+// Body: { email, newPassword? }
 app.post('/api/_internal/founder-reset', express.json(), async (req, res) => {
   const expected = process.env.PURGE_TOKEN || '';
   const received = req.headers['x-purge-token'] || '';
@@ -388,25 +387,35 @@ app.post('/api/_internal/founder-reset', express.json(), async (req, res) => {
   }
   const email = (req.body?.email || '').toLowerCase().trim();
   const newPassword = req.body?.newPassword || '';
-  if (!email || !newPassword || newPassword.length < 8) {
-    return res.status(400).json({ error: 'email and newPassword (>=8 chars) required' });
+  if (!email) {
+    return res.status(400).json({ error: 'email required' });
   }
   const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   if (!user) return res.status(404).json({ error: `No user with email ${email}` });
-  const { hashPassword } = await import('./middleware/auth.js');
-  const hash = hashPassword(newPassword);
-  db.prepare(`
-    UPDATE users
-       SET password_hash = ?,
-           failed_login_count = 0,
-           locked_until = NULL,
-           updated_at = CURRENT_TIMESTAMP
-     WHERE id = ?
-  `).run(hash, user.id);
-  // Kill any old sessions so the new password takes effect cleanly.
+  const { hashPassword, generateToken } = await import('./middleware/auth.js');
+
+  let passwordReset = false;
+  if (newPassword && newPassword.length >= 8) {
+    const hash = hashPassword(newPassword);
+    db.prepare(`UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(hash, user.id);
+    passwordReset = true;
+  }
+  // Always clear lockout counters and old sessions.
+  db.prepare(`UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE id = ?`).run(user.id);
   db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
-  console.log(`[founder-reset] User ${email} (id=${user.id}) password reset + lockout cleared`);
-  res.json({ ok: true, message: `Password reset for ${email}. Old sessions cleared. Lockout counter zeroed.`, userId: user.id });
+
+  // Issue a fresh 24h session — the magic link.
+  const sessionToken = generateToken();
+  db.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', '+24 hours'))").run(sessionToken, user.id);
+
+  console.log(`[founder-reset] User ${email} (id=${user.id}) reset; session ${sessionToken.slice(0, 8)}...`);
+  res.json({
+    ok: true,
+    message: passwordReset ? `Password reset and magic-session issued for ${email}` : `Magic-session issued for ${email} (password unchanged)`,
+    userId: user.id,
+    sessionToken,
+    magicLink: `https://sa.eiaawsolutions.com/app?welcome=1&token=${sessionToken}`,
+  });
 });
 
 // One-shot founder promotion — promote the freshly-signed-up account to
