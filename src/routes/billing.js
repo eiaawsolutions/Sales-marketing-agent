@@ -310,7 +310,7 @@ router.post('/upgrade', requireAuth, async (req, res) => {
 // POST /api/billing/checkout — create Stripe checkout session for signup
 router.post('/checkout', async (req, res) => {
   try {
-    const { plan, email, username, displayName } = req.body;
+    const { plan, email, username, displayName, founderToken } = req.body;
 
     if (!plan || !PLANS[plan]) return res.status(400).json({ error: 'Invalid plan. Choose starter, pro, or business.' });
     if (!email || !username) return res.status(400).json({ error: 'Email and username required.' });
@@ -344,11 +344,18 @@ router.post('/checkout', async (req, res) => {
         .run(`stripe_price_${plan}`, priceId);
     }
 
-    // Create checkout session with trial.
-    // allow_promotion_codes lets the customer enter coupon codes (e.g.
-    // FOUNDER_HQ for the founder comp) on the Stripe-hosted checkout page.
+    // Founder comp: if the request carries a valid founderToken matching
+    // FOUNDER_TOKEN env, server-side attach the FOUNDER_HQ coupon to the
+    // checkout. This is mutually exclusive with allow_promotion_codes per
+    // Stripe API, so we branch.
+    const founderTokenEnv = process.env.FOUNDER_TOKEN || '';
+    const isFounderSignup = founderToken
+      && founderTokenEnv.length >= 32
+      && Buffer.from(founderToken).length === Buffer.from(founderTokenEnv).length
+      && crypto.timingSafeEqual(Buffer.from(founderToken), Buffer.from(founderTokenEnv));
+
     const baseUrl = req.headers.origin || `https://${req.headers.host}`;
-    const session = await stripe.checkout.sessions.create({
+    const checkoutPayload = {
       mode: 'subscription',
       payment_method_types: ['card'],
       customer_email: email,
@@ -357,11 +364,20 @@ router.post('/checkout', async (req, res) => {
         metadata: { plan, username, displayName: displayName || username },
       },
       line_items: [{ price: priceId, quantity: 1 }],
-      allow_promotion_codes: true,
       success_url: `${baseUrl}/api/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/#pricing`,
       metadata: { plan, username, email, displayName: displayName || username },
-    });
+    };
+
+    if (isFounderSignup) {
+      checkoutPayload.discounts = [{ coupon: 'FOUNDER_HQ' }];
+      checkoutPayload.metadata.founder = '1';
+      checkoutPayload.subscription_data.metadata.founder = '1';
+    } else {
+      checkoutPayload.allow_promotion_codes = true;
+    }
+
+    const session = await stripe.checkout.sessions.create(checkoutPayload);
 
     res.json({ url: session.url, sessionId: session.id });
   } catch (err) {
