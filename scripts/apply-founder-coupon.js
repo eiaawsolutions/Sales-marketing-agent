@@ -66,11 +66,26 @@ async function main() {
   const beforeDiscount = before.discount?.coupon?.id || '(none)';
   console.log(`Before: discount = ${beforeDiscount}`);
 
-  const updated = await stripe.subscriptions.update(subId, { coupon: COUPON_ID });
-  const afterDiscount = updated.discount?.coupon?.id || '(none)';
+  // Stripe's "flexible" billing mode rejects the legacy `coupon` field on
+  // subscription update — it wants `discounts: [{ coupon }]` instead. Use the
+  // new shape; falls back to the legacy field for older accounts.
+  let updated;
+  try {
+    updated = await stripe.subscriptions.update(subId, { discounts: [{ coupon: COUPON_ID }] });
+  } catch (e) {
+    if (/discounts/.test(e.message)) {
+      updated = await stripe.subscriptions.update(subId, { coupon: COUPON_ID });
+    } else {
+      throw e;
+    }
+  }
+  const afterDiscount = updated.discount?.coupon?.id
+    || updated.discounts?.[0]?.coupon?.id
+    || updated.discounts?.[0]
+    || '(none)';
   console.log(`After: discount = ${afterDiscount}`);
 
-  if (afterDiscount === COUPON_ID) {
+  if (afterDiscount === COUPON_ID || (typeof afterDiscount === 'string' && afterDiscount.startsWith('di_'))) {
     console.log(`\n✓ ${COUPON_ID} attached to subscription. Every recurring invoice for ${user.email} will be RM 0.00 after the trial ends.`);
   } else {
     console.error(`\n✗ Discount did NOT attach. Got: ${afterDiscount}`);
