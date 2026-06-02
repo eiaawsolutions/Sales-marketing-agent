@@ -307,6 +307,82 @@ router.post('/upgrade', requireAuth, async (req, res) => {
   }
 });
 
+// Ensure a Billing Portal configuration exists with self-serve cancellation
+// enabled, and return its id. We create + cache the config rather than relying
+// on the account's default portal config being toggled on in the Dashboard —
+// this makes cancellation self-healing: if the default config is ever missing
+// or reset, the first /portal call recreates a working one. The config id is
+// cached in settings so we don't hit the configurations API on every request.
+async function ensurePortalConfig(stripe, baseUrl) {
+  const cached = db.prepare("SELECT value FROM settings WHERE key = 'stripe_portal_config'").get()?.value;
+  if (cached) {
+    // Verify it still exists and is active; if Stripe 404s or it's archived,
+    // fall through and recreate.
+    try {
+      const existing = await stripe.billingPortal.configurations.retrieve(cached);
+      if (existing && existing.active !== false) return existing.id;
+    } catch (_) { /* recreate below */ }
+  }
+
+  const config = await stripe.billingPortal.configurations.create({
+    business_profile: {
+      headline: 'EIAAW SalesAgent — manage your subscription',
+      privacy_policy_url: `${baseUrl}/privacy.html`,
+      terms_of_service_url: `${baseUrl}/terms.html`,
+    },
+    features: {
+      // Self-serve cancellation. `at_period_end` means the user keeps access
+      // until the current paid period (or trial) ends, matching the Terms:
+      // "cancellation takes effect at the end of the current cycle."
+      subscription_cancel: {
+        enabled: true,
+        mode: 'at_period_end',
+        cancellation_reason: {
+          enabled: true,
+          options: ['too_expensive', 'missing_features', 'switched_service', 'unused', 'customer_service', 'too_complex', 'low_quality', 'other'],
+        },
+      },
+      // Let users update their card and view past invoices without contacting us.
+      payment_method_update: { enabled: true },
+      invoice_history: { enabled: true },
+    },
+  });
+
+  db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+    .run('stripe_portal_config', config.id);
+  return config.id;
+}
+
+// POST /api/billing/portal — open the Stripe Customer Portal so the user can
+// cancel, update their card, or view invoices. Cancellation after the trial is
+// the primary use: the trial auto-converts to a paid subscription, and this is
+// the self-serve path to stop it (effective end-of-cycle). The Stripe
+// customer id is resolved server-side from the authenticated user, so a user
+// can only ever manage their own subscription (no IDOR).
+router.post('/portal', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const customerId = db.prepare("SELECT value FROM settings WHERE key = ?").get(`stripe_customer_${userId}`)?.value;
+    if (!customerId) {
+      return res.status(400).json({ error: 'No billing account found. If you signed up with a special offer or have not completed checkout, contact support to manage your subscription.' });
+    }
+
+    const stripe = getStripe();
+    const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+    const configuration = await ensurePortalConfig(stripe, baseUrl);
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      configuration,
+      return_url: `${baseUrl}/app?page=billing`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/billing/checkout — create Stripe checkout session for signup
 router.post('/checkout', async (req, res) => {
   try {

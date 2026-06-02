@@ -3420,6 +3420,7 @@ async function loadBilling() {
     const revealAddons = data.revealAddons || {};
     const aiCreditAddons = data.aiCreditAddons || {};
     const stripeOk = data.stripeConfigured;
+    const isSuperadmin = currentUser?.role === 'superadmin';
 
     function usageBar(used, max, label, extra) {
       const pct = max >= 99999 ? 0 : Math.min((used / max) * 100, 100);
@@ -3444,13 +3445,17 @@ async function loadBilling() {
 
       <!-- Current Plan & Usage -->
       <div class="card" style="margin-bottom:16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap">
           <div>
             <h3 style="margin:0;text-transform:none;letter-spacing:0">${esc(data.planName)} Plan</h3>
             <span class="text-muted">RM ${data.price}/month${data.isTrialing ? ` — <span style="color:var(--warning)">Trial until ${new Date(data.trialEnd).toLocaleDateString()}</span>` : ''}</span>
           </div>
-          ${data.plan !== 'business' ? `<button class="btn btn-outline" onclick="document.getElementById('plan-cards').scrollIntoView({behavior:'smooth'})">View Plans</button>` : '<span class="badge badge-active">Top tier</span>'}
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            ${isSuperadmin ? '' : `<button class="btn btn-outline" style="${stripeOk ? '' : 'opacity:0.5'}" onclick="openBillingPortal()" ${stripeOk ? '' : 'disabled'} title="Update card, view invoices, or cancel">Manage subscription</button>`}
+            ${data.plan !== 'business' ? `<button class="btn btn-outline" onclick="document.getElementById('plan-cards').scrollIntoView({behavior:'smooth'})">View Plans</button>` : '<span class="badge badge-active">Top tier</span>'}
+          </div>
         </div>
+        ${isSuperadmin ? '' : `<p class="text-muted text-sm" style="margin:-8px 0 4px">${data.isTrialing ? 'Your trial converts to a paid plan automatically when it ends. ' : ''}To cancel, use <strong>Manage subscription</strong> — cancellation takes effect at the end of your current ${data.isTrialing ? 'trial' : 'billing cycle'}, and you keep access until then.</p>`}
 
         <h4 style="margin-bottom:12px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">This Month's Usage</h4>
         ${usageBar(u.leads, l.leads, 'Leads')}
@@ -3566,6 +3571,20 @@ async function upgradePlan(plan) {
     if (result.url) window.location.href = result.url;
   } catch (e) {
     const msg = e.message.includes('Stripe') ? 'Payment system is being set up. Please try again later or contact support.' : e.message;
+    showNotification(msg, 'error');
+  }
+}
+
+// Open the Stripe Customer Portal — update card, view invoices, or cancel.
+// Cancellation takes effect at the end of the current cycle/trial (configured
+// server-side); the user keeps access until then.
+async function openBillingPortal() {
+  try {
+    showNotification('Opening billing portal...');
+    const result = await api.post('/billing/portal', {});
+    if (result.url) window.location.href = result.url;
+  } catch (e) {
+    const msg = e.message.includes('Stripe') ? 'Billing portal is being set up. Please try again later or contact support.' : e.message;
     showNotification(msg, 'error');
   }
 }
