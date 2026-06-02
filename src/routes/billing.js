@@ -35,6 +35,18 @@ function getStripe() {
   return new Stripe(key);
 }
 
+// Reverse-lookup the local user id from a Stripe subscription id. Subscription
+// ids are stored in settings keyed by user id (stripe_subscription_<userId>),
+// so we scan that key space. Returns the userId string, or null if unmatched.
+function userIdForSubscription(subId) {
+  if (!subId) return null;
+  const rows = db.prepare("SELECT key, value FROM settings WHERE key LIKE 'stripe_subscription_%'").all();
+  for (const row of rows) {
+    if (row.value === subId) return row.key.replace('stripe_subscription_', '');
+  }
+  return null;
+}
+
 // Plan config
 // Lead caps reflect real web-search economics (~RM 0.95 per verified lead).
 const PLANS = {
@@ -98,12 +110,20 @@ router.get('/usage', requireAuth, (req, res) => {
   const trialEnd = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(`trial_end_${userId}`)?.value;
   const isTrialing = trialEnd && new Date(trialEnd) > new Date();
 
+  // Pending cancellation: set by the customer.subscription.updated webhook when
+  // the user schedules cancellation in the portal. Value is the effective ISO
+  // date (or 'true' if the date was unavailable). Cleared on reinstate/delete.
+  const cancelPendingRaw = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(`cancel_pending_${userId}`)?.value;
+  const cancelAt = cancelPendingRaw && cancelPendingRaw !== 'true' ? cancelPendingRaw : null;
+
   res.json({
     plan,
     planName: PLANS[plan]?.name || plan,
     price: PLANS[plan]?.price_myr || 0,
     isTrialing,
     trialEnd: trialEnd || null,
+    cancelPending: !!cancelPendingRaw,
+    cancelAt,
     usage: { leads, campaigns, aiActions, contactReveals },
     limits: {
       leads: limits.leads,
@@ -641,16 +661,44 @@ router.post('/webhook', async (req, res) => {
         }
         break;
       }
+      case 'customer.subscription.updated': {
+        // Fired when a user schedules cancellation in the Customer Portal
+        // (cancel_at_period_end -> true), or reverses it ("Renew plan" ->
+        // false). The subscription is still ACTIVE here — access continues
+        // until the period ends — so we only record a "pending cancellation"
+        // marker for the UI; we do NOT suspend. customer.subscription.deleted
+        // (Step 2, end of period) is what actually suspends.
+        const sub = event.data.object;
+        const usrId = userIdForSubscription(sub.id);
+        if (usrId) {
+          if (sub.cancel_at_period_end) {
+            // cancel_at is the unix timestamp the cancellation takes effect.
+            // Fall back to current_period_end, which in flexible billing mode
+            // lives on the subscription ITEM (sub.items.data[0]) rather than
+            // the subscription root, then to the root for legacy shapes.
+            const effective = sub.cancel_at
+              || sub.items?.data?.[0]?.current_period_end
+              || sub.current_period_end;
+            const iso = effective ? new Date(effective * 1000).toISOString() : '';
+            db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+              .run(`cancel_pending_${usrId}`, iso || 'true');
+          } else {
+            // Reinstated — clear the pending marker.
+            db.prepare("DELETE FROM settings WHERE key = ?").run(`cancel_pending_${usrId}`);
+          }
+        }
+        break;
+      }
       case 'customer.subscription.deleted': {
         const sub = event.data.object;
-        // Find user by subscription ID and suspend
-        const rows = db.prepare("SELECT key, value FROM settings WHERE key LIKE 'stripe_subscription_%'").all();
-        for (const row of rows) {
-          if (row.value === sub.id) {
-            const usrId = row.key.replace('stripe_subscription_', '');
-            db.prepare("UPDATE users SET status = 'suspended' WHERE id = ?").run(usrId);
-            db.prepare('DELETE FROM sessions WHERE user_id = ?').run(usrId);
-          }
+        // Find user by subscription ID and suspend. This is the real
+        // end-of-period cancellation (or an immediate cancel).
+        const usrId = userIdForSubscription(sub.id);
+        if (usrId) {
+          db.prepare("UPDATE users SET status = 'suspended' WHERE id = ?").run(usrId);
+          db.prepare('DELETE FROM sessions WHERE user_id = ?').run(usrId);
+          // Cancellation is now complete — the pending marker is obsolete.
+          db.prepare("DELETE FROM settings WHERE key = ?").run(`cancel_pending_${usrId}`);
         }
         break;
       }

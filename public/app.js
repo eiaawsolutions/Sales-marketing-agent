@@ -3455,7 +3455,12 @@ async function loadBilling() {
             ${data.plan !== 'business' ? `<button class="btn btn-outline" onclick="document.getElementById('plan-cards').scrollIntoView({behavior:'smooth'})">View Plans</button>` : '<span class="badge badge-active">Top tier</span>'}
           </div>
         </div>
-        ${isSuperadmin ? '' : `<p class="text-muted text-sm" style="margin:-8px 0 4px">${data.isTrialing ? 'Your trial converts to a paid plan automatically when it ends. ' : ''}To cancel, use <strong>Manage subscription</strong> — cancellation takes effect at the end of your current ${data.isTrialing ? 'trial' : 'billing cycle'}, and you keep access until then.</p>`}
+        ${isSuperadmin ? '' : (data.cancelPending
+          ? `<div style="margin:4px 0 8px;padding:10px 14px;border-radius:8px;background:rgba(217,119,6,0.10);border:1px solid rgba(217,119,6,0.3)">
+               <span style="color:var(--warning);font-weight:600">⚠ Cancellation scheduled.</span>
+               <span class="text-sm">Your plan will end${data.cancelAt ? ` on <strong>${new Date(data.cancelAt).toLocaleDateString()}</strong>` : ' at the end of the current period'} and you keep full access until then. Changed your mind? Click <strong>Manage subscription</strong> and choose <em>Renew plan</em>.</span>
+             </div>`
+          : `<p class="text-muted text-sm" style="margin:-8px 0 4px">${data.isTrialing ? 'Your trial converts to a paid plan automatically when it ends. ' : ''}To cancel, use <strong>Manage subscription</strong> — cancellation takes effect at the end of your current ${data.isTrialing ? 'trial' : 'billing cycle'}, and you keep access until then.</p>`)}
 
         <h4 style="margin-bottom:12px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">This Month's Usage</h4>
         ${usageBar(u.leads, l.leads, 'Leads')}
