@@ -37,12 +37,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://cdn.jsdelivr.net", "https://esm.sh"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://cdn.jsdelivr.net", "https://esm.sh", "https://connect.facebook.net"],
       scriptSrcAttr: ["'unsafe-inline'"], // Allow onclick handlers
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://checkout.stripe.com", "https://api.stripe.com", "wss://*.retellai.com", "https://*.retellai.com", "wss://*.livekit.cloud", "https://*.livekit.cloud", "https://esm.sh"],
+      connectSrc: ["'self'", "https://checkout.stripe.com", "https://api.stripe.com", "wss://*.retellai.com", "https://*.retellai.com", "wss://*.livekit.cloud", "https://*.livekit.cloud", "https://esm.sh", "https://www.facebook.com", "https://connect.facebook.net"],
       mediaSrc: ["'self'", "blob:"],
       workerSrc: ["'self'", "blob:"],
       frameSrc: ["https://js.stripe.com", "https://checkout.stripe.com"],
