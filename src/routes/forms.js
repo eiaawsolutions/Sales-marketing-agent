@@ -94,8 +94,15 @@ router.post('/public/:id/submit', publicSubmitLimiter, (req, res) => {
 // fabricate a digital footprint here; the "verifiable footprint" rule governs
 // OUTBOUND sourcing, not a person handing us their own details.
 //
-// Owner: all chatbot leads are assigned to the founder account (user_id = 1),
-// the same default the voice public-session uses. Triage/reassign in the CRM.
+// Owner: chatbot leads are routed to a per-site owner via LEAD_OWNER_MAP (see
+// resolveOwnerId). Today every site resolves to the founder (user_id = 1) — the
+// same default the voice public-session uses — because no per-product team
+// accounts exist yet. When you onboard a product owner, add e.g.
+//   LEAD_OWNER_MAP={"workforce":3,"social_media_team":4}
+// and that product's leads route to them with NO code change. The resolver
+// validates the target user actually exists and falls back to the founder if
+// not, so a lead is never orphaned on a stale/mistyped id. Triage/reassign in
+// the CRM regardless.
 //
 // Tighter limiter than the form submitter — a chatbot gate should fire once
 // per visitor, so 5/min/IP is generous and still throttles abuse. The route
@@ -114,6 +121,37 @@ function validPhone(p) {
 // Sites we accept chatbot intake from. Anything else is tagged generically so a
 // spoofed value can't masquerade as a first-party product source.
 const KNOWN_SITES = new Set(['parent', 'sales_agent', 'workforce', 'social_media_team', 'ads_agency']);
+
+const FOUNDER_ID = 1;
+// Parse LEAD_OWNER_MAP once at load. Malformed JSON is non-fatal — we just fall
+// back to founder-for-everything and log, so a typo in an env var can never
+// take the intake endpoint down.
+let LEAD_OWNER_MAP = {};
+try {
+  if (process.env.LEAD_OWNER_MAP) LEAD_OWNER_MAP = JSON.parse(process.env.LEAD_OWNER_MAP);
+} catch (e) {
+  console.error('LEAD_OWNER_MAP is not valid JSON — defaulting all sites to founder:', e.message);
+  LEAD_OWNER_MAP = {};
+}
+// Cache which user_ids exist so we don't hit the DB on every intake. Refreshed
+// lazily if a mapped id isn't found (covers a user added after boot).
+const _userExists = new Map();
+function userIdExists(id) {
+  if (_userExists.has(id)) return _userExists.get(id);
+  const ok = !!db.prepare('SELECT 1 FROM users WHERE id = ?').get(id);
+  _userExists.set(id, ok);
+  return ok;
+}
+// Resolve the owner for a given site: mapped id if present AND the user exists,
+// else the founder. Never returns an id that isn't a real user.
+function resolveOwnerId(site) {
+  const mapped = LEAD_OWNER_MAP[site];
+  if (Number.isInteger(mapped) && mapped !== FOUNDER_ID) {
+    if (userIdExists(mapped)) return mapped;
+    console.error(`LEAD_OWNER_MAP[${site}] = ${mapped} but no such user — falling back to founder.`);
+  }
+  return FOUNDER_ID;
+}
 
 router.post('/public/lead-intake', intakeLimiter, (req, res) => {
   try {
@@ -136,7 +174,7 @@ router.post('/public/lead-intake', intakeLimiter, (req, res) => {
       return res.status(400).json({ error: 'Please enter a valid phone number.' });
     }
 
-    const OWNER_ID = 1; // founder — see note above
+    const OWNER_ID = resolveOwnerId(site); // per-site via LEAD_OWNER_MAP; see note above
     const source = `chatbot_${site}`;
 
     // Notes fold: self-reported provenance so the CRM shows exactly how this
