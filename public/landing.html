@@ -2040,10 +2040,64 @@ function toggleChatbot() {
   }
 }
 
+// ---------- Pre-chat lead gate ----------
+// Capture name + email + phone before the AI answers; store as an inbound lead
+// (source chatbot_sales_agent). Asked once per browsing session.
+let _saGatePassed = false;
+try { _saGatePassed = sessionStorage.getItem('saChatGate') === '1'; } catch (e) {}
+
+function renderChatGate(pendingMsg) {
+  const messages = document.getElementById('chatbot-messages');
+  if (document.getElementById('sa-chat-gate')) return;
+  const box = 'border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:8px;background:var(--surface);color:var(--text);line-height:1.5';
+  const fld = 'width:100%;box-sizing:border-box;padding:8px 10px;margin:5px 0;background:var(--bg);border:1px solid var(--line-soft);border-radius:8px;color:var(--ink);font-size:13px;font-family:var(--sans);outline:none';
+  const wrap = document.createElement('div');
+  wrap.id = 'sa-chat-gate';
+  wrap.style.cssText = box;
+  wrap.innerHTML = '<div style="margin-bottom:6px">Quick intro before we chat — so our team can follow up if you’d like.</div>'
+    + '<input id="sag-name" type="text" placeholder="Your name" maxlength="120" style="'+fld+'">'
+    + '<input id="sag-email" type="email" placeholder="Email" maxlength="160" style="'+fld+'">'
+    + '<input id="sag-phone" type="tel" placeholder="Phone" maxlength="40" style="'+fld+'">'
+    + '<input id="sag-company" type="text" placeholder="Company (optional)" maxlength="160" style="'+fld+'">'
+    + '<div id="sag-err" style="color:var(--danger);font-size:12px;min-height:14px;margin:2px 0"></div>'
+    + '<button id="sag-go" style="width:100%;padding:9px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">Start chatting</button>';
+  messages.appendChild(wrap);
+  messages.scrollTop = messages.scrollHeight;
+  const go = () => submitChatGate(pendingMsg);
+  wrap.querySelector('#sag-go').addEventListener('click', go);
+  wrap.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } }));
+  wrap.querySelector('#sag-name').focus();
+}
+
+async function submitChatGate(pendingMsg) {
+  const name = document.getElementById('sag-name').value.trim();
+  const email = document.getElementById('sag-email').value.trim();
+  const phone = document.getElementById('sag-phone').value.trim();
+  const company = document.getElementById('sag-company').value.trim();
+  const err = document.getElementById('sag-err');
+  if (!name || !email || !phone) { err.textContent = 'Name, email, and phone are required.'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = 'Please enter a valid email.'; return; }
+  if (String(phone).replace(/\D/g, '').length < 7) { err.textContent = 'Please enter a valid phone number.'; return; }
+  const btn = document.getElementById('sag-go');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await fetch('/api/forms/public/lead-intake', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone, company, site: 'sales_agent', page: location.pathname }),
+    });
+  } catch (e) { /* soft-fail: don't trap the visitor */ }
+  _saGatePassed = true;
+  try { sessionStorage.setItem('saChatGate', '1'); } catch (e) {}
+  document.getElementById('sa-chat-gate')?.remove();
+  if (pendingMsg) { document.getElementById('chatbot-input').value = pendingMsg; sendChatbotMsg(); }
+}
+
 async function sendChatbotMsg() {
   const input = document.getElementById('chatbot-input');
   const msg = input?.value?.trim();
   if (!msg) return;
+  // Hard gate: capture visitor details before the AI answers.
+  if (!_saGatePassed) { renderChatGate(msg); input.value = ''; return; }
   input.value = '';
 
   const messages = document.getElementById('chatbot-messages');
