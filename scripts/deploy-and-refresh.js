@@ -36,10 +36,31 @@
  */
 import { execFileSync } from 'child_process';
 import fs from 'fs';
+import path from 'path';
 
 const BASE_URL = (process.env.BASE_URL || 'https://sa.eiaawsolutions.com').replace(/\/$/, '');
 const TOKEN_FILE = process.env.VOICE_REFRESH_TOKEN_FILE || 'C:\\tmp\\eiaaw_voice_refresh_token.txt';
-const RAILWAY_BIN = process.env.RAILWAY_BIN || 'railway';
+
+// Resolve the Railway CLI robustly. npm-spawned subprocesses on Windows don't
+// always inherit the PATH that resolves a bare `railway`, and the launchable
+// file is `railway.cmd` (not `railway`), which execFile can't run without a
+// shell. Honour RAILWAY_BIN, else probe the npm global dir, else fall back to
+// a bare name run through a shell.
+function resolveRailwayBin() {
+  if (process.env.RAILWAY_BIN) return process.env.RAILWAY_BIN;
+  const npmDir = process.env.APPDATA ? path.join(process.env.APPDATA, 'npm') : null;
+  const candidates = npmDir
+    ? [path.join(npmDir, 'railway.cmd'), path.join(npmDir, 'railway.exe'), path.join(npmDir, 'railway')]
+    : [];
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) return c;
+    } catch { /* ignore */ }
+  }
+  return process.platform === 'win32' ? 'railway.cmd' : 'railway';
+}
+const RAILWAY_BIN = resolveRailwayBin();
+
 const POLL_TIMEOUT_MS = Number(process.env.POLL_TIMEOUT_MS || 480000);
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15000);
 const HTTP_TIMEOUT_MS = Number(process.env.HTTP_TIMEOUT_MS || 30000);
@@ -86,9 +107,11 @@ function readToken() {
 function latestDeployment() {
   let out;
   try {
-    out = execFileSync(RAILWAY_BIN, ['deployment', 'list', '--json'], { encoding: 'utf8' });
+    // shell:true so a resolved .cmd shim (Windows) or bare name both work.
+    out = execFileSync(RAILWAY_BIN, ['deployment', 'list', '--json'], { encoding: 'utf8', shell: true });
   } catch (e) {
-    die(`\`${RAILWAY_BIN} deployment list --json\` failed — is the CLI on PATH and the project linked?\n${e.message}`);
+    die(`\`${RAILWAY_BIN} deployment list --json\` failed — is the CLI installed and the project linked? ` +
+      `Set RAILWAY_BIN to its full path if it isn't auto-detected.\n${e.message}`);
   }
   let arr;
   try {
