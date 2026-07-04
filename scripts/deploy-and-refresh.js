@@ -34,7 +34,7 @@
  *   HTTP_TIMEOUT_MS          default 30000  (30 s) per request
  *   SKIP_POLL=1              skip step 2 (deploy already known live)
  */
-import { execFileSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -104,11 +104,16 @@ function readToken() {
 }
 
 // Newest deployment (id + status) as reported by the Railway CLI JSON output.
+// The CLI is a .cmd shim on Windows, which spawnSync can only run through a
+// shell (execFile gets EINVAL). We therefore build ONE command string and use
+// execSync — passing an args array with shell:true is what trips the DEP0190
+// warning, so we avoid the array. The bin path is quoted for spaces; args are
+// static literals (no injection surface).
+const RAILWAY_CMD = `"${RAILWAY_BIN}" deployment list --json`;
 function latestDeployment() {
   let out;
   try {
-    // shell:true so a resolved .cmd shim (Windows) or bare name both work.
-    out = execFileSync(RAILWAY_BIN, ['deployment', 'list', '--json'], { encoding: 'utf8', shell: true });
+    out = execSync(RAILWAY_CMD, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (e) {
     die(`\`${RAILWAY_BIN} deployment list --json\` failed — is the CLI installed and the project linked? ` +
       `Set RAILWAY_BIN to its full path if it isn't auto-detected.\n${e.message}`);
