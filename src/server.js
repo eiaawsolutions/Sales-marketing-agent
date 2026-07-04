@@ -28,6 +28,15 @@ import uploadsRouter from './routes/uploads.js';
 import formsRouter from './routes/forms.js';
 import { maskLeads, maskLead } from './services/leads.js';
 import { startScheduler } from './services/scheduler.js';
+import { SALES_AGENT_PROMPT } from './routes/voice.js';
+import { GIT_SHA, BUILT_AT } from './version.js';
+
+// Fingerprint of the voice prompt that /refresh-prompt-with-token pushes to
+// Retell. Computed once at boot — the prompt is a module-level constant.
+// promptSha lets the deploy pipeline assert "the build I'm about to refresh
+// carries the exact prompt I expect", which length alone can't guarantee.
+const PROMPT_SHA = crypto.createHash('sha256').update(SALES_AGENT_PROMPT).digest('hex').slice(0, 16);
+const PROMPT_CHARS = SALES_AGENT_PROMPT.length;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -159,7 +168,19 @@ app.use(['/api/billing/checkout', '/api/billing/upgrade-checkout', '/api/billing
 app.get('/api/health', (req, res) => {
   try {
     db.prepare('SELECT 1').get();
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      // Build identity — lets the deploy pipeline confirm the new code is
+      // actually live before running /refresh-prompt-with-token.
+      gitSha: GIT_SHA,
+      builtAt: BUILT_AT,
+      // Voice-prompt fingerprint — this is the exact SALES_AGENT_PROMPT that
+      // the refresh endpoint pushes to Retell. Assert these match what you
+      // expect before refreshing, so you never push a stale/old prompt.
+      promptChars: PROMPT_CHARS,
+      promptSha: PROMPT_SHA,
+    });
   } catch (e) {
     res.status(503).json({ status: 'error', error: e.message });
   }

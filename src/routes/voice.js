@@ -6,8 +6,15 @@ import { checkPlanLimit, VOICE_ADDONS } from '../middleware/auth.js';
 import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
 import { generateMeetLink, sendCalendarInviteEmail } from './appointments.js';
+import { GIT_SHA } from '../version.js';
 
 const router = Router();
+
+// Same 16-hex fingerprint scheme as /api/health (server.js). Computed lazily
+// because SALES_AGENT_PROMPT is declared further down this module.
+function promptFingerprint() {
+  return crypto.createHash('sha256').update(SALES_AGENT_PROMPT).digest('hex').slice(0, 16);
+}
 
 // --- Helpers ---
 
@@ -533,6 +540,10 @@ router.post('/refresh-prompt-with-token', async (req, res) => {
       llmId: updated.llm_id || llmId,
       lastModified: updated.last_modification_timestamp || null,
       promptChars: SALES_AGENT_PROMPT.length,
+      // Echo the build + prompt fingerprint that was actually pushed, so the
+      // caller can confirm it matches what /api/health reported pre-refresh.
+      gitSha: GIT_SHA,
+      promptSha: promptFingerprint(),
       message: 'Prompt refreshed via token. New calls use the updated prompt; in-flight calls keep the old.',
     });
   } catch (err) {
@@ -1418,5 +1429,11 @@ The caller is on smt.eiaawsolutions.com (the Social Media Team product page). On
 - If {{custom_script}} is provided AND {{site_scope}} = "lead", integrate it naturally. For "parent" or "sales_agent" landing visitors, ignore custom_script unless it's clearly aligned with the FACTS block.
 - Never volunteer that you're AI. If asked directly, be honest and pivot to value.
 - Real talk. No corporate speak. No brochure language. No emojis.`;
+
+// Exported so /api/health (in server.js) can report the exact prompt length
+// and hash that /refresh-prompt-with-token pushes to Retell — the health
+// endpoint and the refresh endpoint therefore read the SAME string, so a
+// deploy that changed the prompt is detectable before the refresh runs.
+export { SALES_AGENT_PROMPT };
 
 export default router;
