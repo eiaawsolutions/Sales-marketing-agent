@@ -1,0 +1,24 @@
+# Docker build context excludes. Because we deploy with `railway up
+# --no-gitignore` (so the deploy stamp src/version.json — which IS in
+# .gitignore — gets uploaded), THIS file, not .gitignore, controls what the
+# build excludes. Keep node_modules/data/.git out; DO NOT list
+# src/version.json here — it must ship so /api/health can report gitSha.
+
+node_modules
+npm-debug.log
+
+# Local SQLite dev data — prod uses the Railway volume mounted at /app/data,
+# created fresh by the Dockerfile. Never ship local dev data into the image.
+data
+*.db
+*.db-wal
+*.db-shm
+
+.git
+.gitignore
+.claude
+.env
+.DS_Store
+
+# Docs / scratch that don't belong in the runtime image
+*.md

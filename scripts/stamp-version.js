@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 // Writes src/version.json with the current git commit SHA and a build
-// timestamp. Run this IMMEDIATELY before `railway up --detach` so the SHA
-// ships inside the uploaded snapshot and is served by /api/health at
-// runtime. See src/version.js for why this exists (CLI deploys don't get
-// Railway's RAILWAY_GIT_COMMIT_SHA).
+// timestamp. Run this IMMEDIATELY before `railway up` so the SHA ships
+// inside the uploaded snapshot and is served by /api/health at runtime.
+// See src/version.js for why this exists (CLI deploys don't get Railway's
+// RAILWAY_GIT_COMMIT_SHA).
 //
-// Usage:  node scripts/stamp-version.js && railway up --detach
+// IMPORTANT: deploy with `railway up --detach --no-gitignore` (see the
+// `deploy` npm script). src/version.json is in .gitignore, and by default
+// `railway up` honours .gitignore and would DROP it from the upload —
+// then /api/health reports gitSha:"unknown". --no-gitignore makes Railway
+// use .dockerignore instead, which intentionally does NOT exclude it.
+//
+// Usage:  npm run deploy      (= stamp + railway up --detach --no-gitignore)
 
 import { execSync } from 'child_process';
 import fs from 'fs';

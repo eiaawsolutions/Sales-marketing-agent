@@ -10,6 +10,11 @@
 // into the snapshot right before `railway up`, so the SHA travels WITH the
 // exact code that gets deployed and can never disagree with what is running.
 //
+// version.json is .gitignored, so the deploy MUST use `railway up
+// --no-gitignore` (baked into `npm run deploy`) or Railway drops the file
+// from the upload and this resolves to "unknown". .dockerignore — not
+// .gitignore — governs the build context on that path.
+//
 // Resolution order: version.json (stamped) → RAILWAY_GIT_COMMIT_SHA env →
 // GIT_SHA env → "unknown".
 
