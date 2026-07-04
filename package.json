@@ -9,7 +9,9 @@
     "dev": "node --watch src/server.js",
     "seed": "node src/db/seed.js",
     "stamp": "node scripts/stamp-version.js",
-    "deploy": "node scripts/stamp-version.js && railway up --detach --no-gitignore"
+    "deploy": "node scripts/stamp-version.js && railway up --detach --no-gitignore",
+    "release": "node scripts/deploy-and-refresh.js",
+    "ship": "npm run deploy && npm run release"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
