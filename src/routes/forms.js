@@ -3,8 +3,36 @@ import rateLimit from 'express-rate-limit';
 import db from '../db/index.js';
 import { formsService } from '../services/forms.js';
 import { requireAuth } from '../middleware/auth.js';
+import { leadSourcesService } from '../services/lead-sources.js';
+import { ingest, IngestRejected } from '../services/lead-ingest.js';
 
 const router = Router();
+
+// Map a form submission ({field.name → value}) onto the lead candidate shape the
+// ingest core expects. Field TYPE is authoritative (the builder tags each field
+// name/email/phone/...); fall back to name heuristics for generic text fields.
+function formSubmissionToCandidate(fields, data) {
+  const out = { name: null, email: null, phone: null, company: null, title: null, message: null };
+  const messageBits = [];
+  for (const f of fields) {
+    const v = data[f.name];
+    if (v == null || v === '') continue;
+    const value = Array.isArray(v) ? v.join(', ') : String(v);
+    const nameLc = String(f.name || '').toLowerCase();
+    const labelLc = String(f.label || '').toLowerCase();
+    const hints = nameLc + ' ' + labelLc;
+
+    if (f.type === 'email' || /email/.test(hints)) { out.email = out.email || value; continue; }
+    if (f.type === 'phone' || /phone|mobile|whatsapp|contact number/.test(hints)) { out.phone = out.phone || value; continue; }
+    if (f.type === 'name' || /(^|[^a-z])name([^a-z]|$)|full name/.test(hints)) { out.name = out.name || value; continue; }
+    if (/company|organi[sz]ation|business/.test(hints)) { out.company = out.company || value; continue; }
+    if (/title|role|position|job/.test(hints)) { out.title = out.title || value; continue; }
+    // Everything else (textarea, dropdown, the "how can we help" box) is intent.
+    messageBits.push(`${f.label || f.name}: ${value}`);
+  }
+  if (messageBits.length) out.message = messageBits.join('\n').slice(0, 2000);
+  return out;
+}
 
 // ---------- Public routes (NO auth) ----------
 // These are reached at /api/forms/public/* — server.js exempts this prefix
@@ -75,6 +103,33 @@ router.post('/public/:id/submit', publicSubmitLimiter, (req, res) => {
       ip: req.ip,
       userAgent: req.headers['user-agent'] || '',
     });
+
+    // Funnel the submission into the lead pipeline as a self-reported inbound
+    // lead, owned by the form's owner. Before this, a cold submission from a
+    // stranger was recorded but never became a lead — it fell out of the funnel
+    // entirely. Best-effort: a failure here must not fail the submission itself,
+    // so the visitor always sees success and the raw submission is never lost.
+    try {
+      const candidate = formSubmissionToCandidate(form.fields || [], cleaned);
+      if (candidate.email || candidate.phone) {
+        const source = leadSourcesService.ensureInternal(form.user_id, 'web_form');
+        if (source) {
+          // web_form is an internal source (auth_mode 'internal' → auto_promote 1),
+          // so a real submission with a contact identifier lands as a lead, while
+          // the AI-qualify threshold still gates any Claude spend.
+          ingest(source, candidate, {
+            externalId: null,
+            raw: cleaned,
+            ip: req.ip,
+            userAgent: req.headers['user-agent'] || '',
+          });
+        }
+      }
+    } catch (e) {
+      if (!(e instanceof IngestRejected)) {
+        console.error('[forms] lead ingest from submission failed:', e.message);
+      }
+    }
 
     res.json({ success: true, redirect: form.redirect_url || null });
   } catch (err) {

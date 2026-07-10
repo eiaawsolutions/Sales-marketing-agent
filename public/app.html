@@ -110,6 +110,33 @@
     .nav-item:hover { background: var(--surface2); color: var(--text); }
     .nav-item.active { color: var(--primary); background: var(--primary-light); border-right: 3px solid var(--primary); }
 
+    /* Collapsible "Admin" group (HQ superadmin only) */
+    .nav-admin-toggle {
+      margin-top: 8px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      font-weight: 600;
+      color: var(--text);
+      position: relative;
+    }
+    .nav-admin-toggle.admin-parent-active { color: var(--primary); }
+    .nav-caret {
+      margin-left: auto;
+      font-size: 10px;
+      transition: transform 0.2s;
+      color: var(--text-muted);
+    }
+    .nav-caret.open { transform: rotate(90deg); }
+    .nav-admin-children { display: block; }
+    .nav-admin-children[hidden] { display: none; }
+    /* Indent + de-emphasise the nested admin tools */
+    .nav-item.nav-child {
+      padding-left: 40px;
+      font-size: 13.5px;
+      color: var(--text-muted);
+    }
+    .nav-item.nav-child.active { color: var(--primary); }
+
     /* min-width:0 escapes the flex `min-width:auto` trap. Without it any
        descendant with `white-space:nowrap` (campaign target_audience meta
        line, long lead names, raw URLs in notes) blows .main wider than the
@@ -1507,6 +1534,7 @@
   </script>
   <script src="/email-templates.js?v=20260422e"></script>
   <script src="/email-designer.js?v=20260422e"></script>
-  <script src="/app.js?v=20260602-cancel-pending"></script>
+  <script src="/sources-ui.js?v=20260711-omnichannel"></script>
+  <script src="/app.js?v=20260711-omnichannel"></script>
 </body>
 </html>

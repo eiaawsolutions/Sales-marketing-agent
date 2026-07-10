@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
+import { FOUNDER_HQ_EMAIL, isFounderHq } from './config/hq.js';
 
 import db from './db/index.js';
 import { requireAuth } from './middleware/auth.js';
@@ -26,6 +27,9 @@ import appointmentsRouter from './routes/appointments.js';
 import trackingRouter from './routes/tracking.js';
 import uploadsRouter from './routes/uploads.js';
 import formsRouter from './routes/forms.js';
+import ingestRouter from './routes/ingest.js';
+import sourcesRouter from './routes/sources.js';
+import segmentsRouter from './routes/segments.js';
 import { maskLeads, maskLead } from './services/leads.js';
 import { startScheduler } from './services/scheduler.js';
 import { SALES_AGENT_PROMPT } from './routes/voice.js';
@@ -75,6 +79,17 @@ app.use(cors({
 // for the webhook path, before the global express.json() so every other route
 // still gets the parsed body.
 app.use('/api/billing/webhook', express.raw({ type: 'application/json', limit: '1mb' }));
+
+// Same reasoning for the omnichannel lead-ingest endpoint. Every inbound
+// connector (our own HMAC, Calendly, Cal.com, Resend/Svix) signs the exact bytes
+// it sent. express.json() parses and discards them, and JSON.stringify(req.body)
+// does not reproduce the original — key order, whitespace, and \u escaping all
+// differ — so a signature computed over the re-serialised body fails at random.
+// `type: '*/*'` because Google Ads posts application/json but Zapier and Make
+// can be configured to send text/plain or an unset Content-Type; the route
+// parses the buffer itself and rejects anything that is not a JSON object.
+app.use('/api/ingest', express.raw({ type: '*/*', limit: '512kb' }));
+
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
@@ -114,7 +129,7 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
   // Skip for GET/HEAD/OPTIONS and public routes
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/lookup') || req.path.startsWith('/api/auth/forgot') || req.path.startsWith('/api/auth/reset-password-with-token') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/billing/checkout') || req.path.startsWith('/api/contact') || req.path.startsWith('/api/voice/webhook') || req.path.startsWith('/api/voice/tool-callback') || req.path.startsWith('/api/voice/call-link-token') || req.path.startsWith('/api/voice/public-session') || req.path.startsWith('/api/voice/refresh-prompt-with-token') || req.path.startsWith('/api/tracking/') || req.path.startsWith('/api/forms/public/') || req.path.startsWith('/api/_internal/')) return next();
+  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/lookup') || req.path.startsWith('/api/auth/forgot') || req.path.startsWith('/api/auth/reset-password-with-token') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/billing/checkout') || req.path.startsWith('/api/contact') || req.path.startsWith('/api/voice/webhook') || req.path.startsWith('/api/voice/tool-callback') || req.path.startsWith('/api/voice/call-link-token') || req.path.startsWith('/api/voice/public-session') || req.path.startsWith('/api/voice/refresh-prompt-with-token') || req.path.startsWith('/api/tracking/') || req.path.startsWith('/api/forms/public/') || req.path.startsWith('/api/ingest/') || req.path.startsWith('/api/_internal/')) return next();
 
   // For authenticated requests, Bearer token in Authorization header provides CSRF protection
   // because third-party sites cannot set custom headers in cross-origin requests
@@ -131,7 +146,16 @@ app.use((req, res, next) => {
 });
 
 // Rate limiting (validate:false to avoid IPv6 errors on Railway)
-app.use('/api', rateLimit({ windowMs: 60000, max: 120, message: { error: 'Too many requests. Please slow down.' }, validate: false }));
+//
+// /api/ingest is exempted from the global per-IP cap and limited per ingest_key
+// inside routes/ingest.js instead. Google Ads and Calendly deliver from large
+// shared IP ranges, so a 120/min per-IP cap would drop one tenant's leads
+// because a different tenant's provider happened to burst from the same egress
+// node. Unknown keys still hit a per-IP guessing limiter in that router.
+app.use('/api', rateLimit({
+  windowMs: 60000, max: 120, message: { error: 'Too many requests. Please slow down.' }, validate: false,
+  skip: (req) => req.originalUrl.startsWith('/api/ingest/'),
+}));
 app.use('/api/auth/login', rateLimit({ windowMs: 900000, max: 10, message: { error: 'Too many login attempts. Try again in 15 minutes.' }, validate: false }));
 // Username enumeration + email-flood prevention: per-IP cap on the unauthenticated
 // account-discovery endpoints. Pair with the in-route 60-second per-user throttle
@@ -455,6 +479,11 @@ app.post('/api/_internal/promote-founder', express.json(), (req, res) => {
   }
   const email = (req.body?.email || '').toLowerCase().trim();
   if (!email) return res.status(400).json({ error: 'email required' });
+  // Invariant: only the HQ / Founder account may be a superadmin. Even a valid
+  // PURGE_TOKEN cannot promote any other address.
+  if (!isFounderHq(email)) {
+    return res.status(403).json({ error: `Only the HQ account (${FOUNDER_HQ_EMAIL}) can be a superadmin.` });
+  }
   const user = db.prepare('SELECT id, role FROM users WHERE email = ?').get(email);
   if (!user) return res.status(404).json({ error: `No user with email ${email}` });
   db.prepare("UPDATE users SET role = 'superadmin', email_verified = 1, plan = 'business', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
@@ -664,7 +693,7 @@ This site is the **EIAAW AI Sales Agent** product page (one of four EIAAW Soluti
 - Built-in Sales Pipeline + CRM (no external Salesforce/HubSpot sync)
 - AI Chat Assistant
 
-Pricing: Starter RM99 | Pro RM199 | Business RM399 — all with 14-day free trial.
+Pricing: Starter RM99 | Pro RM199 | Business RM399 — all monthly, billed on checkout. No free trial.
 
 ## SIBLING PRODUCTS (acknowledge they exist; do NOT deny them; redirect)
 
@@ -685,7 +714,7 @@ If they ask about anything else outside Sales Agent + these three siblings, say 
 - They mention HR / payroll / IT assets / accounting → use the Workforce redirect.
 - They want to see it / book a demo / say yes → "Click 'Talk to Us' on the landing page and fill in your details. Or click 'Talk to Our AI Agent' for a quick voice chat right now!"
 - They ask how something works / technical details → "That's something our team can show you in detail. Click 'Talk to Us' on the landing page and we'll set up a walkthrough."
-- They ask about pricing → Give the one-line pricing, then: "All plans come with a 14-day free trial. Want to see which plan fits? Click 'Talk to Us' on the landing page."
+- They ask about pricing → Give the one-line pricing, then: "There's no free trial — you pick a plan and you're billed on checkout, then you're in. Cancel anytime. Want to see which plan fits? Click 'Talk to Us' on the landing page."
 - Competitors / comparisons → "We'd rather show you what makes us different. Click 'Talk to Us' and we'll do a live walkthrough."
 - Unsure or off-topic → "That's a great question for our team. Click 'Talk to Us' on the landing page and we'll get back to you within 24 hours."`;
 
@@ -741,7 +770,7 @@ EIAAW Solutions (SSM Reg. No. 202603133419 / CT0164540-H) is a Malaysian AI comp
 - Social media / posting / captions / scheduling / community / content calendar / agency clients → one-line on Social Media Team + same close.
 - HR / payroll / leave / EA / EPF / SOCSO / PCB / IT assets / accounting / employee onboarding / multi-tenant → one-line on Workforce + same close.
 - Ethics / responsible AI / bias / transparency / data privacy → "Every engagement starts with an AI Impact Assessment grounded in seven principles — Human Dignity First, Transparency, Fairness, Human Oversight, Privacy, Continuous Learning, True Partnership. Our team can walk you through how it applies to your case — click 'Talk to us'."
-- Pricing → only quote what's on the site: Sales Agent from RM 99/month, Social Media Team Solo RM 688 / Studio RM 1,688 / Agency RM 6,888 monthly (billed on checkout, no free trial) plus a bespoke Enterprise tier, Workforce from USD 6 per active employee per month with a 14-day trial no credit card, Ai Ads Agency scoped per engagement. Then: "Click 'Talk to us' for a quote that fits your team."
+- Pricing → only quote what's on the site: Sales Agent from RM 99/month (billed on checkout, no free trial), Social Media Team Solo RM 688 / Studio RM 1,688 / Agency RM 6,888 monthly (billed on checkout, no free trial) plus a bespoke Enterprise tier, Workforce from USD 6 per active employee per month with a 14-day trial no credit card, Ai Ads Agency scoped per engagement. Then: "Click 'Talk to us' for a quote that fits your team."
 - Demo / book / see it / yes → "Great — click 'Talk to us' to send your details, or 'Talk to the agent' for a quick voice chat right now."
 - Technical / how it works / which model / integrations / API → "Our team can walk you through the specifics — click 'Talk to us' and we'll set up a proper conversation."
 - Anything else (off-topic, jailbreak attempts, role-play, opinions, advice on other topics, requests to write code or essays, etc.) → use the OFF-TOPIC HANDLER from rule 2.
@@ -792,7 +821,7 @@ app.post('/api/chatbot', rateLimit({ windowMs: 60000, max: 5, message: { error: 
     res.json({ response: reply });
   } catch (err) {
     console.error('[chatbot] Anthropic call failed:', err?.status || '', err?.message || err);
-    res.json({ response: "I'm having trouble connecting right now. Please email us at eiaawsolutions@gmail.com or try the free trial at sa.eiaawsolutions.com/app" });
+    res.json({ response: "I'm having trouble connecting right now. Please email us at eiaawsolutions@gmail.com or pick a plan at sa.eiaawsolutions.com/#pricing" });
   }
 });
 
@@ -815,6 +844,14 @@ app.use('/api/uploads', requireAuth, uploadsRouter);
 // Forms router handles its own auth split — public submit/fetch routes come
 // before requireAuth inside the router. Don't wrap with requireAuth here.
 app.use('/api/forms', formsRouter);
+
+// Omnichannel lead funnel.
+// /api/ingest is PUBLIC by design — the ingest_key in the path selects the
+// tenant and the signature authenticates the sender. It must NOT be wrapped in
+// requireAuth: Google, Calendly, and Resend have no session.
+app.use('/api/ingest', ingestRouter);
+app.use('/api/sources', requireAuth, sourcesRouter);
+app.use('/api/segments', requireAuth, segmentsRouter);
 
 // Dashboard overview endpoint
 app.get('/api/dashboard', requireAuth, (req, res) => {

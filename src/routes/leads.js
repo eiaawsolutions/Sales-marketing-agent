@@ -62,8 +62,25 @@ router.post('/:id/activities', (req, res) => {
   res.status(201).json(activity);
 });
 
+// The AI task handlers in ai-agent.js look leads up by id alone
+// (`SELECT * FROM leads WHERE id = ?`) and then UPDATE status/score on them.
+// Without an ownership check here, any authenticated user could score, qualify,
+// or generate outreach against another tenant's lead — an IDOR that both leaks
+// the lead's data in the response and mutates it. Mirror the check already used
+// by POST /:id/activities. Superadmin (userId scope = null) still reaches all.
+function requireOwnedLead(req, res) {
+  const userIdScope = req.user.role === 'superadmin' ? null : req.user.id;
+  const lead = leadsService.getById(userIdScope, req.params.id);
+  if (!lead) {
+    res.status(404).json({ error: 'Lead not found' });
+    return null;
+  }
+  return lead;
+}
+
 router.post('/:id/score', async (req, res) => {
   try {
+    if (!requireOwnedLead(req, res)) return;
     checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'score_lead', { leadId: parseInt(req.params.id), campaignId: null });
     res.json(result);
@@ -74,6 +91,8 @@ router.post('/:id/score', async (req, res) => {
 
 router.post('/:id/qualify', async (req, res) => {
   try {
+    if (!requireOwnedLead(req, res)) return;
+    checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'qualify_lead', {
       leadId: parseInt(req.params.id), additionalInfo: req.body.additionalInfo,
     });
@@ -85,6 +104,8 @@ router.post('/:id/qualify', async (req, res) => {
 
 router.post('/:id/outreach', async (req, res) => {
   try {
+    if (!requireOwnedLead(req, res)) return;
+    checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'craft_outreach', {
       leadId: parseInt(req.params.id), context: req.body.context,
       valueProposition: req.body.valueProposition,

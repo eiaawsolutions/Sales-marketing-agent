@@ -4,7 +4,12 @@ import { fileURLToPath } from 'url';
 import { initializeDatabase } from './schema.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '..', '..', 'data', 'agent.db');
+
+// SA_DB_PATH points the whole app at a throwaway database. Production never sets
+// it, so the default below is unchanged. Without it the services — which all
+// import this singleton — could only ever be exercised against the real
+// data/agent.db, which is why none of them had tests.
+const DB_PATH = process.env.SA_DB_PATH || path.join(__dirname, '..', '..', 'data', 'agent.db');
 
 // Ensure data directory exists
 import fs from 'fs';

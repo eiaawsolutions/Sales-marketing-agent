@@ -57,6 +57,9 @@ window.esc = esc;
 // ========== State ==========
 let currentPage = 'dashboard';
 let modal = null;
+// Whether the superadmin-only "Admin" sidebar group is expanded. Auto-opens
+// when the active page is one of its children (see renderSidebar).
+let adminMenuOpen = false;
 
 // ========== Router ==========
 function navigate(page) {
@@ -450,9 +453,11 @@ function closeMobileMenu() {
 
 function renderSidebar() {
   const isSuperadmin = currentUser?.role === 'superadmin';
+  // The links EVERY user sees.
   const items = [
     { id: 'dashboard', icon: '&#9632;', label: 'Dashboard' },
     { id: 'leads', icon: '&#9679;', label: 'Leads' },
+    { id: 'sources', icon: '&#9741;', label: 'Sources' },
     { id: 'pipeline', icon: '&#9654;', label: 'Pipeline' },
     { id: 'campaigns', icon: '&#9993;', label: 'Campaigns' },
     { id: 'forms', icon: '&#9634;', label: 'Forms' },
@@ -463,13 +468,42 @@ function renderSidebar() {
     { id: 'account', icon: '&#9790;', label: 'Account & Security' },
   ];
 
-  if (isSuperadmin) {
-    items.push({ id: 'settings', icon: '&#9881;', label: 'Settings' });
-    items.push({ id: 'accounts', icon: '&#9775;', label: 'Accounts' });
-    items.push({ id: 'system-overview', icon: '&#9881;', label: 'System Overview' });
-    items.push({ id: 'system-logic', icon: '&#9883;', label: 'System Logic' });
-    items.push({ id: 'proposal', icon: '&#128196;', label: 'Sales Proposal' });
-  }
+  // The 5 admin tools, grouped under a single collapsible "Admin" entry that
+  // only the HQ superadmin ever sees. Route-level gating (SUPERADMIN_ROUTES +
+  // afterRender + server-side requireSuperadmin) is unchanged — this grouping
+  // is navigation only. Non-superadmins never receive this markup at all.
+  const adminItems = [
+    { id: 'settings', icon: '&#9881;', label: 'Settings' },
+    { id: 'accounts', icon: '&#9775;', label: 'Accounts' },
+    { id: 'system-overview', icon: '&#128202;', label: 'System Overview' },
+    { id: 'system-logic', icon: '&#9883;', label: 'System Logic' },
+    { id: 'proposal', icon: '&#128196;', label: 'Sales Proposal' },
+  ];
+  const onAdminPage = adminItems.some(a => a.id === currentPage);
+  // Deep-linking to an admin page (e.g. ?p=settings) lands with the group open.
+  if (onAdminPage) adminMenuOpen = true;
+
+  const navHtml = items.map(i => `
+    <div class="nav-item ${currentPage === i.id ? 'active' : ''}" onclick="closeMobileMenu(); navigate('${i.id}')">
+      <span>${i.icon}</span> ${i.label}
+    </div>
+  `).join('');
+
+  const adminHtml = isSuperadmin ? `
+    <div class="nav-item nav-admin-toggle ${onAdminPage ? 'admin-parent-active' : ''}" onclick="toggleAdminMenu()" title="HQ-only admin tools">
+      <span>&#9881;</span> Admin
+      <span class="nav-caret ${adminMenuOpen ? 'open' : ''}">&#9656;</span>
+    </div>
+    <div class="nav-admin-children" ${adminMenuOpen ? '' : 'hidden'}>
+      ${adminItems.map(i => `
+        <div class="nav-item nav-child ${currentPage === i.id ? 'active' : ''}" onclick="closeMobileMenu(); navigate('${i.id}')">
+          <span>${i.icon}</span> ${i.label}
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  const footerLabel = isSuperadmin ? 'Super Admin &middot; Business' : `${(currentUser?.plan || 'starter').toUpperCase()} Plan`;
 
   return `
     <div class="sidebar">
@@ -481,25 +515,34 @@ function renderSidebar() {
         </div>
       </div>
       <div class="sidebar-nav-items" style="flex:1;overflow-y:auto">
-      ${items.map(i => `
-        <div class="nav-item ${currentPage === i.id ? 'active' : ''}" onclick="closeMobileMenu(); navigate('${i.id}')">
-          <span>${i.icon}</span> ${i.label}
-        </div>
-      `).join('')}
+        ${navHtml}
+        ${adminHtml}
       </div>
       <div style="padding:14px 20px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0">
         <div class="text-sm" style="font-weight:600">${esc(currentUser?.displayName || currentUser?.username || '')}</div>
-        <div class="text-muted text-sm" ${currentUser?.role !== 'superadmin' ? `style="cursor:pointer;text-decoration:underline" onclick="navigate('billing')"` : ''}>${currentUser?.role === 'superadmin' ? 'Super Admin' : `${(currentUser?.plan||'starter').toUpperCase()} Plan`}</div>
+        <div class="text-muted text-sm" style="cursor:pointer;text-decoration:underline" onclick="navigate('billing')">${footerLabel}</div>
         <button class="btn btn-sm btn-outline" style="margin-top:8px;width:100%" onclick="doLogout()">Sign Out</button>
       </div>
     </div>
   `;
 }
 
+// Toggle the collapsible Admin group. DOM-only (no full re-render) so expanding
+// the group never reloads the current page's data or flashes the view. The
+// module-level flag stays in sync for the next full render.
+function toggleAdminMenu() {
+  adminMenuOpen = !adminMenuOpen;
+  const children = document.querySelector('.nav-admin-children');
+  const caret = document.querySelector('.nav-admin-toggle .nav-caret');
+  if (children) children.hidden = !adminMenuOpen;
+  if (caret) caret.classList.toggle('open', adminMenuOpen);
+}
+
 function renderPage() {
   switch (currentPage) {
     case 'dashboard': return '<div id="page" class="loading">Loading dashboard...</div>';
     case 'leads': return '<div id="page" class="loading">Loading leads...</div>';
+    case 'sources': return '<div id="page" class="loading">Loading sources...</div>';
     case 'pipeline': return '<div id="page" class="loading">Loading pipeline...</div>';
     case 'campaigns': return '<div id="page" class="loading">Loading campaigns...</div>';
     case 'forms': return '<div id="page" class="loading">Loading forms...</div>';
@@ -535,6 +578,7 @@ async function afterRender() {
   switch (currentPage) {
     case 'dashboard': return loadDashboard();
     case 'leads': return loadLeads();
+    case 'sources': return loadSources();
     case 'pipeline': return loadPipeline();
     case 'campaigns': return loadCampaigns();
     case 'forms': return loadForms();
@@ -3421,6 +3465,11 @@ async function loadBilling() {
     const aiCreditAddons = data.aiCreditAddons || {};
     const stripeOk = data.stripeConfigured;
     const isSuperadmin = currentUser?.role === 'superadmin';
+    // HQ / Founder comp: business tier, invoices RM 0.00 via FOUNDER_HQ coupon.
+    const comped = data.comped;
+    // Only show "Manage subscription" when a real Stripe customer exists — a
+    // hand-promoted admin has none, and opening the portal for it would 400.
+    const canManageSub = data.stripeCustomer && stripeOk;
 
     function usageBar(used, max, label, extra) {
       const pct = max >= 99999 ? 0 : Math.min((used / max) * 100, 100);
@@ -3447,20 +3496,26 @@ async function loadBilling() {
       <div class="card" style="margin-bottom:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap">
           <div>
-            <h3 style="margin:0;text-transform:none;letter-spacing:0">${esc(data.planName)} Plan</h3>
-            <span class="text-muted">RM ${data.price}/month${data.isTrialing ? ` — <span style="color:var(--warning)">Trial until ${new Date(data.trialEnd).toLocaleDateString()}</span>` : ''}</span>
+            <h3 style="margin:0;text-transform:none;letter-spacing:0">${esc(data.planName)} Plan${comped ? ' <span class="badge badge-active" style="vertical-align:middle">Founder comp</span>' : ''}</h3>
+            <span class="text-muted">${comped
+              ? 'RM 0/month &middot; Founder comp (FOUNDER_HQ &mdash; 100% off)'
+              : `RM ${data.price}/month${data.isTrialing ? ` — <span style="color:var(--warning)">Trial until ${new Date(data.trialEnd).toLocaleDateString()}</span>` : ''}`}</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            ${isSuperadmin ? '' : `<button class="btn btn-outline" style="${stripeOk ? '' : 'opacity:0.5'}" onclick="openBillingPortal()" ${stripeOk ? '' : 'disabled'} title="Update card, view invoices, or cancel">Manage subscription</button>`}
+            ${canManageSub ? `<button class="btn btn-outline" onclick="openBillingPortal()" title="Update card, view invoices, or cancel">Manage subscription</button>` : ''}
             ${data.plan !== 'business' ? `<button class="btn btn-outline" onclick="document.getElementById('plan-cards').scrollIntoView({behavior:'smooth'})">View Plans</button>` : '<span class="badge badge-active">Top tier</span>'}
           </div>
         </div>
-        ${isSuperadmin ? '' : (data.cancelPending
+        ${comped
+          ? `<p class="text-muted text-sm" style="margin:-8px 0 4px"><strong style="color:var(--success)">Founder comp — no charges.</strong> Your Business subscription is active at RM 0.00 via the FOUNDER_HQ coupon. You have full access to every feature with no plan limits.</p>`
+          : (data.cancelPending
           ? `<div style="margin:4px 0 8px;padding:10px 14px;border-radius:8px;background:rgba(217,119,6,0.10);border:1px solid rgba(217,119,6,0.3)">
                <span style="color:var(--warning);font-weight:600">⚠ Cancellation scheduled.</span>
                <span class="text-sm">Your plan will end${data.cancelAt ? ` on <strong>${new Date(data.cancelAt).toLocaleDateString()}</strong>` : ' at the end of the current period'} and you keep full access until then. Changed your mind? Click <strong>Manage subscription</strong> and choose <em>Renew plan</em>.</span>
              </div>`
-          : `<p class="text-muted text-sm" style="margin:-8px 0 4px">${data.isTrialing ? 'Your trial converts to a paid plan automatically when it ends. ' : ''}To cancel, use <strong>Manage subscription</strong> — cancellation takes effect at the end of your current ${data.isTrialing ? 'trial' : 'billing cycle'}, and you keep access until then.</p>`)}
+          : (canManageSub
+            ? `<p class="text-muted text-sm" style="margin:-8px 0 4px">${data.isTrialing ? 'Your trial converts to a paid plan automatically when it ends. ' : ''}To cancel, use <strong>Manage subscription</strong> — cancellation takes effect at the end of your current ${data.isTrialing ? 'trial' : 'billing cycle'}, and you keep access until then.</p>`
+            : ''))}
 
         <h4 style="margin-bottom:12px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">This Month's Usage</h4>
         ${usageBar(u.leads, l.leads, 'Leads')}
@@ -3581,7 +3636,7 @@ async function upgradePlan(plan) {
 }
 
 // Open the Stripe Customer Portal — update card, view invoices, or cancel.
-// Cancellation takes effect at the end of the current cycle/trial (configured
+// Cancellation takes effect at the end of the current billing cycle (configured
 // server-side); the user keeps access until then.
 async function openBillingPortal() {
   try {
@@ -4034,7 +4089,7 @@ function showCreateAccountModal() {
       <div class="form-group"><label>Password *</label><input id="f-password" type="password" placeholder="Min 8 characters"></div>
       <div class="grid-2">
         <div class="form-group"><label>Role</label>
-          <select id="f-role"><option value="user">User</option><option value="superadmin">Super Admin</option></select>
+          <select id="f-role" title="Only the HQ account can be a superadmin"><option value="user" selected>User</option></select>
         </div>
         <div class="form-group"><label>Subscription Plan</label>
           <select id="f-plan">
@@ -4073,10 +4128,12 @@ async function showEditAccountModal(userId) {
     title: `Edit Account: ${user.display_name || user.username}`,
     body: `
       <div class="form-group"><label>Display Name</label><input id="f-display" value="${user.display_name || ''}"></div>
-      <div class="form-group"><label>Email</label><input id="f-email" value="${user.email}"></div>
+      <div class="form-group"><label>Email</label><input id="f-email" value="${user.email}"${user.is_hq ? ' readonly title="The HQ account email is locked"' : ''}></div>
       <div class="grid-2">
         <div class="form-group"><label>Role</label>
-          <select id="f-role">${['user','superadmin'].map(r => `<option value="${r}" ${user.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
+          ${user.is_hq
+            ? `<select id="f-role" title="The HQ account is always the superadmin"><option value="superadmin" selected>Super Admin (HQ)</option></select>`
+            : `<select id="f-role" title="Only the HQ account can be a superadmin"><option value="user" selected>User</option></select>`}
         </div>
         <div class="form-group"><label>Subscription Plan</label>
           <select id="f-plan">${['starter','pro','business','enterprise'].map(p => { const label = p==='starter'?' (RM 99)':p==='pro'?' (RM 199)':p==='business'?' (RM 399)':' (custom)'; return `<option value="${p}" ${(user.plan||'starter') === p ? 'selected' : ''}>${p.charAt(0).toUpperCase()+p.slice(1)}${label}</option>`; }).join('')}</select>
@@ -4472,7 +4529,7 @@ async function loadSystemOverview() {
         <tr><td>AI Ad Copy + A/B Test Plans</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
         <tr><td>AI SEO Strategy</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
         <tr><td>Pipeline AI Analysis</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
-        <tr><td>14-Day Free Trial</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
+        <tr><td>Cancel anytime (end of cycle)</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td><td style="text-align:center;color:var(--success)">&#10003;</td></tr>
       </table>
       </div>
     </div>
@@ -4782,7 +4839,7 @@ async function loadSystemOverview() {
           <strong style="color:var(--text)">Justification:</strong><br>
           1. <strong>Working product</strong> — ${m.endpoints || 107} API endpoints, ${m.tables || 14} DB tables, full auth, billing, deployment. Not a prototype.<br>
           2. <strong>AI moat</strong> — Super Sales Agent with 9 specialized skills + AI Voice Agent + AIDA emails + SEO + cold call conversion. Hard to replicate prompt engineering.<br>
-          3. <strong>Revenue-ready</strong> — Stripe billing live, 3 subscription tiers, 14-day trials, auto account creation. Can accept payments TODAY.<br>
+          3. <strong>Revenue-ready</strong> — Stripe billing live, 3 subscription tiers, charged on checkout, auto account creation. Can accept payments TODAY.<br>
           4. <strong>Multi-tenant</strong> — Full user isolation, plan enforcement, budget controls. Ready for 100+ users.<br>
           5. <strong>Deployed</strong> — Live on Railway with Docker, health checks, auto-deploy from GitHub. Not localhost.<br>
           6. <strong>Malaysian market fit</strong> — Built for MY salespeople, MYR pricing, local SEO, APAC timezone. First-mover in this niche.<br>
@@ -5772,7 +5829,7 @@ async function init() {
           <div style="margin-bottom:8px"><strong>Username:</strong> ${esc(currentUser.username)}</div>
           <div style="margin-bottom:8px"><strong>Email:</strong> ${esc(currentUser.email)}</div>
           ${tempPass ? `<div style="margin-bottom:8px"><strong>Temporary Password:</strong> <code style="background:var(--surface2);padding:2px 8px;border-radius:4px">${esc(tempPass)}</code></div>` : ''}
-          <div><strong>Plan:</strong> <span class="badge badge-active">${esc((currentUser.plan || 'starter').toUpperCase())}</span> — 14-day free trial</div>
+          <div><strong>Plan:</strong> <span class="badge badge-active">${esc((currentUser.plan || 'starter').toUpperCase())}</span> — billed monthly, cancel anytime</div>
         </div>
         ${tempPass ? `<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px;font-size:13px;color:var(--warning)">
           <strong>Important:</strong> Save your password now and change it in Settings. You'll need it to log in next time.

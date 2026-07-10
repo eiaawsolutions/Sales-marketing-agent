@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { migrateOmnichannel } from './schema-omnichannel.js';
+import { FOUNDER_HQ_EMAIL } from '../config/hq.js';
 
 export function initializeDatabase(db) {
   db.exec(`
@@ -265,6 +267,19 @@ export function initializeDatabase(db) {
 
   // Add plan column to users if missing
   try { db.exec("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'starter'"); } catch (e) { /* already exists */ }
+
+  // Invariant: ONLY the HQ / Founder account may be a superadmin. Self-heal on
+  // every boot — demote any other superadmin (legacy data, manual DB edit, a
+  // promotion that predates this rule) down to 'user'. The HQ account is matched
+  // case-insensitively and is never touched. Runs BEFORE the superadmin→business
+  // line so a demoted account keeps its real plan instead of being bumped up.
+  const demoted = db.prepare(
+    "UPDATE users SET role = 'user', updated_at = CURRENT_TIMESTAMP WHERE role = 'superadmin' AND lower(trim(email)) != ?"
+  ).run(FOUNDER_HQ_EMAIL);
+  if (demoted.changes > 0) {
+    console.warn(`[schema] HQ-only superadmin invariant: demoted ${demoted.changes} non-HQ superadmin(s) to 'user' (HQ = ${FOUNDER_HQ_EMAIL}).`);
+  }
+
   // Set superadmin to business plan
   db.prepare("UPDATE users SET plan = 'business' WHERE role = 'superadmin' AND (plan IS NULL OR plan = 'starter')").run();
 
@@ -408,6 +423,12 @@ export function initializeDatabase(db) {
   // go through Stripe Checkout. After signup, promote to superadmin via a
   // one-time SQL UPDATE. An empty users table is the correct steady state
   // for a freshly purged production DB; the public signup flow will fill it.
+
+  // Omnichannel lead funnel: lead_sources / lead_inbox / lead_touchpoints /
+  // segments / scoring rules, plus the leads-table rebuild that makes email
+  // nullable and unique per-tenant instead of globally. Runs last so it sees
+  // the final shape of every base table (notably the campaigns rebuild above).
+  migrateOmnichannel(db);
 
   // Seed system logic from codebase on every startup (auto-update)
   seedSystemLogic(db);

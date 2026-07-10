@@ -123,25 +123,42 @@ export function getPlanLimits(plan) {
   return PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
 }
 
-// Check if user is within plan limits for a resource
+// Check if user is within plan limits for a resource.
+//
+// `req`-bound wrapper kept for every existing caller. The user-object form below
+// is what server-side paths with no request need — webhook ingest, the scheduler,
+// and the campaign pipeline, all of which previously skipped limits entirely
+// because they had no `req` to pass.
 export function checkPlanLimit(req, resource) {
-  if (req.user.role === 'superadmin') return true;
+  return checkPlanLimitForUser(req.user, resource);
+}
 
-  const limits = getPlanLimits(req.user.plan);
-  const userId = req.user.id;
+// Look up a user's plan/role straight from the DB. For callers holding only an id.
+export function loadPlanUser(userId) {
+  const row = db.prepare('SELECT id, role, plan FROM users WHERE id = ?').get(userId);
+  if (!row) throw new Error(`Unknown user: ${userId}`);
+  return { id: row.id, role: row.role, plan: row.plan || 'starter' };
+}
+
+export function checkPlanLimitForUser(user, resource) {
+  if (!user) throw new Error('Plan check requires a user');
+  if (user.role === 'superadmin') return true;
+
+  const limits = getPlanLimits(user.plan);
+  const userId = user.id;
 
   switch (resource) {
     case 'leads': {
       const count = db.prepare('SELECT COUNT(*) as c FROM leads WHERE user_id = ?').get(userId);
       if (count.c >= limits.leads) {
-        throw new Error(`Lead limit reached (${limits.leads} on ${req.user.plan} plan). Upgrade for more.`);
+        throw new Error(`Lead limit reached (${limits.leads} on ${user.plan} plan). Upgrade for more.`);
       }
       return true;
     }
     case 'campaigns': {
       const count = db.prepare('SELECT COUNT(*) as c FROM campaigns WHERE user_id = ?').get(userId);
       if (count.c >= limits.campaigns) {
-        throw new Error(`Campaign limit reached (${limits.campaigns} on ${req.user.plan} plan). Upgrade for more.`);
+        throw new Error(`Campaign limit reached (${limits.campaigns} on ${user.plan} plan). Upgrade for more.`);
       }
       return true;
     }
@@ -153,7 +170,7 @@ export function checkPlanLimit(req, resource) {
         "SELECT COUNT(*) as c FROM campaigns WHERE user_id = ? AND status IN ('active','scheduled')"
       ).get(userId);
       if (count.c >= limits.campaigns) {
-        throw new Error(`Active-campaign limit reached (${limits.campaigns} running on ${req.user.plan} plan). Pause or stop one before activating another, or upgrade.`);
+        throw new Error(`Active-campaign limit reached (${limits.campaigns} running on ${user.plan} plan). Pause or stop one before activating another, or upgrade.`);
       }
       return true;
     }
@@ -166,7 +183,7 @@ export function checkPlanLimit(req, resource) {
       const aiAddonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`ai_addon_${userId}`)?.value || '0');
       const totalAiLimit = limits.ai_actions + aiAddonCredits;
       if (count.c >= totalAiLimit) {
-        throw new Error(`AI action limit reached (${totalAiLimit}/month on ${req.user.plan} plan${aiAddonCredits > 0 ? ` + ${aiAddonCredits} add-on` : ''}). ${aiAddonCredits > 0 ? 'Buy more credits or upgrade' : 'Add more credits or upgrade'} from Plan & Billing.`);
+        throw new Error(`AI action limit reached (${totalAiLimit}/month on ${user.plan} plan${aiAddonCredits > 0 ? ` + ${aiAddonCredits} add-on` : ''}). ${aiAddonCredits > 0 ? 'Buy more credits or upgrade' : 'Add more credits or upgrade'} from Plan & Billing.`);
       }
       return true;
     }
@@ -190,7 +207,7 @@ export function checkPlanLimit(req, resource) {
         "SELECT COUNT(*) as c FROM leads WHERE user_id = ? AND source = 'ai_generated' AND created_at >= datetime('now', 'start of month')"
       ).get(userId);
       if (count.c >= limits.ai_leads_per_month) {
-        throw new Error(`AI lead generation limit reached (${limits.ai_leads_per_month}/month on ${req.user.plan} plan). Upgrade for a higher cap.`);
+        throw new Error(`AI lead generation limit reached (${limits.ai_leads_per_month}/month on ${user.plan} plan). Upgrade for a higher cap.`);
       }
       return true;
     }
@@ -202,7 +219,7 @@ export function checkPlanLimit(req, resource) {
       const addonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`reveal_addon_${userId}`)?.value || '0');
       const totalLimit = limits.contact_reveals + addonCredits;
       if (count.c >= totalLimit) {
-        throw new Error(`Contact reveal limit reached (${totalLimit}/month on ${req.user.plan} plan). Add more credits from Plan & Billing.`);
+        throw new Error(`Contact reveal limit reached (${totalLimit}/month on ${user.plan} plan). Add more credits from Plan & Billing.`);
       }
       return true;
     }
@@ -213,7 +230,7 @@ export function checkPlanLimit(req, resource) {
       const voiceAddonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`voice_addon_${userId}`)?.value || '0');
       const totalVoiceLimit = limits.voice_calls + voiceAddonCredits;
       if (voiceCount.c >= totalVoiceLimit) {
-        throw new Error(`Voice call limit reached (${totalVoiceLimit}/month on ${req.user.plan} plan${voiceAddonCredits > 0 ? ` + ${voiceAddonCredits} add-on` : ''}). Add more credits or upgrade from Plan & Billing.`);
+        throw new Error(`Voice call limit reached (${totalVoiceLimit}/month on ${user.plan} plan${voiceAddonCredits > 0 ? ` + ${voiceAddonCredits} add-on` : ''}). Add more credits or upgrade from Plan & Billing.`);
       }
       return true;
     }
