@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Attach FOUNDER_HQ coupon to a user's Stripe subscription so every
- * recurring invoice (after the trial) is RM 0.00 forever.
+ * recurring invoice is RM 0.00 forever.
  *
  * Run via: railway run node scripts/apply-founder-coupon.js <email>
  *
@@ -86,7 +86,7 @@ async function main() {
   console.log(`After: discount = ${afterDiscount}`);
 
   if (afterDiscount === COUPON_ID || (typeof afterDiscount === 'string' && afterDiscount.startsWith('di_'))) {
-    console.log(`\n✓ ${COUPON_ID} attached to subscription. Every recurring invoice for ${user.email} will be RM 0.00 after the trial ends.`);
+    console.log(`\n✓ ${COUPON_ID} attached to subscription. Every recurring invoice for ${user.email} will be RM 0.00.`);
   } else {
     console.error(`\n✗ Discount did NOT attach. Got: ${afterDiscount}`);
     process.exit(1);

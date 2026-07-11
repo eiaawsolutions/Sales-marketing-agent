@@ -5,6 +5,7 @@ import db from '../db/index.js';
 import { hashPassword, generateToken, getPlanLimits, requireAuth } from '../middleware/auth.js';
 import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
+import { isFounderHq } from '../config/hq.js';
 
 const router = Router();
 
@@ -49,23 +50,29 @@ function userIdForSubscription(subId) {
 
 // Plan config
 // Lead caps reflect real web-search economics (~RM 0.95 per verified lead).
+//
+// trial_days = 0 on every plan: signups are charged when Stripe Checkout
+// completes. A trial meant EIAAW absorbed the web-search + Anthropic cost of
+// every non-converter for 14 days. The key is kept (rather than deleted) so a
+// trial can be re-enabled per-plan by setting it > 0 — checkout, the success
+// handler, and the welcome email all branch on it.
 const PLANS = {
   starter: {
     name: 'Starter',
     price_myr: 99,
-    trial_days: 14,
+    trial_days: 0,
     features: '30 AI-verified leads/mo · 3 campaigns · 50 AI actions/mo · 5 voice calls/mo',
   },
   pro: {
     name: 'Pro',
     price_myr: 199,
-    trial_days: 14,
+    trial_days: 0,
     features: '70 AI-verified leads/mo · 10 campaigns · 200 AI actions/mo · 20 voice calls/mo · auto-outreach · AI lead gen',
   },
   business: {
     name: 'Business',
     price_myr: 399,
-    trial_days: 14,
+    trial_days: 0,
     features: '140 AI-verified leads/mo · 25 campaigns · 1,000 AI actions/mo · 100 voice calls/mo · priority Sonnet · up to 10 seats',
   },
 };
@@ -116,10 +123,32 @@ router.get('/usage', requireAuth, (req, res) => {
   const cancelPendingRaw = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(`cancel_pending_${userId}`)?.value;
   const cancelAt = cancelPendingRaw && cancelPendingRaw !== 'true' ? cancelPendingRaw : null;
 
+  // HQ / Founder comp — scoped to the single FOUNDER_HQ_EMAIL account, NOT to
+  // every superadmin. That one account is a business-tier subscriber whose
+  // invoices are RM 0.00 via the FOUNDER_HQ 100%-off Stripe coupon (see
+  // scripts/apply-founder-coupon.js and the founder-token branch of /checkout).
+  // Mirrors SMT's model where the founder rides a real tier but is comped.
+  // `comped` is advisory — the true RM 0.00 lives on the Stripe subscription
+  // discount — so the billing UI can render "Business — comped (Founder)"
+  // instead of a price. We force the plan label to Business because HQ is always
+  // provisioned there (promote-founder + schema.js). A second superadmin is NOT
+  // comped: they fall through to the normal paid-subscriber billing view.
+  const comped = isFounderHq(req.user.email);
+  const compReason = comped ? 'Founder' : null;
+  const effectivePlan = comped ? 'business' : plan;
+  // Whether a Stripe customer exists for this account. Only a founder-checkout
+  // HQ has one; a hand-promoted admin may not. The UI gates the "Manage
+  // subscription" button on this so it never opens the portal for an account
+  // that would 400 (no stripe_customer_ row).
+  const hasStripeCustomer = !!db.prepare("SELECT value FROM settings WHERE key = ?").get(`stripe_customer_${userId}`)?.value;
+
   res.json({
-    plan,
-    planName: PLANS[plan]?.name || plan,
-    price: PLANS[plan]?.price_myr || 0,
+    plan: effectivePlan,
+    planName: PLANS[effectivePlan]?.name || effectivePlan,
+    price: comped ? 0 : (PLANS[plan]?.price_myr || 0),
+    comped,
+    compReason,
+    stripeCustomer: hasStripeCustomer,
     isTrialing,
     trialEnd: trialEnd || null,
     cancelPending: !!cancelPendingRaw,
@@ -352,7 +381,7 @@ async function ensurePortalConfig(stripe, baseUrl) {
     },
     features: {
       // Self-serve cancellation. `at_period_end` means the user keeps access
-      // until the current paid period (or trial) ends, matching the Terms:
+      // until the current paid period ends, matching the Terms:
       // "cancellation takes effect at the end of the current cycle."
       subscription_cancel: {
         enabled: true,
@@ -374,11 +403,11 @@ async function ensurePortalConfig(stripe, baseUrl) {
 }
 
 // POST /api/billing/portal — open the Stripe Customer Portal so the user can
-// cancel, update their card, or view invoices. Cancellation after the trial is
-// the primary use: the trial auto-converts to a paid subscription, and this is
-// the self-serve path to stop it (effective end-of-cycle). The Stripe
-// customer id is resolved server-side from the authenticated user, so a user
-// can only ever manage their own subscription (no IDOR).
+// cancel, update their card, or view invoices. Self-serve cancellation is the
+// primary use: the subscription renews monthly and this is the path to stop it
+// (effective end-of-cycle). The Stripe customer id is resolved server-side from
+// the authenticated user, so a user can only ever manage their own
+// subscription (no IDOR).
 router.post('/portal', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -451,14 +480,22 @@ router.post('/checkout', async (req, res) => {
       && crypto.timingSafeEqual(Buffer.from(founderToken), Buffer.from(founderTokenEnv));
 
     const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+
+    // No trial by default (PLANS[*].trial_days === 0) — the card is charged when
+    // Checkout completes. Stripe rejects trial_period_days: 0, so only send the
+    // key when a plan genuinely carries a trial.
+    const subscriptionData = {
+      metadata: { plan, username, displayName: displayName || username },
+    };
+    if (planInfo.trial_days > 0) {
+      subscriptionData.trial_period_days = planInfo.trial_days;
+    }
+
     const checkoutPayload = {
       mode: 'subscription',
       payment_method_types: ['card'],
       customer_email: email,
-      subscription_data: {
-        trial_period_days: planInfo.trial_days,
-        metadata: { plan, username, displayName: displayName || username },
-      },
+      subscription_data: subscriptionData,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${baseUrl}/api/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/#pricing`,
@@ -481,6 +518,140 @@ router.post('/checkout', async (req, res) => {
   }
 });
 
+// A checkout session may legitimately provision an account in three states:
+//   'paid'                → the card was charged (the normal, no-trial path)
+//   'no_payment_required' → nothing was due at completion. Two ways to get
+//                           here: the 100%-off FOUNDER_HQ coupon, or a trial
+//                           (Stripe does not charge on completion, so it never
+//                           reports 'paid'). Gating on 'paid' alone would
+//                           reject every comped account.
+//   subscription trialing → belt-and-braces for the trial case.
+export function isProvisionable(session) {
+  return ['paid', 'no_payment_required'].includes(session.payment_status)
+    || session.subscription?.status === 'trialing';
+}
+
+// Create the account for a completed signup checkout. Idempotent, and shared by
+// BOTH entry points:
+//   1. GET /success — the browser redirect after Stripe Checkout
+//   2. the checkout.session.completed webhook — the safety net for a customer
+//      who paid but never reached (1): tab closed, network dropped, or the
+//      redirect 500'd. With no trial the card is charged AT checkout, so
+//      without this net that customer is billed and has no account.
+//
+// Returns { status: 'created' | 'exists' | 'skipped', userId?, token? }.
+// The unique indexes on users.email / users.username make the insert the real
+// arbiter when the redirect and the webhook race each other — whoever loses the
+// race catches the constraint error and reports 'exists' rather than
+// double-provisioning.
+export async function provisionFromSession(session, baseUrl) {
+  const md = session.metadata || {};
+
+  // Upgrades of existing accounts are handled by the webhook's own branch, and
+  // a session with no plan/username isn't a signup at all.
+  if (md.upgrade === 'true') return { status: 'skipped' };
+  const { plan, username, email, displayName } = md;
+  if (!plan || !username || !email || !PLANS[plan]) return { status: 'skipped' };
+
+  const existing = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get(email, username);
+  if (existing) return { status: 'exists', userId: existing.id };
+
+  // CSPRNG temp password — Math.random was previously seeded predictably.
+  const tempPassword = randomTempPassword();
+  const hash = hashPassword(tempPassword);
+  const trialDays = PLANS[plan].trial_days || 0;
+  // CSPRNG verification code (no ambiguous chars).
+  const verifyCode = randomVerifyCode();
+
+  // Auto-login session. The webhook path never uses this token (there is no
+  // browser to hand it to); it is harmless and expires in 24h.
+  const token = generateToken();
+
+  // All-or-nothing. A half-written account is the worst outcome now that the
+  // card is charged before we get here: the retrying webhook would see the user
+  // row, report 'exists', and never write the missing stripe_customer_* row —
+  // leaving a paying customer who cannot open the billing portal.
+  const createAccount = db.transaction(() => {
+    const result = db.prepare(`
+      INSERT INTO users (username, email, password_hash, role, display_name, plan, budget_limit, monthly_system_cost, status, email_verified)
+      VALUES (?, ?, ?, 'user', ?, ?, 0, ?, 'active', 0)
+    `).run(username, email, hash, displayName || username, plan, PLANS[plan].price_myr);
+    const uid = result.lastInsertRowid;
+
+    const put = db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)");
+    put.run(`verify_code_${uid}`, verifyCode);
+    put.run(`stripe_customer_${uid}`, session.customer);
+    put.run(`stripe_subscription_${uid}`, session.subscription?.id || '');
+
+    // Only stamp a trial marker when the plan actually granted one. GET /usage
+    // derives isTrialing from this key, so its absence is what makes a new
+    // signup render as an ordinary paid subscription. Accounts created while
+    // trials were live keep their existing marker and finish their trial.
+    if (trialDays > 0) {
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + trialDays);
+      put.run(`trial_end_${uid}`, trialEnd.toISOString());
+    }
+
+    db.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', '+24 hours'))")
+      .run(token, uid);
+    // Store temp password for one-time retrieval (NOT in URL)
+    put.run(`temp_pass_${token}`, tempPassword);
+
+    return uid;
+  });
+
+  let userId;
+  try {
+    userId = createAccount();
+  } catch (e) {
+    // The other entry point won the race between our SELECT and this INSERT.
+    // The transaction rolled back, so there is nothing to clean up.
+    if (/UNIQUE constraint/i.test(e.message)) {
+      const winner = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get(email, username);
+      if (winner) return { status: 'exists', userId: winner.id };
+    }
+    throw e;
+  }
+
+  // Welcome + login details. Goes through sendEmail() so it uses the same
+  // Resend → SMTP fallback as outreach mail; the previous hand-rolled SMTP
+  // path read smtp_pass without decrypting it (smtp_pass is in
+  // SENSITIVE_KEYS) and silently failed. When the webhook is the one that
+  // provisions, this email is the customer's ONLY route to their credentials.
+  try {
+    await sendEmail({
+      to: email,
+      subject: 'Welcome to EIAAW SalesAgent — Your Login Details',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto">
+          <h1 style="color:#2ec4b6">Welcome to EIAAW SalesAgent!</h1>
+          <p>Hi ${displayName || username},</p>
+          <p>Your account is ready. Here are your login details:</p>
+          <div style="background:#f5f5f5;padding:20px;border-radius:8px;margin:20px 0">
+            <p><strong>Login URL:</strong> <a href="${baseUrl}/app">${baseUrl}/app</a></p>
+            <p><strong>Username:</strong> ${username}</p>
+            <p><strong>Password:</strong> ${tempPassword}</p>
+            <p><strong>Plan:</strong> ${PLANS[plan].name}${trialDays > 0 ? ` (${trialDays}-day free trial)` : ` — RM ${PLANS[plan].price_myr}/month`}</p>
+          </div>
+          <p style="color:#e74c3c"><strong>Please change your password after your first login.</strong></p>
+          <p style="background:#fff3cd;padding:12px;border-radius:6px;margin-top:12px"><strong>Verify your email:</strong> Enter code <strong style="font-size:18px;letter-spacing:2px">${verifyCode}</strong> in the app to activate full features.</p>
+          <p>${trialDays > 0
+            ? `Your ${trialDays}-day free trial starts today. You won't be charged until the trial ends.`
+            : `Your subscription is active from today and renews monthly. You can cancel anytime from <strong>Plan &amp; Billing</strong> — access continues to the end of the cycle you've paid for.`}</p>
+          <hr style="margin:24px 0">
+          <p style="color:#999;font-size:12px">EIAAW SalesAgent AI — AI-Human Sales Partnerships<br>
+          <a href="https://eiaawsolutions.com">eiaawsolutions.com</a></p>
+        </div>
+      `,
+    });
+  } catch (emailErr) {
+    console.error('Welcome email failed:', emailErr.message);
+  }
+
+  return { status: 'created', userId, token };
+}
+
 // GET /api/billing/success — handle successful checkout, create account
 router.get('/success', async (req, res) => {
   try {
@@ -489,92 +660,20 @@ router.get('/success', async (req, res) => {
       expand: ['subscription'],
     });
 
-    if (session.payment_status !== 'paid' && !session.subscription?.trial_start) {
+    if (!isProvisionable(session)) {
       return res.redirect('/?error=payment_failed');
     }
 
-    const { plan, username, email, displayName } = session.metadata;
+    const baseUrl = req.headers.origin || `https://${req.headers.host}`;
+    const result = await provisionFromSession(session, baseUrl);
 
-    // Check if already created (idempotent)
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-    if (existing) {
-      // Already exists, just redirect to login
+    if (result.status !== 'created') {
+      // Already provisioned (webhook won the race, or this redirect was
+      // replayed), or the session wasn't a signup. Send them to login.
       return res.redirect('/app?signup=exists');
     }
 
-    // CSPRNG temp password — Math.random was previously seeded predictably.
-    const tempPassword = randomTempPassword();
-    const hash = hashPassword(tempPassword);
-
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + (PLANS[plan]?.trial_days || 14));
-
-    // CSPRNG verification code (no ambiguous chars).
-    const verifyCode = randomVerifyCode();
-
-    const result = db.prepare(`
-      INSERT INTO users (username, email, password_hash, role, display_name, plan, budget_limit, monthly_system_cost, status, email_verified)
-      VALUES (?, ?, ?, 'user', ?, ?, 0, ?, 'active', 0)
-    `).run(
-      username, email, hash, displayName || username, plan,
-      PLANS[plan]?.price_myr || 99
-    );
-
-    // Store Stripe customer and subscription IDs
-    const userId = result.lastInsertRowid;
-
-    // Store verification code
-    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
-      .run(`verify_code_${userId}`, verifyCode);
-    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
-      .run(`stripe_customer_${userId}`, session.customer);
-    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
-      .run(`stripe_subscription_${userId}`, session.subscription?.id || '');
-    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
-      .run(`trial_end_${userId}`, trialEnd.toISOString());
-
-    // Auto-login: create session
-    const token = generateToken();
-    db.prepare(
-      "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', '+24 hours'))"
-    ).run(token, userId);
-
-    // Welcome + login details. Goes through sendEmail() so it uses the same
-    // Resend → SMTP fallback as outreach mail; the previous hand-rolled SMTP
-    // path read smtp_pass without decrypting it (smtp_pass is in
-    // SENSITIVE_KEYS) and silently failed.
-    try {
-      const baseUrl = req.headers.origin || `https://${req.headers.host}`;
-      await sendEmail({
-        to: email,
-        subject: 'Welcome to EIAAW SalesAgent — Your Login Details',
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto">
-            <h1 style="color:#2ec4b6">Welcome to EIAAW SalesAgent!</h1>
-            <p>Hi ${displayName || username},</p>
-            <p>Your account is ready. Here are your login details:</p>
-            <div style="background:#f5f5f5;padding:20px;border-radius:8px;margin:20px 0">
-              <p><strong>Login URL:</strong> <a href="${baseUrl}/app">${baseUrl}/app</a></p>
-              <p><strong>Username:</strong> ${username}</p>
-              <p><strong>Password:</strong> ${tempPassword}</p>
-              <p><strong>Plan:</strong> ${PLANS[plan]?.name || plan} (14-day free trial)</p>
-            </div>
-            <p style="color:#e74c3c"><strong>Please change your password after your first login.</strong></p>
-            <p style="background:#fff3cd;padding:12px;border-radius:6px;margin-top:12px"><strong>Verify your email:</strong> Enter code <strong style="font-size:18px;letter-spacing:2px">${verifyCode}</strong> in the app to activate full features.</p>
-            <p>Your 14-day free trial starts today. You won't be charged until the trial ends.</p>
-            <hr style="margin:24px 0">
-            <p style="color:#999;font-size:12px">EIAAW SalesAgent AI — AI-Human Sales Partnerships<br>
-            <a href="https://eiaawsolutions.com">eiaawsolutions.com</a></p>
-          </div>
-        `,
-      });
-    } catch (emailErr) {
-      console.error('Welcome email failed:', emailErr.message);
-    }
-
-    // Store temp password for one-time retrieval (NOT in URL)
-    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
-      .run(`temp_pass_${token}`, tempPassword);
+    const token = result.token;
 
     // The session token used to ride along in the URL (?token=...), which
     // leaks via referrer headers, browser history, and any analytics that
@@ -658,6 +757,27 @@ router.post('/webhook', async (req, res) => {
             db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
               .run(`stripe_subscription_${userId}`, session.subscription);
           }
+          break;
+        }
+
+        // SIGNUP SAFETY NET. The card is charged when Checkout completes, so a
+        // customer who never lands on /success (tab closed, network drop,
+        // redirect error) would otherwise be billed with no account. Re-fetch
+        // the session to get the expanded subscription the webhook payload
+        // omits, then run the SAME idempotent provisioner /success uses — if
+        // the redirect already won, this no-ops on the email-exists guard.
+        // Throwing here returns 400 and Stripe retries, which is what we want.
+        if (session.metadata?.plan && session.metadata?.username) {
+          const stripe = getStripe();
+          const full = await stripe.checkout.sessions.retrieve(session.id, { expand: ['subscription'] });
+          if (isProvisionable(full)) {
+            const result = await provisionFromSession(full, `https://${req.headers.host}`);
+            if (result.status === 'created') {
+              console.warn(`[stripe-webhook] RECOVERED stranded signup — provisioned user ${result.userId} for session ${session.id} that /success never finished.`);
+            }
+          } else {
+            console.info(`[stripe-webhook] signup session ${session.id} payment_status=${full.payment_status} — not provisioning.`);
+          }
         }
         break;
       }
@@ -695,10 +815,23 @@ router.post('/webhook', async (req, res) => {
         // end-of-period cancellation (or an immediate cancel).
         const usrId = userIdForSubscription(sub.id);
         if (usrId) {
-          db.prepare("UPDATE users SET status = 'suspended' WHERE id = ?").run(usrId);
-          db.prepare('DELETE FROM sessions WHERE user_id = ?').run(usrId);
-          // Cancellation is now complete — the pending marker is obsolete.
-          db.prepare("DELETE FROM settings WHERE key = ?").run(`cancel_pending_${usrId}`);
+          // Never suspend the single HQ / Founder account. It rides a Business
+          // subscription comped to RM 0.00 by the FOUNDER_HQ coupon; if that
+          // subscription is ever deleted (coupon rotated, Stripe housekeeping),
+          // HQ must keep full access — losing the operator account is far worse
+          // than a lapsed comp. Scoped to FOUNDER_HQ_EMAIL only (not every
+          // superadmin), matching the /usage comp scope. Clear the pending
+          // marker but leave status/sessions untouched.
+          const usr = db.prepare('SELECT email FROM users WHERE id = ?').get(usrId);
+          if (isFounderHq(usr?.email)) {
+            db.prepare("DELETE FROM settings WHERE key = ?").run(`cancel_pending_${usrId}`);
+            console.warn(`[stripe-webhook] subscription.deleted for HQ Founder account ${usrId} — NOT suspending (Founder comp).`);
+          } else {
+            db.prepare("UPDATE users SET status = 'suspended' WHERE id = ?").run(usrId);
+            db.prepare('DELETE FROM sessions WHERE user_id = ?').run(usrId);
+            // Cancellation is now complete — the pending marker is obsolete.
+            db.prepare("DELETE FROM settings WHERE key = ?").run(`cancel_pending_${usrId}`);
+          }
         }
         break;
       }

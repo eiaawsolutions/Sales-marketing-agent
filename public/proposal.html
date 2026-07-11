@@ -422,7 +422,7 @@
 
     <div class="hero-eyebrow-row rvl">
       <div class="eyebrow">A proposal</div>
-      <div class="availability"><span class="dot"></span> Valid for 14 days</div>
+      <div class="availability"><span class="dot"></span> Offer valid 14 days</div>
     </div>
 
     <div class="grid-12">
@@ -440,7 +440,7 @@
         This is a proposal for a single agent that generates leads, qualifies them with reasoning, writes outreach, and talks to prospects by voice &mdash; in place of hours of manual work, every day.
       </p>
       <div class="hero-cta-row">
-        <button class="btn btn-primary btn-lg magnetic" onclick="openSignup('pro')">Start 14-day trial <span class="arrow">&rarr;</span></button>
+        <button class="btn btn-primary btn-lg magnetic" onclick="openSignup('pro')">Subscribe now <span class="arrow">&rarr;</span></button>
         <button class="btn btn-ghost" onclick="openContact()">Talk to us</button>
       </div>
     </div>
@@ -650,7 +650,7 @@
     <header class="section-head rvl">
       <div class="label eyebrow">Pricing</div>
       <h2 class="title section-h">Flat monthly. <em>Cancel anytime.</em></h2>
-      <div class="aside">MYR &middot; 14-day trial</div>
+      <div class="aside">MYR &middot; billed monthly</div>
     </header>
 
     <div class="pricing">
@@ -659,12 +659,13 @@
         <div class="price-num">RM 99<span class="per">/ mo</span></div>
         <p class="price-blurb">Individual salespeople getting started.</p>
         <ul class="price-features-inline">
-          <li>100 leads &middot; 3 campaigns</li>
+          <li>30 AI-verified leads / month</li>
+          <li>3 campaigns</li>
           <li>50 AI actions / month</li>
           <li>5 voice calls / month</li>
           <li>Email &amp; social content</li>
         </ul>
-        <button class="btn btn-ghost" onclick="openSignup('starter')">Start trial <span class="arrow">&rarr;</span></button>
+        <button class="btn btn-ghost" onclick="openSignup('starter')">Subscribe <span class="arrow">&rarr;</span></button>
       </div>
 
       <div class="pricing-row featured rvl">
@@ -672,12 +673,13 @@
         <div class="price-num">RM 199<span class="per">/ mo</span></div>
         <p class="price-blurb">Operators who want real AI leverage.</p>
         <ul class="price-features-inline">
-          <li>500 leads &middot; 10 campaigns</li>
+          <li>70 AI-verified leads / month</li>
+          <li>10 campaigns</li>
           <li>200 AI actions / month</li>
           <li>20 voice calls / month</li>
           <li>Auto-outreach + AI lead gen</li>
         </ul>
-        <button class="btn btn-primary" onclick="openSignup('pro')">Start trial <span class="arrow">&rarr;</span></button>
+        <button class="btn btn-primary" onclick="openSignup('pro')">Subscribe <span class="arrow">&rarr;</span></button>
       </div>
 
       <div class="pricing-row rvl">
@@ -685,12 +687,13 @@
         <div class="price-num">RM 399<span class="per">/ mo</span></div>
         <p class="price-blurb">Sales teams and agencies.</p>
         <ul class="price-features-inline">
-          <li>Unlimited leads &amp; campaigns</li>
+          <li>140 AI-verified leads / month</li>
+          <li>25 campaigns</li>
           <li>1,000 AI actions / month</li>
           <li>100 voice calls / month</li>
           <li>Priority model (Claude Sonnet) &middot; up to 10 seats</li>
         </ul>
-        <button class="btn btn-ghost" onclick="openSignup('business')">Start trial <span class="arrow">&rarr;</span></button>
+        <button class="btn btn-ghost" onclick="openSignup('business')">Subscribe <span class="arrow">&rarr;</span></button>
       </div>
     </div>
   </div>
@@ -701,12 +704,12 @@
   <div class="wrap">
     <div class="eyebrow rvl">The ask</div>
     <h2 class="display rvl" style="margin-top:20px">
-      Give the agent <em>fourteen days</em>.
+      Give the agent <em>one month</em>.
     </h2>
     <div class="cta-final-meta rvl">
-      <p class="lead">No card charged during the trial. The agent is live the moment you sign in. If it doesn't carry its weight, walk.</p>
+      <p class="lead">You're billed on checkout. The agent is live the moment you sign in. If it doesn't carry its weight, cancel &mdash; you keep access to the end of the month you paid for, and it never bills again.</p>
       <div class="hero-cta-row">
-        <button class="btn btn-primary btn-lg magnetic" onclick="openSignup('pro')">Start 14-day trial <span class="arrow">&rarr;</span></button>
+        <button class="btn btn-primary btn-lg magnetic" onclick="openSignup('pro')">Subscribe now <span class="arrow">&rarr;</span></button>
         <button class="btn btn-outline btn-lg" onclick="openContact()">Talk to us</button>
       </div>
     </div>
@@ -813,8 +816,8 @@
   <div class="modal-card">
     <button onclick="closeSignup()" class="modal-close" aria-label="Close">&times;</button>
     <div class="modal-head">
-      <h2>Start your free trial.</h2>
-      <p>14 days free. No card charged until the trial ends.</p>
+      <h2>Start your subscription.</h2>
+      <p>Billed monthly on checkout. Cancel anytime.</p>
     </div>
     <div class="plan-badge"><span id="signup-plan-label">PRO &middot; RM 199 / mo</span></div>
     <div class="form-group"><label>Full name</label><input id="su-name" placeholder="e.g. Ahmad Firdaus"></div>
@@ -827,7 +830,7 @@
         <option value="business">Business &mdash; RM 399 / mo</option>
       </select>
     </div>
-    <p style="font-family:var(--mono);font-size:10px;color:var(--mute);margin-bottom:20px;text-align:center;letter-spacing:0.1em;text-transform:uppercase">No charge during trial &middot; Cancel anytime</p>
+    <p style="font-family:var(--mono);font-size:10px;color:var(--mute);margin-bottom:20px;text-align:center;letter-spacing:0.1em;text-transform:uppercase">Charged on checkout &middot; Cancel anytime</p>
     <div id="su-error" class="modal-err"></div>
     <button id="su-btn" onclick="startCheckout()" class="modal-btn">Continue to payment &rarr;</button>
     <p class="modal-foot">Already have an account? <a href="/app">Sign in</a></p>

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../db/index.js';
 import { requireAuth, requireSuperadmin, hashPassword } from '../middleware/auth.js';
+import { FOUNDER_HQ_EMAIL, isFounderHq } from '../config/hq.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -18,7 +19,10 @@ router.get('/', (req, res) => {
       (SELECT COALESCE(SUM(total_tokens), 0) FROM ai_cost_log WHERE user_id = u.id) as total_tokens
     FROM users u ORDER BY u.created_at DESC
   `).all();
-  res.json(users);
+  // is_hq flags the single HQ / Founder account so the UI can lock its role
+  // (always superadmin) and forbid promoting anyone else. Override-safe: derived
+  // from FOUNDER_HQ_EMAIL, not hardcoded client-side.
+  res.json(users.map(u => ({ ...u, is_hq: isFounderHq(u.email) })));
 });
 
 // POST /api/users — DISABLED.
@@ -55,12 +59,35 @@ router.get('/:id', (req, res) => {
     WHERE c.user_id = ? GROUP BY c.id ORDER BY c.created_at DESC
   `).all(req.params.id);
 
-  res.json({ ...user, campaigns });
+  res.json({ ...user, campaigns, is_hq: isFounderHq(user.email) });
 });
 
 // PUT /api/users/:id — update user
 router.put('/:id', (req, res) => {
   const { username, display_name, email, role, budget_limit, monthly_system_cost, status, plan } = req.body;
+
+  // Invariant: only the HQ / Founder account may be a superadmin. Enforce it on
+  // the RESULTING state (post-update role + email), so this catches promoting a
+  // non-HQ user, and changing a superadmin's email away from the HQ address.
+  const target = db.prepare('SELECT email, role FROM users WHERE id = ?').get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const effectiveEmail = email !== undefined ? email : target.email;
+  const effectiveRole = role !== undefined ? role : target.role;
+
+  if (effectiveRole === 'superadmin' && !isFounderHq(effectiveEmail)) {
+    return res.status(403).json({ error: `Only the HQ account (${FOUNDER_HQ_EMAIL}) can be a superadmin.` });
+  }
+  // Protect the HQ account from being locked out: it must stay a superadmin and
+  // keep its HQ email. (Deleting it is already blocked separately.)
+  if (isFounderHq(target.email) && target.role === 'superadmin') {
+    if (effectiveRole !== 'superadmin') {
+      return res.status(403).json({ error: 'The HQ account must remain a superadmin.' });
+    }
+    if (email !== undefined && !isFounderHq(email)) {
+      return res.status(403).json({ error: 'The HQ account email cannot be changed away from the HQ address.' });
+    }
+  }
+
   const fields = [];
   const params = [];
 

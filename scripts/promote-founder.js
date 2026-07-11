@@ -7,10 +7,18 @@
  * Idempotent: returns the user state whether or not it changed it.
  */
 import db from '../src/db/index.js';
+import { FOUNDER_HQ_EMAIL, isFounderHq } from '../src/config/hq.js';
 
 const email = (process.argv[2] || '').toLowerCase().trim();
 if (!email) {
   console.error('Usage: node scripts/promote-founder.js <email>');
+  process.exit(1);
+}
+
+// Invariant: only the HQ / Founder account may be a superadmin.
+if (!isFounderHq(email)) {
+  console.error(`Refusing to promote ${email}: only the HQ account (${FOUNDER_HQ_EMAIL}) can be a superadmin.`);
+  console.error('Set FOUNDER_HQ_EMAIL if the HQ address differs in this environment.');
   process.exit(1);
 }
 

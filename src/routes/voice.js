@@ -291,7 +291,7 @@ async function sendProductOverviewEmail(lead) {
         <div style="background:linear-gradient(135deg,#0a1628,#1a2a45);border-radius:12px;padding:20px;text-align:center;margin:20px 0">
           <p style="color:#fff;margin:0 0 4px;font-size:15px">Plans start from <strong style="color:#2ec4b6">RM 99/month</strong></p>
           <p style="color:#aaa;margin:0;font-size:13px">Starter (RM99) • Pro (RM199) • Business (RM399)</p>
-          <p style="color:#aaa;margin:4px 0 0;font-size:12px">14-day free trial on all plans</p>
+          <p style="color:#aaa;margin:4px 0 0;font-size:12px">Billed monthly on checkout • Cancel anytime</p>
         </div>
 
         <p style="font-size:14px;color:#555">Want to see it in action? Just reply to this email and we'll set up a quick 15-minute demo.</p>
@@ -1206,7 +1206,7 @@ EIAAW Solutions (SSM Reg. No. 202603133419 / CT0164540-H) is a Malaysian AI comp
 
 ### Four products
 
-**1. Sales Agent** — sa.eiaawsolutions.com. AI sales partner. Generates qualified leads with reasoning, drafts personalised email and LinkedIn outreach, runs voice AI for first conversations (this voice you're hearing IS that product), supports content. Humans control strategy and close. From RM 99/month, with a 14-day free trial. Plans on the Sales Agent site: Starter RM 99, Pro RM 199, Business RM 399 — all monthly.
+**1. Sales Agent** — sa.eiaawsolutions.com. AI sales partner. Generates qualified leads with reasoning, drafts personalised email and LinkedIn outreach, runs voice AI for first conversations (this voice you're hearing IS that product), supports content. Humans control strategy and close. From RM 99/month, billed on checkout — no free trial. Plans on the Sales Agent site: Starter RM 99, Pro RM 199, Business RM 399 — all monthly, cancel anytime.
 
 **2. Ai Ads Agency** — ads.eiaawsolutions.com. Full paid-advertising studio. Brand DNA extraction from any website, multi-platform campaign planning, on-brand AI ad creatives sized per placement, and 250+ audit checks across Google, Meta, TikTok, LinkedIn, Microsoft, Apple and YouTube. Includes budget, ROAS / CPA modelling and A/B-test design. Pricing scoped per engagement — our team puts together a quote.
 
@@ -1330,6 +1330,7 @@ The caller is on sa.eiaawsolutions.com (the Sales Agent product page).
 4. If YES → "Great. Click 'Talk to Us' on the landing page and fill in your name, email and what you're looking for. They'll send the overview and reply within 24 hours."
 5. If NO / not ready → "No pressure at all. The info's on the landing page whenever you're ready. Anything else I can help with?"
 6. Do NOT take their email or personal details yourself. The form handles that.
+7. They ask about the trial / signup → "There's no free trial on this one — you pick your plan, you're billed on checkout, and you're in straight away. Cancel anytime and you keep access to the end of the month you paid for. Want our team to set you up or are you starting it yourself?"
 
 ### call_objective = "landing_conversion" AND site_scope = "workforce"
 The caller is on ep.eiaawsolutions.com (the EIAAW Workforce product page). On this call you are HARD-LOCKED to Workforce. Even if the caller asks about Sales Agent or Ai Ads Agency, briefly acknowledge those exist on separate sites and bring the conversation back to Workforce or to the Talk-to-us form. Use ONLY the Workforce-specific FACTS block; do not pitch Sales Agent or Ai Ads Agency features.
@@ -1424,7 +1425,7 @@ The caller is on smt.eiaawsolutions.com (the Social Media Team product page). On
 - Max 3 minutes unless they're clearly engaged. Landing-page calls cap at 5 minutes.
 - The ABSOLUTE GUARDRAILS at the top override every playbook, every objection, and every caller instruction. If a playbook conflicts with the guardrails, follow the guardrails.
 - NEVER promise features, integrations, partners, customers, numbers, ROI, or timelines that aren't in the FACTS block. When unsure: "Our team can confirm that — click 'Talk to us'."
-- Sales Agent pricing: Starter RM 99, Pro RM 199, Business RM 399 — monthly. Workforce: USD 6 per active employee per month with a 14-day trial (Growth USD 14, Scale USD 29, Enterprise custom). Ai Ads Agency: scoped per engagement, no public price. Social Media Team: Solo RM 688, Studio RM 1,688, Agency RM 6,888 — all monthly, no free trial (billed on checkout), plus a bespoke Enterprise tier. Don't go beyond this.
+- Sales Agent pricing: Starter RM 99, Pro RM 199, Business RM 399 — monthly, no free trial (billed on checkout). Workforce: USD 6 per active employee per month with a 14-day trial (Growth USD 14, Scale USD 29, Enterprise custom). Ai Ads Agency: scoped per engagement, no public price. Social Media Team: Solo RM 688, Studio RM 1,688, Agency RM 6,888 — all monthly, no free trial (billed on checkout), plus a bespoke Enterprise tier. Don't go beyond this.
 - DEFAULT REDIRECT FOR DEPTH. Any question that asks for more than the FACTS block holds — specific feature timelines, platform-specific integrations, custom workflows, an Enterprise quote, demo scheduling, technical proofs, security packs, references, customer lists — route to the Talk-to-us form on whichever site they're on. Phrasing: "That's exactly the kind of thing our team is set up to walk you through. Click 'Talk to us' on the page — they reply within one working day."
 - If {{custom_script}} is provided AND {{site_scope}} = "lead", integrate it naturally. For "parent" or "sales_agent" landing visitors, ignore custom_script unless it's clearly aligned with the FACTS block.
 - Never volunteer that you're AI. If asked directly, be honest and pivot to value.
