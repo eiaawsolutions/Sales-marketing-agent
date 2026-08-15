@@ -49,6 +49,8 @@ const api = {
   async put(url, body, headers = {}) { return apiRequest(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }); },
   async patch(url, body, headers = {}) { return apiRequest(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }); },
   async del(url, headers = {}) { return apiRequest(url, { method: 'DELETE', headers }); },
+  // Alias — sibling scripts (sources-ui.js) call the HTTP verb by its real name.
+  async delete(url, headers = {}) { return apiRequest(url, { method: 'DELETE', headers }); },
 };
 // Expose to other script files (email-designer.js)
 window.api = api;
@@ -57,6 +59,18 @@ window.esc = esc;
 // ========== State ==========
 let currentPage = 'dashboard';
 let modal = null;
+
+// `modal` is a top-level `let`, so it lives in the global *lexical* environment
+// and is NOT reachable as `window.modal`. Sibling scripts loaded separately
+// (sources-ui.js) can only address it via `window.modal`, so without this bridge
+// their `window.modal = {...}; window.render();` writes a phantom property and
+// render() sees `modal === null` — every Sources modal silently no-ops.
+// Accessor keeps both spellings pointing at the same slot.
+Object.defineProperty(window, 'modal', {
+  get() { return modal; },
+  set(v) { modal = v; },
+  configurable: true,
+});
 // Whether the superadmin-only "Admin" sidebar group is expanded. Auto-opens
 // when the active page is one of its children (see renderSidebar).
 let adminMenuOpen = false;
