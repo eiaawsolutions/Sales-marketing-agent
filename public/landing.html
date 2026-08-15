@@ -1968,6 +1968,12 @@ function openContact(topic) {
   document.getElementById('contact-success').style.display = 'none';
   document.getElementById('ct-error').style.display = 'none';
   document.getElementById('contact-modal').style.display = 'flex';
+  // A successful send leaves the button disabled and reading "Sending..." — the
+  // form is hidden at that point so nothing resets it. Without this, re-opening
+  // the modal shows a dead button and no second enquiry can ever be sent.
+  const btn = document.getElementById('ct-btn');
+  btn.disabled = false;
+  btn.textContent = 'Send Enquiry';
   if (topic === 'enterprise') {
     const msgEl = document.getElementById('ct-message');
     if (msgEl && !msgEl.value.trim()) {
@@ -2018,6 +2024,8 @@ async function submitContact() {
 
     document.getElementById('contact-form').style.display = 'none';
     document.getElementById('contact-success').style.display = 'block';
+    // Sent — drop the message so a re-opened form never re-submits stale text.
+    document.getElementById('ct-message').value = '';
   } catch (e) {
     errEl.textContent = 'Something went wrong. Please email us at eiaawsolutions@gmail.com';
     errEl.style.display = 'block';
