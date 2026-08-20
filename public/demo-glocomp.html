@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en-MY">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulated Scenario — Glocomp Systems &times; EIAAW SalesAgent</title>
+<meta name="description" content="A simulated go-to-market scenario: how the EIAAW SalesAgent would turn Glocomp's WEKA AI-infrastructure launch into qualified, channel-aware pipeline.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#11766A">
+<link rel="icon" type="image/png" href="/brand/shield.png?v=3">
+<link rel="apple-touch-icon" href="/brand/shield.png?v=3">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FAF7F2;
+  --bg-warm: #F3EDE0;
+  --surface: #FFFFFF;
+  --ink: #0F1A1D;
+  --ink-2: #2A3438;
+  --mute: #6B7A7F;
+  --line: #D9CFBC;
+  --line-soft: #E8DFCC;
+  --primary: #1FA896;
+  --primary-dark: #11766A;
+  --primary-tint: #E5F4F1;
+  --danger: #B4412B;
+  --gradient: linear-gradient(135deg, #22B8A5 0%, #11766A 55%, #0A4D47 100%);
+  --shield-blue: #2C5F8C;
+
+  --serif: 'Instrument Serif', 'Times New Roman', serif;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
+
+  --fs-eyebrow: 11px;
+  --fs-body: 16px;
+  --fs-lead: clamp(18px, 1.1vw + 14px, 22px);
+
+  --tracking-ui: -0.01em;
+  --tracking-display: -0.035em;
+  --tracking-eyebrow: 0.14em;
+
+  --ease: cubic-bezier(.2,.7,.2,1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  letter-spacing: var(--tracking-ui);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+
+.wrap {
+  max-width: 1440px; margin: 0 auto;
+  padding: 0 clamp(20px, 4vw, 56px);
+  position: relative; z-index: 1;
+}
+.grid-12 { display: grid; grid-template-columns: repeat(12, 1fr); gap: clamp(16px, 1.6vw, 28px); }
+.section-pad { padding: clamp(84px, 12vh, 150px) 0; }
+.rule { height: 1px; background: var(--line-soft); border: 0; margin: 0; }
+
+/* ---------- typography primitives ---------- */
+.eyebrow {
+  font-family: var(--mono); font-size: var(--fs-eyebrow); font-weight: 500;
+  text-transform: uppercase; letter-spacing: var(--tracking-eyebrow);
+  color: var(--primary-dark);
+  display: inline-flex; align-items: center; gap: 10px;
+}
+.eyebrow::before { content: ''; width: 28px; height: 1px; background: currentColor; opacity: 0.5; }
+.display {
+  font-family: var(--sans); font-weight: 500;
+  font-size: clamp(40px, 6.4vw, 92px); line-height: 0.98;
+  letter-spacing: var(--tracking-display); color: var(--ink); margin: 0;
+}
+.display em, .section-h em {
+  font-family: var(--serif); font-style: italic; font-weight: 400;
+  color: var(--primary-dark); letter-spacing: -0.01em;
+}
+.section-h {
+  font-family: var(--sans); font-weight: 500;
+  font-size: clamp(30px, 4vw, 56px); line-height: 1.03;
+  letter-spacing: var(--tracking-display); color: var(--ink); margin: 0;
+}
+.lead { font-size: var(--fs-lead); line-height: 1.5; color: var(--ink-2); max-width: 54ch; }
+.indent { display: block; padding-left: clamp(24px, 7vw, 130px); }
+.meta-line {
+  font-family: var(--mono); font-size: var(--fs-eyebrow); text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--mute);
+}
+p { margin: 0 0 18px; }
+.body-col { max-width: 62ch; color: var(--ink-2); }
+.body-col strong { color: var(--ink); font-weight: 600; }
+
+.section-head {
+  display: grid; grid-template-columns: repeat(12, 1fr);
+  gap: clamp(16px, 1.6vw, 28px);
+  margin-bottom: clamp(48px, 8vh, 96px); align-items: end;
+}
+.section-head .label { grid-column: 1 / span 2; }
+.section-head .title { grid-column: 3 / span 8; }
+.section-head .aside {
+  grid-column: 11 / span 2; text-align: right;
+  font-family: var(--mono); font-size: var(--fs-eyebrow);
+  letter-spacing: 0.12em; color: var(--mute); text-transform: uppercase;
+}
+
+/* ---------- lockup ---------- */
+.lockup { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; }
+.lockup img { width: 38px; height: 38px; object-fit: contain; }
+.lockup .words { display: flex; flex-direction: column; line-height: 1.1; }
+.lockup .words strong {
+  font-size: 13px; font-weight: 800; letter-spacing: 0.09em;
+  color: var(--primary-dark); text-transform: uppercase;
+}
+.lockup .words small {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.13em;
+  color: var(--mute); text-transform: uppercase;
+}
+
+/* ---------- nav ---------- */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 90;
+  padding: 16px 0; transition: all 0.4s var(--ease);
+  border-bottom: 1px solid transparent;
+}
+.nav.scrolled {
+  background: rgba(250, 247, 242, 0.86);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-bottom-color: var(--line-soft); padding: 11px 0;
+}
+.nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.nav-right { display: flex; align-items: center; gap: clamp(10px, 2vw, 22px); }
+.nav-link {
+  font-size: 13.5px; color: var(--ink-2); text-decoration: none;
+  transition: color 0.3s var(--ease);
+}
+.nav-link:hover { color: var(--primary-dark); }
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 13px 22px;
+  font-family: var(--sans); font-size: 14px; font-weight: 500;
+  letter-spacing: -0.005em; border-radius: 999px;
+  cursor: pointer; text-decoration: none;
+  transition: all 0.35s var(--ease);
+  border: 1px solid transparent; position: relative; overflow: hidden;
+}
+.btn-primary { background: var(--ink); color: var(--bg); }
+.btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+.btn-outline { background: transparent; color: var(--ink); border-color: var(--ink); }
+.btn-outline:hover { background: var(--ink); color: var(--bg); }
+.btn .arrow { display: inline-block; transition: transform 0.35s var(--ease); }
+.btn:hover .arrow { transform: translateX(4px); }
+.btn-lg { padding: 17px 28px; font-size: 15px; }
+
+/* ---------- chips ---------- */
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.11em;
+  padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--mute); background: var(--surface);
+}
+.chip-sim { border-color: rgba(180,65,43,0.34); color: var(--danger); background: rgba(180,65,43,0.05); }
+.chip-real { border-color: rgba(17,118,106,0.34); color: var(--primary-dark); background: var(--primary-tint); }
+.chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* ---------- reveal ---------- */
+.rvl { opacity: 0; transform: translateY(18px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
+.rvl.in { opacity: 1; transform: none; }
+
+/* ---------- hero ---------- */
+.hero { padding: clamp(140px, 20vh, 210px) 0 clamp(60px, 9vh, 110px); position: relative; }
+.hero::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 70% 55% at 78% 8%, rgba(31,168,150,0.09), transparent 62%);
+}
+.hero-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap; margin-bottom: clamp(48px, 9vh, 96px);
+  padding-bottom: 20px; border-bottom: 1px solid var(--line-soft);
+}
+.hero-title { grid-column: 1 / span 9; }
+.hero-side { grid-column: 10 / span 3; align-self: end; }
+.hero-side .lead { font-size: 15.5px; color: var(--mute); max-width: 34ch; }
+.hero .lead-main { margin-top: clamp(26px, 4vh, 44px); }
+.hero-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 26px; }
+
+.notice {
+  margin-top: clamp(34px, 5vh, 56px);
+  border-left: 2px solid var(--primary-dark);
+  padding: 16px 0 16px 20px;
+  max-width: 68ch; color: var(--ink-2); font-size: 15px;
+}
+.notice strong { color: var(--ink); }
+
+/* ---------- fact rows ---------- */
+.facts { border-top: 1px solid var(--line-soft); }
+.fact {
+  display: grid; grid-template-columns: 2.4fr 3.6fr 1.6fr;
+  gap: clamp(14px, 2vw, 34px); align-items: baseline;
+  padding: 22px 0; border-bottom: 1px solid var(--line-soft);
+}
+.fact-k {
+  font-family: var(--mono); font-size: var(--fs-eyebrow); text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--primary-dark);
+}
+.fact-v { color: var(--ink-2); font-size: 15.5px; }
+.fact-v b { color: var(--ink); font-weight: 600; }
+.fact-src { text-align: right; }
+
+/* ---------- stepper ---------- */
+.stepper { display: grid; grid-template-columns: 300px 1fr; gap: clamp(24px, 4vw, 64px); align-items: start; }
+.step-rail { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 92px; }
+.step-btn {
+  display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: baseline;
+  text-align: left; background: transparent; border: 0; cursor: pointer;
+  padding: 14px 12px 14px 0; border-top: 1px solid var(--line-soft);
+  font-family: var(--sans); color: var(--mute);
+  transition: color 0.35s var(--ease), padding 0.35s var(--ease);
+}
+.step-btn:hover { color: var(--ink-2); padding-left: 6px; }
+.step-btn .n { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; white-space: nowrap; }
+.step-btn .t { font-size: 15px; font-weight: 500; letter-spacing: var(--tracking-ui); line-height: 1.3; }
+.step-btn[aria-selected="true"] { color: var(--ink); border-top-color: var(--primary-dark); }
+.step-btn[aria-selected="true"] .n { color: var(--primary-dark); }
+
+.step-panel { display: none; }
+.step-panel.on { display: block; animation: fade 0.6s var(--ease); }
+@keyframes fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.step-panel h3 {
+  font-family: var(--sans); font-weight: 500; font-size: clamp(24px, 2.6vw, 38px);
+  line-height: 1.08; letter-spacing: var(--tracking-display); margin: 0 0 8px;
+}
+.step-panel .when { margin-bottom: 22px; }
+
+/* terminal-ish evidence block, composed from tokens */
+.trace {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 20px 22px; margin: 22px 0 0;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.85; color: var(--ink-2);
+  box-shadow: 0 1px 2px rgba(15,26,29,0.04), 0 14px 34px -20px rgba(15,26,29,0.24);
+  overflow-x: auto;
+}
+.trace .k { color: var(--primary-dark); }
+.trace .d { color: var(--mute); }
+.trace .w { color: var(--danger); }
+.trace-h {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--line-soft);
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.13em; color: var(--mute);
+}
+
+/* ---------- lead inspector ---------- */
+.inspect { display: grid; grid-template-columns: 1.05fr 1fr; gap: clamp(20px, 3vw, 44px); align-items: start; }
+.lead-list { display: flex; flex-direction: column; }
+.lead-row {
+  display: grid; grid-template-columns: 58px 1fr auto; gap: 14px; align-items: center;
+  padding: 18px 14px 18px 0; border-top: 1px solid var(--line-soft);
+  background: transparent; border-left: 0; border-right: 0; border-bottom: 0;
+  text-align: left; cursor: pointer; width: 100%; font-family: var(--sans);
+  transition: padding 0.35s var(--ease), background 0.35s var(--ease);
+}
+.lead-row:last-child { border-bottom: 1px solid var(--line-soft); }
+.lead-row:hover { padding-left: 8px; }
+.lead-row[aria-selected="true"] { background: var(--primary-tint); padding-left: 8px; }
+.score {
+  font-family: var(--mono); font-size: 19px; font-weight: 500;
+  color: var(--ink); line-height: 1;
+}
+.score small { display: block; font-size: 8.5px; letter-spacing: 0.12em; color: var(--mute); margin-top: 4px; }
+.lead-who { min-width: 0; }
+.lead-who .role { display: block; font-size: 14.5px; font-weight: 500; color: var(--ink); line-height: 1.3; }
+.lead-who .org { display: block; font-size: 13px; color: var(--mute); margin-top: 2px; }
+.band { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; }
+.band-hot { color: var(--primary-dark); }
+.band-warm { color: var(--ink-2); }
+.band-cold { color: var(--mute); }
+.band-out { color: var(--danger); }
+
+.detail {
+  position: sticky; top: 92px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 18px; padding: clamp(22px, 2.4vw, 32px);
+  box-shadow: 0 1px 2px rgba(15,26,29,0.04), 0 26px 60px -34px rgba(15,26,29,0.3);
+}
+.detail-pane { display: none; }
+.detail-pane.on { display: block; animation: fade 0.5s var(--ease); }
+.detail h4 {
+  font-family: var(--sans); font-size: 19px; font-weight: 600; margin: 10px 0 3px;
+  letter-spacing: var(--tracking-ui); line-height: 1.25;
+}
+.detail .sub { font-size: 13.5px; color: var(--mute); margin-bottom: 20px; }
+.bant { border-top: 1px solid var(--line-soft); }
+.bant-row { display: grid; grid-template-columns: 74px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+.bant-k { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--primary-dark); padding-top: 3px; }
+.bant-v { font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.verdict { margin-top: 18px; padding: 15px 17px; border-radius: 12px; background: var(--bg-warm); font-size: 14px; color: var(--ink-2); }
+.verdict b { color: var(--ink); }
+.meter { height: 3px; background: var(--line-soft); border-radius: 999px; overflow: hidden; margin: 14px 0 4px; }
+.meter i { display: block; height: 100%; background: var(--gradient); border-radius: 999px; transition: width 1s var(--ease); }
+
+/* ---------- segment tabs ---------- */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 34px; }
+.tab {
+  font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em;
+  padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line);
+  background: transparent; color: var(--mute); cursor: pointer;
+  transition: all 0.35s var(--ease);
+}
+.tab:hover { border-color: var(--ink); color: var(--ink); }
+.tab[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.seg-panel { display: none; }
+.seg-panel.on { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(20px, 3vw, 48px); animation: fade 0.5s var(--ease); }
+.seq { border-top: 1px solid var(--line-soft); }
+.seq-step { display: grid; grid-template-columns: 62px 1fr; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--line-soft); }
+.seq-when { font-family: var(--mono); font-size: 10px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--primary-dark); padding-top: 3px; }
+.seq-body .ch { font-size: 11px; font-family: var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--mute); }
+.seq-body .msg { font-size: 14.5px; color: var(--ink-2); margin-top: 4px; line-height: 1.5; }
+.seq-body .msg b { color: var(--ink); font-weight: 600; }
+
+/* ---------- compliance ---------- */
+.comp { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 clamp(24px, 4vw, 64px); border-top: 1px solid var(--line-soft); }
+.comp-item { padding: 24px 0; border-bottom: 1px solid var(--line-soft); }
+.comp-item h4 { margin: 0 0 6px; font-size: 16px; font-weight: 600; letter-spacing: var(--tracking-ui); }
+.comp-item p { margin: 0; font-size: 14.5px; color: var(--ink-2); line-height: 1.55; }
+
+/* ---------- economics ---------- */
+.econ { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(14px, 2vw, 30px); }
+.econ-cell { border-top: 1px solid var(--ink); padding-top: 18px; }
+.econ-n { font-family: var(--sans); font-weight: 500; font-size: clamp(30px, 3.4vw, 46px); letter-spacing: var(--tracking-display); line-height: 1; color: var(--ink); }
+.econ-n .unit { font-size: 0.5em; color: var(--mute); margin-left: 3px; }
+.econ-k { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--mute); margin-top: 10px; }
+.econ-note { font-size: 13.5px; color: var(--ink-2); margin-top: 8px; line-height: 1.5; }
+.assump { margin-top: clamp(34px, 5vh, 54px); padding: 22px 24px; border: 1px dashed var(--line); border-radius: 14px; background: var(--bg-warm); }
+.assump h4 { margin: 0 0 10px; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.13em; color: var(--danger); }
+.assump ul { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; line-height: 1.75; }
+
+/* ---------- integrity ---------- */
+.integ { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(22px, 3.4vw, 56px); }
+.integ-col h4 { margin: 0 0 16px; display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 600; }
+.integ-col ul { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line-soft); }
+.integ-col li { padding: 13px 0; border-bottom: 1px solid var(--line-soft); font-size: 14.5px; color: var(--ink-2); line-height: 1.5; }
+.integ-col li b { color: var(--ink); font-weight: 600; }
+
+/* ---------- cta ---------- */
+.cta { background: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%); border-top: 1px solid var(--line-soft); }
+.cta-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 34px; }
+
+/* ---------- footer ---------- */
+footer {
+  background: linear-gradient(180deg, var(--bg-warm) 0%, var(--bg) 100%);
+  color: var(--ink); padding: clamp(66px, 9vh, 104px) 0 40px;
+  border-top: 1px solid var(--line-soft);
+}
+.footer-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: clamp(16px, 1.6vw, 28px); }
+.footer-lockup-blk { grid-column: 1 / span 6; }
+.footer-statement {
+  font-family: var(--serif); font-style: italic; font-size: clamp(20px, 2vw, 27px);
+  color: var(--ink-2); margin: 22px 0 0; max-width: 30ch; line-height: 1.3;
+}
+.footer-col { grid-column: span 2; }
+.footer-col h5 {
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.13em; color: var(--mute); margin: 0 0 14px; font-weight: 500;
+}
+.footer-col a { display: block; font-size: 14px; color: var(--ink-2); text-decoration: none; padding: 5px 0; transition: color 0.3s var(--ease); }
+.footer-col a:hover { color: var(--primary-dark); }
+.footer-bottom {
+  margin-top: clamp(48px, 7vh, 76px); padding-top: 22px; border-top: 1px solid var(--line-soft);
+  display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--mute);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 1040px) {
+  .stepper { grid-template-columns: 1fr; }
+  .step-rail { position: static; flex-direction: row; overflow-x: auto; gap: 0; padding-bottom: 4px; }
+  .step-btn { grid-template-columns: 1fr; min-width: 148px; border-top: 2px solid var(--line-soft); padding-right: 18px; }
+  .inspect { grid-template-columns: 1fr; }
+  .detail { position: static; }
+  .seg-panel.on { grid-template-columns: 1fr; }
+  .econ { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 860px) {
+  .hero-title, .hero-side { grid-column: 1 / -1; }
+  .section-head .label, .section-head .title, .section-head .aside { grid-column: 1 / -1; text-align: left; }
+  .fact { grid-template-columns: 1fr; gap: 6px; }
+  .fact-src { text-align: left; }
+  .comp, .integ { grid-template-columns: 1fr; }
+  .footer-lockup-blk { grid-column: 1 / -1; }
+  .footer-col { grid-column: span 4; }
+  .indent { padding-left: 0; }
+}
+@media (max-width: 560px) {
+  .econ { grid-template-columns: 1fr; }
+  .footer-col { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  html { scroll-behavior: auto; }
+  .rvl { opacity: 1; transform: none; }
+}
+@media (max-width: 760px) {
+  .nav-inner { gap: 10px; }
+  .nav-right .nav-link { display: none; }
+  .lockup img { width: 31px; height: 31px; }
+  .lockup .words strong { font-size: 11px; white-space: nowrap; }
+  .lockup .words small { font-size: 7.5px; white-space: nowrap; }
+  .nav-right .btn { padding: 10px 15px; font-size: 12.5px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a href="/" class="lockup">
+      <img src="/brand/shield.png?v=3" alt="EIAAW Solutions shield">
+      <span class="words"><strong>EIAAW SOLUTIONS</strong><small>AI &middot; Human Partnerships</small></span>
+    </a>
+    <div class="nav-right">
+      <a href="#scenario" class="nav-link">Scenario</a>
+      <a href="#scoring" class="nav-link">Scoring</a>
+      <a href="#integrity" class="nav-link">What&rsquo;s real</a>
+      <a href="/demo.html" class="btn btn-outline">Product demo <span class="arrow">&rarr;</span></a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+
+    <div class="hero-top">
+      <span class="meta-line">Simulated scenario &middot; V.1 &middot; 20 Aug 2026</span>
+      <span class="meta-line">Prepared by EIAAW Solutions &middot; Kuala Lumpur</span>
+    </div>
+
+    <div class="grid-12">
+      <div class="hero-title">
+        <div class="hero-chips rvl">
+          <span class="chip chip-real"><span class="chip-dot"></span>Public facts, cited</span>
+          <span class="chip chip-sim"><span class="chip-dot"></span>All pipeline data simulated</span>
+        </div>
+        <div class="rvl" style="margin-bottom:26px"><span class="eyebrow">Glocomp Systems &times; EIAAW SalesAgent</span></div>
+        <h1 class="display rvl">
+          Glocomp went exclusive
+          <span class="indent">on WEKA AI infrastructure.</span>
+          <span class="indent"><em>107 days ago.</em></span>
+        </h1>
+      </div>
+      <div class="hero-side rvl">
+        <p class="lead">A distributor with 150+ resellers announced an exclusive AI partnership. The demand arrives through the channel &mdash; or it does not arrive at all.</p>
+      </div>
+    </div>
+
+    <p class="lead lead-main rvl">
+      This page is a <em>simulated walkthrough</em> of what the EIAAW SalesAgent would have been doing on each of those 107 days &mdash; consolidating inbound, scoring channel-aware, routing to the right reseller, and keeping the WEKA funnel warm without adding headcount.
+    </p>
+
+    <div class="notice rvl">
+      <strong>Read this first.</strong> Everything about Glocomp on this page is drawn from public sources and cited. Everything about pipeline &mdash; leads, scores, contacts, revenue, timings &mdash; is <strong>invented for illustration</strong>. No real person is named as a lead, no contact detail is guessed, and no claim is made about Glocomp&rsquo;s actual sales performance. The <a href="#integrity" style="color:var(--primary-dark)">integrity panel</a> lists exactly which is which.
+    </div>
+
+  </div>
+</header>
+
+<hr class="rule">
+
+<section class="section-pad" id="situation">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="label rvl"><span class="eyebrow">001</span></div>
+      <div class="title rvl"><h2 class="section-h">The company, <em>as publicly documented.</em></h2></div>
+      <div class="aside rvl">Fig. 01 &mdash; Sources cited</div>
+    </div>
+
+    <div class="facts rvl">
+      <div class="fact">
+        <div class="fact-k">Who</div>
+        <div class="fact-v"><b>Glocomp Systems (M) Sdn Bhd</b> &mdash; &ldquo;The Premier ICT Distributor&rdquo;. Founded 1997. HQ at 1 First Avenue, Bandar Utama, Petaling Jaya, Selangor.</div>
+        <div class="fact-src meta-line">glocomp.com</div>
+      </div>
+      <div class="fact">
+        <div class="fact-k">Ownership</div>
+        <div class="fact-v">Majority stake acquired 2021 by <b>M1</b>, a Keppel company, for <b>RM111 million</b> (S$36m) alongside affiliates GCS and GCIS; founders retained 30%. Now part of <b>Keppel Connectivity</b>.</div>
+        <div class="fact-src meta-line">Keppel / M1</div>
+      </div>
+      <div class="fact">
+        <div class="fact-k">Model</div>
+        <div class="fact-v">Value-added distribution through an ecosystem of <b>150+ resellers and system integrators</b> nationwide &mdash; not direct-to-enterprise selling.</div>
+        <div class="fact-src meta-line">PR Newswire</div>
+      </div>
+      <div class="fact">
+        <div class="fact-k">Practice areas</div>
+        <div class="fact-v">Computing &amp; Information Management &middot; IP Communications &middot; Cybersecurity &middot; Workspace &middot; Data, Automation &amp; AI &middot; Cloud.</div>
+        <div class="fact-src meta-line">glocomp.com</div>
+      </div>
+      <div class="fact">
+        <div class="fact-k">Vendor bench</div>
+        <div class="fact-v">Cisco, NetApp, Dell, VMware, Red Hat, Microsoft, Oracle, AWS, Google Cloud, Huawei Cloud, Veritas, Quantum, Lenovo, HP, Fujitsu &mdash; plus 40+ more.</div>
+        <div class="fact-src meta-line">glocomp.com</div>
+      </div>
+      <div class="fact">
+        <div class="fact-k">Buyers</div>
+        <div class="fact-v">Government agencies, defence and security organisations, utilities, and commercial enterprises &mdash; reached <b>through partners</b>.</div>
+        <div class="fact-src meta-line">Public profile</div>
+      </div>
+    </div>
+
+    <p class="body-col rvl" style="margin-top:44px">
+      That last row is the whole point. A distributor does not have one sales motion &mdash; it has <strong>two</strong>. It has to recruit and activate the partner who sells, and it has to create end-customer demand that the partner can be handed. Most sales tooling is built for the first motion only, and treats the second as somebody else&rsquo;s problem.
+    </p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section-pad" style="background:linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%)">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="label rvl"><span class="eyebrow">002</span></div>
+      <div class="title rvl"><h2 class="section-h">The trigger event, <em>5 May 2026.</em></h2></div>
+      <div class="aside rvl">Fig. 02 &mdash; Public announcement</div>
+    </div>
+    <div class="grid-12">
+      <div style="grid-column:1 / span 7" class="rvl">
+        <p class="body-col">
+          WEKA named Glocomp its <strong>exclusive end-to-end AI infrastructure partner in Malaysia</strong> &mdash; WEKA&rsquo;s NeuralMesh storage and memory system paired with NVIDIA accelerated computing, delivered through Glocomp&rsquo;s 150+ reseller and SI network, with all infrastructure deployed and managed inside Malaysia.
+        </p>
+        <p class="body-col">
+          The announcement names three problems the partnership exists to solve: <strong>GPU utilisation</strong>, <strong>multi-vendor integration</strong>, and <strong>local data sovereignty</strong>. Those three are not marketing copy &mdash; they are a qualification rubric. A Malaysian organisation carrying all three is a live opportunity; one carrying none of them is noise.
+        </p>
+        <p class="body-col">
+          Joseph Giam, Managing Director at Glocomp, is quoted in the release: <em>&ldquo;Our customers have been asking for a complete, locally supported AI solution they can deploy with confidence.&rdquo;</em>
+        </p>
+        <p class="body-col">
+          Exclusivity is a clock. It converts to revenue only if demand is captured, qualified and routed to a capable partner faster than the alternatives get evaluated. <strong>107 days have passed.</strong>
+        </p>
+      </div>
+      <div style="grid-column:9 / span 4" class="rvl">
+        <div class="trace">
+          <div class="trace-h"><span class="chip-dot" style="background:var(--primary-dark)"></span> Qualification rubric</div>
+          <span class="k">gpu_utilisation</span> &rarr; owns or is<br>
+          <span class="d">&nbsp;&nbsp;buying GPU capacity; utilisation</span><br>
+          <span class="d">&nbsp;&nbsp;is a named board-level cost</span><br><br>
+          <span class="k">multi_vendor</span> &rarr; mixed estate,<br>
+          <span class="d">&nbsp;&nbsp;integration burden already felt</span><br><br>
+          <span class="k">data_sovereignty</span> &rarr; regulated or<br>
+          <span class="d">&nbsp;&nbsp;public-sector; data must stay</span><br>
+          <span class="d">&nbsp;&nbsp;inside Malaysia</span><br><br>
+          <span class="w">3 of 3</span> &rarr; route to partner, same day<br>
+          <span class="w">2 of 3</span> &rarr; nurture, 21-day sequence<br>
+          <span class="w">0&ndash;1 of 3</span> &rarr; hold, spend no rep time
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section-pad" id="scenario">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="label rvl"><span class="eyebrow">003</span></div>
+      <div class="title rvl"><h2 class="section-h">One inbound lead, <em>followed all the way through.</em></h2></div>
+      <div class="aside rvl">Fig. 03 &mdash; Simulated</div>
+    </div>
+    <div class="stepper rvl">
+      <div class="step-rail" role="tablist" aria-label="Scenario steps">
+        <button class="step-btn" role="tab" aria-selected="true" data-step="1"><span class="n">DAY 0</span><span class="t">Everything lands in one inbox</span></button>
+        <button class="step-btn" role="tab" aria-selected="false" data-step="2"><span class="n">DAY 0</span><span class="t">Identity resolved, duplicates merged</span></button>
+        <button class="step-btn" role="tab" aria-selected="false" data-step="3"><span class="n">DAY 0</span><span class="t">Scored against the WEKA rubric</span></button>
+        <button class="step-btn" role="tab" aria-selected="false" data-step="4"><span class="n">DAY 0</span><span class="t">Routed to a capable reseller</span></button>
+        <button class="step-btn" role="tab" aria-selected="false" data-step="5"><span class="n">DAY 1&ndash;21</span><span class="t">Two sequences, two audiences</span></button>
+        <button class="step-btn" role="tab" aria-selected="false" data-step="6"><span class="n">DAY 22</span><span class="t">Voice agent qualifies the callback</span></button>
+        <button class="step-btn" role="tab" aria-selected="false" data-step="7"><span class="n">DAY 30</span><span class="t">Deal registered, attribution intact</span></button>
+      </div>
+      <div class="step-body">
+
+        <div class="step-panel on" data-panel="1">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated</span>
+          <h3 style="margin-top:14px">Five channels, <em>one queue.</em></h3>
+          <p class="meta-line when">Day 0 &middot; 09:14 MYT</p>
+          <p class="body-col">Glocomp&rsquo;s inbound arrives in at least five places: the website enquiry form, WEKA co-marketing landing pages, PIKOM and vendor event lists, LinkedIn replies, and partner deal-registration forms. Each is a different inbox owned by a different person.</p>
+          <p class="body-col">The SalesAgent takes a signed ingest URL per channel. Everything lands in one staging inbox with its source, timestamp and raw payload preserved &mdash; nothing is normalised away before a human sees it.</p>
+          <div class="trace">
+            <div class="trace-h"><span class="chip-dot" style="background:var(--primary-dark)"></span> Ingest log</div>
+            <span class="d">09:14:02</span> <span class="k">web_form</span> &rarr; staged #4471<br>
+            <span class="d">09:41:55</span> <span class="k">weka_lp</span> &rarr; staged #4472 <span class="d">utm=neuralmesh</span><br>
+            <span class="d">10:02:17</span> <span class="k">partner_reg</span> &rarr; staged #4473<br>
+            <span class="d">10:02:19</span> <span class="k">linkedin</span> &rarr; staged #4474 <span class="d">reply seq 12</span><br>
+            <span class="d">11:20:44</span> <span class="k">event_list</span> &rarr; staged #4475 <span class="d">CSV, 240 rows</span><br>
+            <span class="w">&rarr; 5 sources, 244 records, 0 lost to a personal inbox</span>
+          </div>
+        </div>
+
+        <div class="step-panel" data-panel="2">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated</span>
+          <h3 style="margin-top:14px">The same buyer, <em>three times over.</em></h3>
+          <p class="meta-line when">Day 0 &middot; 11:22 MYT</p>
+          <p class="body-col">In a channel business the same end customer often appears more than once &mdash; directly, via a reseller registering the deal, and again from an event list. Handled badly that becomes two reps calling one buyer, or a channel-conflict argument with a partner.</p>
+          <p class="body-col">Identity resolution matches on email domain, company name and phone, keeps the <strong>earliest</strong> record as canonical, and attaches the rest as evidence. Partner-originated records win attribution by default &mdash; the rule that keeps resellers trusting the programme.</p>
+          <div class="trace">
+            <div class="trace-h"><span class="chip-dot" style="background:var(--primary-dark)"></span> Identity resolution</div>
+            <span class="k">#4472</span> <span class="d">weka_lp</span> &rarr; domain match &rarr; cluster A<br>
+            <span class="k">#4473</span> <span class="d">partner_reg</span> &rarr; domain match &rarr; cluster A<br>
+            <span class="k">#4475</span> <span class="d">event_list</span> &rarr; company match &rarr; cluster A<br><br>
+            <span class="w">cluster A</span> &rarr; 1 lead, 3 evidence records<br>
+            <span class="w">attribution</span> &rarr; partner_reg (reseller protected)<br>
+            <span class="d">no duplicate outreach dispatched</span>
+          </div>
+        </div>
+
+        <div class="step-panel" data-panel="3">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated</span>
+          <h3 style="margin-top:14px">Scored on the rubric, <em>with the reasoning shown.</em></h3>
+          <p class="meta-line when">Day 0 &middot; 11:23 MYT</p>
+          <p class="body-col">Scoring is neither a black box nor generic. The three signals named in the WEKA release carry the most weight, and each score arrives with the sentence that justifies it. A rep who disagrees can see exactly which signal to argue with.</p>
+          <p class="body-col">Anything the model cannot evidence stays empty. A missing phone number is left missing &mdash; never inferred from a pattern.</p>
+          <div class="trace">
+            <div class="trace-h"><span class="chip-dot" style="background:var(--primary-dark)"></span> Score card &mdash; cluster A</div>
+            <span class="k">gpu_utilisation</span> +32 <span class="d">tender names GPU cluster</span><br>
+            <span class="k">multi_vendor</span> +18 <span class="d">NetApp + Cisco estate cited</span><br>
+            <span class="k">data_sovereignty</span> +26 <span class="d">must remain in-country</span><br>
+            <span class="k">partner_backed</span> +12 <span class="d">registered by active SI</span><br>
+            <span class="k">budget_signal</span> &nbsp;&nbsp;0 <span class="d">not evidenced &mdash; left blank</span><br>
+            <span class="w">= 88 / 100 &nbsp; band: HOT &nbsp; route: same-day</span>
+          </div>
+        </div>
+
+        <div class="step-panel" data-panel="4">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated</span>
+          <h3 style="margin-top:14px">Handed to the reseller <em>who can actually deliver it.</em></h3>
+          <p class="meta-line when">Day 0 &middot; 11:31 MYT</p>
+          <p class="body-col">150+ partners do not have 150 identical capabilities. Routing reads three things: does this partner hold the relevant certifications, do they cover this state, and are they currently active rather than dormant on paper.</p>
+          <p class="body-col">The distributor keeps the relationship and the data; the partner gets a lead they can close. That is the difference between a distributor with a CRM and a distributor with a channel engine.</p>
+          <div class="trace">
+            <div class="trace-h"><span class="chip-dot" style="background:var(--primary-dark)"></span> Routing decision</div>
+            <span class="d">candidate pool</span> &rarr; 150 partners<br>
+            <span class="k">filter</span> cert:ai_infra &rarr; 11 remain<br>
+            <span class="k">filter</span> region:Klang Valley &rarr; 6 remain<br>
+            <span class="k">filter</span> active_90d:true &rarr; 3 remain<br>
+            <span class="k">rank</span> by close-rate on similar deals<br>
+            <span class="w">&rarr; assigned, SLA clock started (4h to first contact)</span><br>
+            <span class="d">2 runners-up held as fallback if SLA breached</span>
+          </div>
+        </div>
+
+        <div class="step-panel" data-panel="5">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated</span>
+          <h3 style="margin-top:14px">The partner and the buyer <em>are not sent the same email.</em></h3>
+          <p class="meta-line when">Day 1&ndash;21</p>
+          <p class="body-col">Two audiences, two jobs. The reseller needs enablement &mdash; margin, demo kit, who to call for pre-sales. The end customer needs proof &mdash; sovereignty, utilisation economics, a reference deployment they can believe.</p>
+          <p class="body-col">Both sequences pause the moment a human replies. Nothing is more expensive than an automated follow-up landing after a real conversation has started.</p>
+          <div class="trace">
+            <div class="trace-h"><span class="chip-dot" style="background:var(--primary-dark)"></span> Sequence state</div>
+            <span class="k">seq:partner_enable</span> <span class="d">step 2/4 &mdash; demo kit sent</span><br>
+            <span class="k">seq:enduser_proof</span> <span class="d">step 3/5 &mdash; sovereignty brief</span><br><br>
+            <span class="w">reply detected</span> &rarr; both sequences paused<br>
+            <span class="d">handover note written to the deal record</span>
+          </div>
+        </div>
+
+        <div class="step-panel" data-panel="6">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated</span>
+          <h3 style="margin-top:14px">The callback at 19:40, <em>answered.</em></h3>
+          <p class="meta-line when">Day 22 &middot; 19:40 MYT</p>
+          <p class="body-col">Enterprise buyers call back after hours. The voice agent answers in English or Bahasa Malaysia, confirms who is calling, captures the requirement, and books time with the assigned partner &mdash; then writes the transcript and summary into the same record.</p>
+          <p class="body-col">It does not quote prices, promise delivery dates, or discuss contract terms. Those are handover triggers, not agent decisions.</p>
+          <div class="trace">
+            <div class="trace-h"><span class="chip-dot" style="background:var(--primary-dark)"></span> Call summary</div>
+            <span class="d">19:40:11 inbound &mdash; 3m 52s &mdash; lang BM/EN</span><br>
+            <span class="k">captured</span> &rarr; timeline Q4, 8-node pilot<br>
+            <span class="k">captured</span> &rarr; procurement via existing SI<br>
+            <span class="w">escalated</span> &rarr; pricing question, not answered<br>
+            <span class="k">booked</span> &rarr; Thu 14:00 with assigned partner<br>
+            <span class="d">transcript + summary appended to cluster A</span>
+          </div>
+        </div>
+
+        <div class="step-panel" data-panel="7">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated</span>
+          <h3 style="margin-top:14px">Registered, attributed, <em>and reportable to WEKA.</em></h3>
+          <p class="meta-line when">Day 30</p>
+          <p class="body-col">The deal closes to the partner. Glocomp keeps the record: which source produced it, which partner closed it, how long each stage took, and what the vendor-funded activity actually returned.</p>
+          <p class="body-col">That last part matters beyond this one deal. Vendor marketing funds get renewed on evidence, and most distributors cannot produce it at the granularity the vendor asks for.</p>
+          <div class="trace">
+            <div class="trace-h"><span class="chip-dot" style="background:var(--primary-dark)"></span> Closed record</div>
+            <span class="k">source</span> &rarr; partner_reg, weka_lp assist<br>
+            <span class="k">partner</span> &rarr; SI #037, ai_infra certified<br>
+            <span class="k">cycle</span> &rarr; 30 days staged to closed<br>
+            <span class="k">touches</span> &rarr; 9 automated, 3 human<br>
+            <span class="w">MDF report</span> &rarr; exportable, per-campaign
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section-pad" id="scoring" style="background:linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%)">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="label rvl"><span class="eyebrow">004</span></div>
+      <div class="title rvl"><h2 class="section-h">The scoring, <em>opened up.</em></h2></div>
+      <div class="aside rvl">Fig. 04 &mdash; Select a row</div>
+    </div>
+
+    <p class="body-col rvl" style="margin-bottom:40px">
+      Five records from the same week. Every organisation below is <strong>invented</strong> &mdash; no real company is scored, and no real person is named. The point is the reasoning, and the fifth row in particular.
+    </p>
+
+    <div class="inspect rvl">
+      <div class="lead-list" role="tablist" aria-label="Simulated leads">
+        <button class="lead-row" role="tab" aria-selected="true" data-lead="1">
+          <span class="score">88<small>SCORE</small></span>
+          <span class="lead-who"><span class="role">Head of Infrastructure</span><span class="org">Persada Analitik Sdn Bhd &middot; simulated</span></span>
+          <span class="band band-hot">Hot</span>
+        </button>
+        <button class="lead-row" role="tab" aria-selected="false" data-lead="2">
+          <span class="score">74<small>SCORE</small></span>
+          <span class="lead-who"><span class="role">GM, Technology</span><span class="org">Selat Utilities Berhad &middot; simulated</span></span>
+          <span class="band band-warm">Warm</span>
+        </button>
+        <button class="lead-row" role="tab" aria-selected="false" data-lead="3">
+          <span class="score">61<small>SCORE</small></span>
+          <span class="lead-who"><span class="role">Chief Technology Officer</span><span class="org">Rimba Health Group &middot; simulated</span></span>
+          <span class="band band-warm">Warm</span>
+        </button>
+        <button class="lead-row" role="tab" aria-selected="false" data-lead="4">
+          <span class="score">34<small>SCORE</small></span>
+          <span class="lead-who"><span class="role">IT Manager</span><span class="org">Bandar Retail Sdn Bhd &middot; simulated</span></span>
+          <span class="band band-cold">Cold</span>
+        </button>
+        <button class="lead-row" role="tab" aria-selected="false" data-lead="5">
+          <span class="score">&mdash;<small>REJECTED</small></span>
+          <span class="lead-who"><span class="role">Unverifiable submission</span><span class="org">Free email, no company &middot; simulated</span></span>
+          <span class="band band-out">Discarded</span>
+        </button>
+      </div>
+
+      <div class="detail">
+        <div class="detail-pane on" data-pane="1">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated lead</span>
+          <h4>Head of Infrastructure</h4>
+          <div class="sub">Persada Analitik Sdn Bhd &middot; Cyberjaya &middot; ~400 staff</div>
+          <div class="meter"><i style="width:88%"></i></div>
+          <div class="meta-line" style="margin-bottom:18px">88 / 100 &middot; 3 of 3 signals</div>
+          <div class="bant">
+            <div class="bant-row"><div class="bant-k">Budget</div><div class="bant-v">Public tender document references a GPU cluster refresh in the current fiscal year. Amount not stated, so no figure is recorded.</div></div>
+            <div class="bant-row"><div class="bant-k">Authority</div><div class="bant-v">Infrastructure head; named on the tender as technical contact. Not the signing authority &mdash; procurement sits above.</div></div>
+            <div class="bant-row"><div class="bant-k">Need</div><div class="bant-v">All three WEKA signals present: GPU utilisation named as a cost problem, mixed NetApp and Cisco estate, data must remain in Malaysia.</div></div>
+            <div class="bant-row"><div class="bant-k">Timeline</div><div class="bant-v">Tender close date is 6 weeks out. This is the constraint that sets the routing SLA.</div></div>
+          </div>
+          <div class="verdict"><b>Route same day</b> to an ai_infra-certified partner in Klang Valley. Deal already registered by an active SI, so attribution is protected before first contact.</div>
+        </div>
+
+        <div class="detail-pane" data-pane="2">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated lead</span>
+          <h4>GM, Technology</h4>
+          <div class="sub">Selat Utilities Berhad &middot; Johor &middot; ~2,000 staff</div>
+          <div class="meter"><i style="width:74%"></i></div>
+          <div class="meta-line" style="margin-bottom:18px">74 / 100 &middot; 2 of 3 signals</div>
+          <div class="bant">
+            <div class="bant-row"><div class="bant-k">Budget</div><div class="bant-v">Utility with a published capex programme, but nothing ties it to AI infrastructure. Treated as unevidenced.</div></div>
+            <div class="bant-row"><div class="bant-k">Authority</div><div class="bant-v">Senior enough to sponsor a pilot; a utility of this size will still route through a tender.</div></div>
+            <div class="bant-row"><div class="bant-k">Need</div><div class="bant-v">Sovereignty and multi-vendor integration both present. No GPU signal &mdash; the AI workload is aspirational, not funded.</div></div>
+            <div class="bant-row"><div class="bant-k">Timeline</div><div class="bant-v">No trigger event. Nurture rather than push.</div></div>
+          </div>
+          <div class="verdict"><b>21-day nurture.</b> Sovereignty-led content, not product content. Re-score automatically if a GPU or AI signal appears.</div>
+        </div>
+
+        <div class="detail-pane" data-pane="3">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated lead</span>
+          <h4>Chief Technology Officer</h4>
+          <div class="sub">Rimba Health Group &middot; Penang &middot; private hospital network</div>
+          <div class="meter"><i style="width:61%"></i></div>
+          <div class="meta-line" style="margin-bottom:18px">61 / 100 &middot; 1 of 3 signals, weighted up</div>
+          <div class="bant">
+            <div class="bant-row"><div class="bant-k">Budget</div><div class="bant-v">Not evidenced. Left blank rather than estimated from headcount.</div></div>
+            <div class="bant-row"><div class="bant-k">Authority</div><div class="bant-v">CTO with clear technical authority; clinical governance will still gate any patient-data workload.</div></div>
+            <div class="bant-row"><div class="bant-k">Need</div><div class="bant-v">Sovereignty is decisive here &mdash; patient data under PDPA and MOH expectations cannot leave the country. That single signal is worth more in health than elsewhere, so the rubric weights it up.</div></div>
+            <div class="bant-row"><div class="bant-k">Timeline</div><div class="bant-v">No procurement trigger visible. Long cycle, high value if it lands.</div></div>
+          </div>
+          <div class="verdict"><b>Nurture, compliance-led.</b> Route to a partner with healthcare references. The sale is a governance conversation before it is an infrastructure one.</div>
+        </div>
+
+        <div class="detail-pane" data-pane="4">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated lead</span>
+          <h4>IT Manager</h4>
+          <div class="sub">Bandar Retail Sdn Bhd &middot; Selangor &middot; ~120 staff</div>
+          <div class="meter"><i style="width:34%"></i></div>
+          <div class="meta-line" style="margin-bottom:18px">34 / 100 &middot; 0 of 3 signals</div>
+          <div class="bant">
+            <div class="bant-row"><div class="bant-k">Budget</div><div class="bant-v">Not evidenced, and company size makes an AI infrastructure spend unlikely this cycle.</div></div>
+            <div class="bant-row"><div class="bant-k">Authority</div><div class="bant-v">IT manager; would not own a capital purchase at this scale.</div></div>
+            <div class="bant-row"><div class="bant-k">Need</div><div class="bant-v">Downloaded a general cloud guide. No GPU, no sovereignty requirement, no integration pain expressed.</div></div>
+            <div class="bant-row"><div class="bant-k">Timeline</div><div class="bant-v">None.</div></div>
+          </div>
+          <div class="verdict"><b>Hold.</b> Real contact, wrong offer. Stays on the newsletter and costs nobody a phone call. This is the row most systems waste a rep on.</div>
+        </div>
+
+        <div class="detail-pane" data-pane="5">
+          <span class="chip chip-sim"><span class="chip-dot"></span>Simulated record</span>
+          <h4>Discarded at the verification gate</h4>
+          <div class="sub">No score assigned &middot; never written to the CRM</div>
+          <div class="meter"><i style="width:0%"></i></div>
+          <div class="meta-line" style="margin-bottom:18px">Rejected &middot; 0 verification sources</div>
+          <div class="bant">
+            <div class="bant-row"><div class="bant-k">Identity</div><div class="bant-v">Free-mail address, no company name, no corroborating public profile.</div></div>
+            <div class="bant-row"><div class="bant-k">Evidence</div><div class="bant-v">No LinkedIn profile, no company website, no directory listing. Nothing to verify against.</div></div>
+            <div class="bant-row"><div class="bant-k">Temptation</div><div class="bant-v">A guessable work address could be constructed from the name. The gate forbids it &mdash; contact details are never inferred.</div></div>
+            <div class="bant-row"><div class="bant-k">Outcome</div><div class="bant-v">Rejected server-side with the reason logged, and reported in the batch summary so the count is visible rather than hidden.</div></div>
+          </div>
+          <div class="verdict"><b>This is the feature, not the failure.</b> Fewer verified leads beat a long list nobody trusts. A rejected record is logged and counted &mdash; it is never quietly stored as though it were real.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section-pad">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="label rvl"><span class="eyebrow">005</span></div>
+      <div class="title rvl"><h2 class="section-h">What makes it <em>Malaysian</em>, not generic.</h2></div>
+      <div class="aside rvl">Fig. 05 &mdash; Operating context</div>
+    </div>
+    <div class="comp rvl">
+      <div class="comp-item">
+        <h4>PDPA 2010, as amended</h4>
+        <p>Consent captured at the form, purpose recorded with the record, retention enforced on a schedule. Breach-notification and data-protection-officer duties introduced by the 2024 amendments are operational requirements, not a policy PDF.</p>
+      </div>
+      <div class="comp-item">
+        <h4>Data residency</h4>
+        <p>The WEKA release commits to infrastructure deployed and managed inside Malaysia. A CRM that ships lead data offshore contradicts the pitch being made. Hosting region is a sales asset here, not an IT detail.</p>
+      </div>
+      <div class="comp-item">
+        <h4>Public-sector procurement</h4>
+        <p>Government and defence buyers arrive through tender, with MOF registration and ePerolehan conventions attached. The pipeline models a tender clock, not a SaaS trial clock.</p>
+      </div>
+      <div class="comp-item">
+        <h4>Bahasa Malaysia</h4>
+        <p>The voice agent answers in BM or English and switches mid-call. Written follow-up matches the language the buyer opened in. In enterprise and public sector this is table stakes, not a nicety.</p>
+      </div>
+      <div class="comp-item">
+        <h4>Channel conflict rules</h4>
+        <p>Partner-registered deals hold attribution. The distributor never appears to compete with the reseller that sourced the opportunity &mdash; encoded as a routing rule rather than trusted to etiquette.</p>
+      </div>
+      <div class="comp-item">
+        <h4>Vendor reporting</h4>
+        <p>Cisco, NetApp, Dell, WEKA and the rest fund activity and expect evidence. Source, campaign and partner stay attached to the record so MDF claims are exportable rather than reconstructed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section-pad" style="background:linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%)">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="label rvl"><span class="eyebrow">006</span></div>
+      <div class="title rvl"><h2 class="section-h">The simulated week, <em>counted.</em></h2></div>
+      <div class="aside rvl">Fig. 06 &mdash; Illustrative</div>
+    </div>
+    <div class="econ rvl">
+      <div class="econ-cell">
+        <div class="econ-n"><span class="count" data-to="244">0</span></div>
+        <div class="econ-k">Records consolidated</div>
+        <div class="econ-note">Five separate channels reduced to one reviewable queue, with source and raw payload preserved.</div>
+      </div>
+      <div class="econ-cell">
+        <div class="econ-n"><span class="count" data-to="4">0</span><span class="unit">h</span></div>
+        <div class="econ-k">Partner routing SLA</div>
+        <div class="econ-note">Clock starts at qualification. Two fallback partners held if the first breaches.</div>
+      </div>
+      <div class="econ-cell">
+        <div class="econ-n"><span class="count" data-to="12">0</span></div>
+        <div class="econ-k">Touches per closed deal</div>
+        <div class="econ-note">Nine automated, three human. The three humans arrive already briefed.</div>
+      </div>
+      <div class="econ-cell">
+        <div class="econ-n"><span class="count" data-to="0">0</span></div>
+        <div class="econ-k">Unverified leads stored</div>
+        <div class="econ-note">Rejections are logged and counted in the batch summary, never silently kept.</div>
+      </div>
+    </div>
+    <div class="assump rvl">
+      <h4>Assumptions behind these figures</h4>
+      <ul>
+        <li>Every number above describes the <strong>simulated week</strong> on this page. None is a measurement of Glocomp&rsquo;s real operations, and none is a forecast.</li>
+        <li>Volume of 244 records is chosen to be plausible for a distributor running vendor co-marketing; it is not sourced from Glocomp.</li>
+        <li>The 4-hour SLA is a configurable policy, not a system guarantee. Partner responsiveness is the real constraint.</li>
+        <li>Touch counts assume one qualified opportunity through a 30-day cycle with no procurement delay.</li>
+        <li>A real pilot would replace all of this with measured baselines in the first fortnight &mdash; that is the honest way to size it.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section-pad" id="integrity">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="label rvl"><span class="eyebrow">007</span></div>
+      <div class="title rvl"><h2 class="section-h">What is real here, <em>and what is not.</em></h2></div>
+      <div class="aside rvl">Fig. 07 &mdash; Disclosure</div>
+    </div>
+    <div class="integ rvl">
+      <div class="integ-col">
+        <h4><span class="chip chip-real"><span class="chip-dot"></span>Verified public fact</span></h4>
+        <ul>
+          <li><b>Glocomp Systems (M) Sdn Bhd</b>, &ldquo;The Premier ICT Distributor&rdquo;, founded 1997, HQ Bandar Utama, Petaling Jaya &mdash; glocomp.com</li>
+          <li><b>M1 (Keppel) majority stake</b>, 2021, RM111 million, founders retaining 30%; now part of Keppel Connectivity &mdash; Keppel and M1 releases</li>
+          <li><b>150+ resellers and system integrators</b> nationwide &mdash; PR Newswire, 5 May 2026</li>
+          <li><b>WEKA exclusive AI infrastructure partnership</b>, NeuralMesh with NVIDIA, deployed inside Malaysia &mdash; PR Newswire, 5 May 2026</li>
+          <li><b>The three named challenges</b> &mdash; GPU utilisation, multi-vendor integration, data sovereignty &mdash; quoted from that release</li>
+          <li><b>Joseph Giam, Managing Director</b>, and his quotation &mdash; reproduced from the same release</li>
+          <li><b>Six practice areas and the vendor bench</b> &mdash; glocomp.com</li>
+        </ul>
+      </div>
+      <div class="integ-col">
+        <h4><span class="chip chip-sim"><span class="chip-dot"></span>Invented for this demo</span></h4>
+        <ul>
+          <li><b>Every lead, score and company</b> in Figure 04. Persada Analitik, Selat Utilities, Rimba Health and Bandar Retail do not exist.</li>
+          <li><b>Every timestamp, record ID and log line</b> in the scenario traces.</li>
+          <li><b>The 244-record week</b> and all counts in Figure 06.</li>
+          <li><b>The routing outcome</b> &mdash; partner counts, certifications and close rates are illustrative.</li>
+          <li><b>The 30-day cycle</b> and the deal that closes at the end of it.</li>
+          <li><b>No contact detail anywhere on this page is real</b>, and none was guessed from a name or a domain pattern.</li>
+          <li><b>No claim is made</b> about Glocomp&rsquo;s actual pipeline, revenue, win rates or sales process. We have no visibility into any of it.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="body-col rvl" style="margin-top:44px">
+      This separation is not decoration. It is the same rule the product runs on: evidence gets stored, inference gets discarded, and the difference is always visible to the person reading the record. A demo that blurred the two would be arguing against its own pitch.
+    </p>
+  </div>
+</section>
+
+<section class="section-pad cta">
+  <div class="wrap">
+    <div class="grid-12">
+      <div style="grid-column:1 / span 7">
+        <div class="rvl" style="margin-bottom:24px"><span class="eyebrow">Next step</span></div>
+        <h2 class="section-h rvl">Run this against <em>real numbers.</em></h2>
+        <p class="lead rvl" style="margin-top:22px">
+          The honest version of this page is the one built on Glocomp&rsquo;s own baselines &mdash; real channel volume, real partner list, real cycle times. That takes a fortnight of measurement and a conversation.
+        </p>
+        <div class="cta-actions rvl">
+          <a href="/demo.html" class="btn btn-primary btn-lg">See the product demo <span class="arrow">&rarr;</span></a>
+          <a href="/#contact" class="btn btn-outline btn-lg">Talk to EIAAW <span class="arrow">&rarr;</span></a>
+        </div>
+      </div>
+      <div style="grid-column:9 / span 4" class="rvl">
+        <div class="trace">
+          <div class="trace-h"><span class="chip-dot" style="background:var(--primary-dark)"></span> What a pilot measures first</div>
+          <span class="k">week 1</span> <span class="d">baseline inbound volume by source</span><br>
+          <span class="k">week 1</span> <span class="d">current time-to-first-contact</span><br>
+          <span class="k">week 2</span> <span class="d">partner activity, last 90 days</span><br>
+          <span class="k">week 2</span> <span class="d">duplicate rate across channels</span><br>
+          <span class="w">then</span> <span class="d">the model gets rebuilt on facts</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap footer-grid">
+    <div class="footer-lockup-blk">
+      <a href="/" class="lockup">
+        <img src="/brand/shield.png?v=3" alt="EIAAW Solutions shield">
+        <span class="words"><strong>EIAAW SOLUTIONS</strong><small>AI &middot; Human Partnerships</small></span>
+      </a>
+      <p class="footer-statement">Fewer verified leads beat a longer list nobody trusts.</p>
+    </div>
+    <div class="footer-col">
+      <h5>Product</h5>
+      <a href="/demo.html">Interactive demo</a>
+      <a href="/app.html">Sign in</a>
+      <a href="/#pricing">Pricing</a>
+    </div>
+    <div class="footer-col">
+      <h5>Company</h5>
+      <a href="/">EIAAW Solutions</a>
+      <a href="/#contact">Contact</a>
+    </div>
+    <div class="footer-col">
+      <h5>Legal</h5>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/security.html">Security</a>
+    </div>
+  </div>
+  <div class="wrap footer-bottom">
+    <span>&copy; 2026 EIAAW Solutions &middot; Simulated scenario, not affiliated with Glocomp Systems</span>
+    <span>Kuala Lumpur, Malaysia</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- nav condense on scroll ----
+  var nav = document.getElementById('nav');
+  function onScroll() { nav.classList.toggle('scrolled', window.scrollY > 12); }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // ---- scroll reveal ----
+  var rvls = [].slice.call(document.querySelectorAll('.rvl'));
+  if (reduced || !('IntersectionObserver' in window)) {
+    rvls.forEach(function (el) { el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    rvls.forEach(function (el) { io.observe(el); });
+  }
+
+  // ---- generic tab/panel switcher ----
+  function wire(btnSel, btnAttr, paneSel, paneAttr) {
+    var btns = [].slice.call(document.querySelectorAll(btnSel));
+    var panes = [].slice.call(document.querySelectorAll(paneSel));
+    if (!btns.length) return;
+    function select(key) {
+      btns.forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset[btnAttr] === key)); });
+      panes.forEach(function (p) { p.classList.toggle('on', p.dataset[paneAttr] === key); });
+    }
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () { select(b.dataset[btnAttr]); });
+      b.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return;
+        ev.preventDefault();
+        var i = btns.indexOf(b) + (ev.key === 'ArrowRight' ? 1 : -1);
+        var next = btns[(i + btns.length) % btns.length];
+        next.focus(); select(next.dataset[btnAttr]);
+      });
+    });
+  }
+  wire('.step-btn', 'step', '.step-panel', 'panel');
+  wire('.lead-row', 'lead', '.detail-pane', 'pane');
+
+  // ---- eased count-up ----
+  var counters = [].slice.call(document.querySelectorAll('.count'));
+  function runCount(el) {
+    var to = parseInt(el.dataset.to, 10) || 0;
+    if (reduced || to === 0) { el.textContent = String(to); return; }
+    var start = null, dur = 1400;
+    function frame(ts) {
+      if (start === null) start = ts;
+      var p = Math.min((ts - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = String(Math.round(to * eased));
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+  if (!('IntersectionObserver' in window)) {
+    counters.forEach(runCount);
+  } else {
+    var cio = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { runCount(e.target); cio.unobserve(e.target); }
+      });
+    }, { threshold: 0.5 });
+    counters.forEach(function (el) { cio.observe(el); });
+  }
+})();
+</script>
+
+</body>
+</html>
