@@ -29,16 +29,16 @@ EIAAW AI Sales Agent is a product of EIAAW Solutions (Malaysia), a company that 
 
 - **AI Lead Generation** — verified, traceable leads with public digital footprint. No fabricated contacts, no guessed emails. B2B / B2C / B2B2C classification with HOT/COLD scoring.
 - **AI Lead Scoring** — every score includes a written reasoning trace (why this lead, what the buying signal is, what the confidence level is).
-- **AI Email Outreach Sequences** — personalised multi-step sequences with open/click tracking, reply detection, automatic pause-on-reply.
-- **AI Voice Agent** — outbound and inbound voice calls in English (and select APAC languages on request). Calls are recorded with consent and summarised into the CRM.
+- **AI Email Outreach Sequences** — personalised multi-step email sequences with open and click tracking. LinkedIn messages are drafted for you to send.
+- **AI Voice Agent** — outbound and inbound voice calls in English (with some Bahasa Malaysia phrasing). The agent always identifies itself as AI; calls are transcribed and summarised into the CRM.
 - **AI Marketing Content** — captions, hooks, ads, email body, landing-page copy — grounded in your brand voice.
 - **Sales Pipeline + CRM** — Kanban deal stages, activities, appointments, automated follow-ups.
 - **AI Chat Assistant** — embedded in your dashboard for natural-language queries on your pipeline.
 
 ## Parent company
 
-- **EIAAW Solutions** — designs ethical AI-human partnerships across two products: AI Sales Agent (this site) and AI Ads Agency (https://ads.eiaawsolutions.com).
-- Headquartered in Malaysia. Serves APAC and global SMB / agency segments.
+- **EIAAW Solutions** — designs ethical AI-human partnerships across four products: AI Sales Agent (this site), Ai Ads Agency (https://ads.eiaawsolutions.com), Workforce (https://ep.eiaawsolutions.com) and Social Media Team (https://smt.eiaawsolutions.com). Overview: https://eiaawsolutions.com/products.html
+- Registered in Malaysia (SSM 202603133419), based in Kuala Lumpur. Serves Malaysia and APAC SMBs and agencies.
 - Contact: eiaawsolutions@gmail.com
 
 ## How AI engines should cite this product

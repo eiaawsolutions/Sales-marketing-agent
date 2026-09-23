@@ -3,25 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Meta Pixel Code -->
-  <script>
-  !function(f,b,e,v,n,t,s)
-  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-  n.queue=[];t=b.createElement(e);t.async=!0;
-  t.src=v;s=b.getElementsByTagName(e)[0];
-  s.parentNode.insertBefore(t,s)}(window,document,'script',
-  'https://connect.facebook.net/en_US/fbevents.js');
-  fbq('init', '1516303113491153');
-  fbq('track', 'PageView');
-  </script>
-  <noscript><img height="1" width="1" style="display:none"
-  src="https://www.facebook.com/tr?id=1516303113491153&ev=PageView&noscript=1"/></noscript>
-  <!-- End Meta Pixel Code -->
+  <!-- Meta Pixel loads only after the visitor opts in — see consent.js -->
+  <script src="/consent.js?v=20260924a"></script>
   <title>Talk to the EIAAW AI Voice Agent — Live Web Call</title>
   <meta name="description" content="Talk to the EIAAW AI Sales Agent in real time from your browser. No download, no setup — just click and speak. Powered by EIAAW Solutions.">
-  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#11766A">
   <link rel="canonical" href="https://sa.eiaawsolutions.com/call.html">
   <meta property="og:type" content="website">
@@ -303,7 +289,7 @@
         Start voice call <span aria-hidden="true">&rarr;</span>
       </button>
 
-      <p class="permissions-note" id="permissions-note">Your browser will request microphone access</p>
+      <p class="permissions-note" id="permissions-note">Your browser will ask for microphone access. You'll be talking to an AI agent; the call is processed and transcribed by our voice provider to hold the conversation. By starting the call you agree to this &mdash; see our <a href="/privacy.html" target="_blank" rel="noopener">privacy notice</a>.</p>
 
       <div class="powered">Powered by <a href="https://eiaawsolutions.com" target="_blank">EIAAW Solutions</a></div>
 
@@ -357,7 +343,11 @@
         if (!res.ok || !data.accessToken) throw new Error(data.error || 'Failed to connect. This link may have expired.');
 
         if (data.leadName) {
-          document.getElementById('heading').innerHTML = `Hi <em>${data.leadName}</em>.`;
+          // textContent, not innerHTML: leadName can originate from a visitor-submitted form.
+          const heading = document.getElementById('heading');
+          const em = document.createElement('em');
+          em.textContent = data.leadName;
+          heading.replaceChildren('Hi ', em, '.');
           document.getElementById('subtitle').textContent = data.greeting || 'Thanks for connecting. Let me walk you through how we can help.';
         }
 
@@ -395,8 +385,14 @@
           if (update.transcript) {
             const el = document.getElementById('transcript');
             el.classList.add('visible');
-            const lines = update.transcript.map(t => `<b>${t.role === 'agent' ? 'AI' : 'You'}</b>${t.content}`);
-            el.innerHTML = lines.slice(-4).join('<br>');
+            // Build nodes, never HTML: transcript text is model/ASR output.
+            el.replaceChildren();
+            update.transcript.slice(-4).forEach((t, i) => {
+              if (i) el.appendChild(document.createElement('br'));
+              const who = document.createElement('b');
+              who.textContent = t.role === 'agent' ? 'AI' : 'You';
+              el.append(who, String(t.content ?? ''));
+            });
             el.scrollTop = el.scrollHeight;
           }
         });

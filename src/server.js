@@ -26,7 +26,7 @@ import voiceRouter from './routes/voice.js';
 import appointmentsRouter from './routes/appointments.js';
 import trackingRouter from './routes/tracking.js';
 import uploadsRouter from './routes/uploads.js';
-import formsRouter from './routes/forms.js';
+import formsRouter, { saveInboundLead, normaliseSite } from './routes/forms.js';
 import ingestRouter from './routes/ingest.js';
 import sourcesRouter from './routes/sources.js';
 import segmentsRouter from './routes/segments.js';
@@ -101,6 +101,11 @@ app.get('/proposal.html', (req, res, next) => {
   if (!session || session.role !== 'superadmin') return res.redirect('/');
   next();
 });
+
+// One URL per page: the landing file is the homepage, and extensionless legal
+// URLs resolve instead of falling through to the 404 below.
+app.get(['/landing.html', '/index.html'], (req, res) => res.redirect(301, '/'));
+app.get(['/privacy', '/terms', '/security'], (req, res) => res.redirect(301, `${req.path}.html`));
 
 app.use(express.static(path.join(__dirname, '..', 'public'), {
   maxAge: 0,
@@ -510,11 +515,46 @@ function escHtml(s) {
 }
 
 // Contact form (public, no auth)
-app.post('/api/contact', async (req, res) => {
+// Public enquiry form (sa landing + the parent site's "Talk to us"). The CRM
+// write is the durable record; the email is a notification. Previously an email
+// failure was swallowed and the visitor told "sent" while the enquiry vanished.
+const contactLimiter = rateLimit({
+  windowMs: 60_000, max: 5, validate: false,
+  message: { error: 'Too many messages. Please wait a minute and try again.' },
+});
+function siteFromOrigin(origin) {
+  const host = (() => { try { return new URL(origin).hostname; } catch { return ''; } })();
+  if (host === 'eiaawsolutions.com' || host === 'www.eiaawsolutions.com') return 'parent';
+  if (host.startsWith('sa.')) return 'sales_agent';
+  return 'unknown';
+}
+app.post('/api/contact', contactLimiter, async (req, res) => {
   try {
-    const { name, email, phone, company, message } = req.body;
+    const b = req.body || {};
+    const name = String(b.name || '').trim().slice(0, 120);
+    const email = String(b.email || '').trim().slice(0, 160).toLowerCase();
+    const phone = String(b.phone || '').trim().slice(0, 40);
+    const company = String(b.company || '').trim().slice(0, 160);
+    const message = String(b.message || '').trim().slice(0, 4000);
     if (!name || !email || !message) return res.status(400).json({ error: 'Name, email, and message are required.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address.' });
+
+    const origin = req.headers['origin'] || req.headers['referer'] || '';
+    let savedToCrm = false;
+    try {
+      saveInboundLead({
+        name, email, phone, company,
+        site: b.site ? normaliseSite(b.site) : siteFromOrigin(origin),
+        channel: 'contact_form',
+        // The consent record is appended to the message by the site; keep the
+        // tail so it survives the 500-char note cap.
+        note: message.length > 500 ? '…' + message.slice(-499) : message,
+        origin,
+      });
+      savedToCrm = true;
+    } catch (dbErr) {
+      console.error('[contact] CRM save failed:', dbErr.message, 'From:', email);
+    }
 
     const subject = `[SalesAgent Enquiry] ${escHtml(name)} — ${escHtml(company || 'Individual')}`;
     const html = `
@@ -531,17 +571,22 @@ app.post('/api/contact', async (req, res) => {
       <p style="color:#999;font-size:12px">Sent from EIAAW SalesAgent landing page</p>
     `;
 
+    let emailed = false;
     try {
       const result = await sendEmail({ to: 'eiaawsolutions@gmail.com', subject, html, replyTo: email });
       console.log('[contact] sent via', result.method, result.id ? '(id=' + result.id + ')' : '', 'from:', email);
+      emailed = true;
     } catch (sendErr) {
-      console.error('[contact] send failed:', sendErr.message, '— enquiry was NOT delivered. From:', email, 'Subject:', subject);
+      console.error('[contact] send failed:', sendErr.message, savedToCrm ? '— saved to CRM.' : '— NOT saved anywhere.', 'From:', email);
     }
 
+    if (!savedToCrm && !emailed) {
+      return res.status(502).json({ error: 'We could not send your message just now. Please email eiaawsolutions@gmail.com directly.' });
+    }
     res.json({ success: true });
   } catch (err) {
     console.error('[contact] handler error:', err.message);
-    res.json({ success: true }); // Don't reveal email errors to user
+    res.status(500).json({ error: 'We could not send your message just now. Please email eiaawsolutions@gmail.com directly.' });
   }
 });
 
@@ -933,9 +978,11 @@ app.get('/f/:id', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'form.html'));
 });
 
-// SPA fallback for any other routes
+// Unknown URLs are real 404s. The old SPA fallback served the landing page
+// with 200 for every path, which search engines index as duplicate "soft 404s".
+app.all('/api/*', (req, res) => res.status(404).json({ error: 'Not found.' }));
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'landing.html'));
+  res.status(404).sendFile(path.join(__dirname, '..', 'public', '404.html'));
 });
 
 const PORT = process.env.PORT || config.port;

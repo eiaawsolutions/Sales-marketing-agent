@@ -435,7 +435,7 @@ router.post('/portal', requireAuth, async (req, res) => {
 // POST /api/billing/checkout — create Stripe checkout session for signup
 router.post('/checkout', async (req, res) => {
   try {
-    const { plan, email, username, displayName, founderToken } = req.body;
+    const { plan, email, username, displayName, founderToken, termsAcceptedAt } = req.body;
 
     if (!plan || !PLANS[plan]) return res.status(400).json({ error: 'Invalid plan. Choose starter, pro, or business.' });
     if (!email || !username) return res.status(400).json({ error: 'Email and username required.' });
@@ -501,6 +501,9 @@ router.post('/checkout', async (req, res) => {
       cancel_url: `${baseUrl}/#pricing`,
       metadata: { plan, username, email, displayName: displayName || username },
     };
+    // Evidence that the buyer ticked "I agree to the Terms and Privacy notice"
+    // on the landing signup (other callers may not send it yet).
+    if (termsAcceptedAt) checkoutPayload.metadata.terms_accepted_at = String(termsAcceptedAt).slice(0, 40);
 
     if (isFounderSignup) {
       checkoutPayload.discounts = [{ coupon: 'FOUNDER_HQ' }];

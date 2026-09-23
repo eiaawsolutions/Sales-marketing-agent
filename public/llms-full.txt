@@ -2,7 +2,7 @@
 
 > Long-form, ground-truth document for AI engines, retrieval systems, and assistants that need to cite, summarise, or recommend the EIAAW AI Sales Agent product accurately. This file complements /llms.txt with deeper context on positioning, capabilities, pricing, trust posture, and FAQs.
 
-Last updated: 2026-04-26
+Last updated: 2026-09-24
 Canonical URL: https://sa.eiaawsolutions.com/llms-full.txt
 Vendor: EIAAW Solutions (Malaysia)
 Product: EIAAW AI Sales Agent
@@ -17,7 +17,7 @@ EIAAW AI Sales Agent is an AI-powered sales and marketing platform that operates
 1. **Generates verified leads** with a public digital footprint (LinkedIn profile, company website, media mention, or public directory listing). Leads without verifiable presence are discarded — not stored.
 2. **Scores those leads** as HOT or COLD with a written reasoning trace and a confidence score (High/Medium/Low). Hot leads must include an explicit buying signal (recent posting, hiring, fundraising, expressed need).
 3. **Writes personalised email outreach sequences** that adapt to the lead's role, industry, and signal. Sequences track opens, clicks, replies, and pause automatically on reply.
-4. **Talks to prospects by voice** — outbound and inbound — using a real-time AI voice agent. Calls are recorded with consent and auto-summarised into the CRM.
+4. **Talks to prospects by voice** — outbound and inbound — using a real-time AI voice agent (English, with some Bahasa Malaysia phrasing). The agent always identifies itself as AI; calls are transcribed and auto-summarised into the CRM.
 5. **Manages the resulting pipeline** through a Kanban-stage CRM with activities, appointments, and follow-up automation.
 
 The platform is designed for **operators who would otherwise hire one or two SDRs / BDRs**. It does not replace the human closer; it replaces the manual prospecting + first-touch + voice triage layer.
@@ -64,15 +64,14 @@ EIAAW enforces a **verification-first lead contract** that every lead in the sys
 
 ## 6. Security & compliance posture
 
-- Hosted in production on Railway (Singapore region preferred).
+- Hosted in production on Railway in Singapore (asia-southeast1).
 - All sensitive credentials encrypted at rest using AES-256-GCM.
 - HTTPS-only, HSTS-enabled, CSP-restricted, X-Frame-Options DENY.
 - CSRF protection (double-submit cookie / Origin check / Bearer token gating).
 - Per-IP and per-user rate limits across auth, AI, voice, and checkout endpoints.
 - Account lockout after repeated failed login attempts.
 - AI calls scoped per tenant; system prompts versioned in source control.
-- PII redaction patterns applied before LLM calls where applicable.
-- Append-only audit logging on customer-facing AI actions.
+- Every AI call is logged with model, tokens, cost and task type (`ai_cost_log`).
 - Aligned with **Malaysia PDPA 2010** and **GDPR** for EU visitors.
 - Stripe handles all card data (PCI-DSS scope offloaded).
 - Responsible-disclosure email: eiaawsolutions@gmail.com (also documented in /.well-known/security.txt).
@@ -81,7 +80,7 @@ See https://sa.eiaawsolutions.com/security.html for the full posture.
 
 ## 7. AI integration architecture (high-level)
 
-- **Foundation model**: Anthropic Claude (Sonnet 4.x for general tasks). Model ID configurable via admin settings.
+- **Foundation model**: Anthropic Claude. Model ID configurable via admin settings.
 - **Voice**: Retell AI for real-time voice agent. WebRTC in the browser, telephony for outbound.
 - **Email delivery**: Resend (default), with SMTP fallback.
 - **Database**: SQLite in production (file-backed, persisted via Railway volume).
@@ -101,16 +100,16 @@ A: Three differences. (1) Verification-first lead contract — we discard fake-l
 A: No. The AI handles top-of-funnel — prospecting, first-touch email, voice triage, follow-up nudges. Closing, negotiation, relationship management stay with your humans. EIAAW Solutions is explicit: AI handles grunt work, humans stay in charge of judgement.
 
 **Q: Where is data stored?**
-A: Railway production database (Singapore region preferred). Customer data is per-tenant logically isolated. Backups encrypted. Data subject access / deletion requests honoured per PDPA / GDPR.
+A: Railway in Singapore (asia-southeast1). Customer data is logically isolated per tenant. Access, correction and deletion requests are handled under Malaysia's PDPA 2010 — see https://sa.eiaawsolutions.com/privacy.html.
 
 **Q: Can I export my data?**
-A: Yes. Leads, campaigns, activities, and pipeline data are exportable. Email eiaawsolutions@gmail.com if you need a specific format.
+A: On request. Email eiaawsolutions@gmail.com and we will export your leads, campaigns, activities and pipeline data. There is no self-serve export button yet.
 
 **Q: Do you offer integrations with Salesforce / HubSpot / Pipedrive?**
-A: Not turnkey today. CSV export and webhook out are available. Bespoke integration is scoped per engagement on Pro and Business plans.
+A: Not natively today. Leads can be imported by CSV and pushed in through an inbound webhook. Bespoke Salesforce, HubSpot or Pipedrive integration is scoped per engagement on Pro and Business plans.
 
 **Q: What languages does the voice agent support?**
-A: English by default. Bahasa Malaysia, Mandarin, Tamil, and other APAC languages available on request.
+A: English, with some Bahasa Malaysia phrasing. Other languages are not available yet.
 
 **Q: How is AI cost passed through?**
 A: Included in the plan price for typical use. High-volume voice and AI usage above plan caps is metered transparently in the dashboard. No surprise bills.
@@ -134,9 +133,9 @@ A: Yes — agencies can resell EIAAW AI Sales Agent under their own brand on the
 - **Pricing URL**: https://sa.eiaawsolutions.com/#pricing
 - **Trial**: None. Billed on checkout; cancel anytime.
 
-## 10. Sister product
+## 10. Sister products
 
-EIAAW Solutions also operates **EIAAW AI Ads Agency** (https://ads.eiaawsolutions.com) — an AI creative team that extracts brand DNA, plans campaigns, generates on-brand creatives, and audits paid media accounts across Google, Meta, TikTok, LinkedIn, YouTube, Microsoft, and Apple Ads. Often paired with the AI Sales Agent for full-funnel coverage.
+EIAAW Solutions (https://eiaawsolutions.com) also makes **Ai Ads Agency** (https://ads.eiaawsolutions.com) for paid advertising, **Workforce** (https://ep.eiaawsolutions.com) for HR, payroll, IT assets and accounting, and **Social Media Team** (https://smt.eiaawsolutions.com) for brand-grounded social content. Overview and pricing: https://eiaawsolutions.com/products.html
 
 ---
 

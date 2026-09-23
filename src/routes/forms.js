@@ -208,6 +208,57 @@ function resolveOwnerId(site) {
   return FOUNDER_ID;
 }
 
+// Persist a self-reported inbound lead (chatbot gate or contact form). Shared so
+// every inbound channel lands in the CRM the same way. Global UNIQUE(email): a
+// returning person is never overwritten — we append a dated note instead, and
+// that note keeps the visitor note, which carries the consent record.
+export function saveInboundLead({ name, email, phone, company, site, channel, note, page, origin }) {
+  const OWNER_ID = resolveOwnerId(site); // per-site via LEAD_OWNER_MAP; see note above
+  const label = channel === 'contact_form' ? 'contact form' : 'chatbot';
+  const visitorNote = note ? String(note).slice(0, 500) : '';
+
+  const existing = db.prepare('SELECT * FROM leads WHERE email = ?').get(email);
+  if (existing) {
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const extra = [phone && `phone: ${phone}`, company && `company: ${company}`, visitorNote && `note: ${visitorNote}`]
+      .filter(Boolean).join('; ');
+    const appended = `${existing.notes ? existing.notes + '\n' : ''}[${stamp}] Returned via ${site} ${label}${extra ? `; ${extra}` : ''}`;
+    db.prepare('UPDATE leads SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(appended.slice(0, 4000), existing.id);
+    try {
+      db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+        .run(existing.user_id || OWNER_ID, existing.id, 'note', `Returned via ${site} ${label}`);
+    } catch (e) { /* activities table shape tolerant */ }
+    return { id: existing.id, deduped: true };
+  }
+
+  // Notes fold: self-reported provenance so the CRM shows exactly how this
+  // lead arrived and that it is NOT an externally-verified prospect.
+  const notesLines = [
+    `Lead type: Inbound (self-reported via website ${label})`,
+    'Confidence: Self-reported — verify before outreach',
+    `Site: ${site} (${origin || 'unknown origin'})`,
+  ];
+  if (visitorNote) notesLines.push(`Visitor note: ${visitorNote}`);
+  if (page) notesLines.push(`Page: ${String(page).slice(0, 300)}`);
+
+  const result = db.prepare(`
+    INSERT INTO leads (user_id, name, email, company, phone, source, status, notes)
+    VALUES (?, ?, ?, ?, ?, ?, 'new', ?)
+  `).run(OWNER_ID, name, email, company || null, phone || null, `${channel || 'chatbot'}_${site}`, notesLines.join('\n'));
+
+  try {
+    db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+      .run(OWNER_ID, result.lastInsertRowid, 'note', `New inbound lead via ${site} ${label}`);
+  } catch (e) { /* non-fatal */ }
+  return { id: result.lastInsertRowid, deduped: false };
+}
+
+export function normaliseSite(site) {
+  const s = String(site || '').trim();
+  return KNOWN_SITES.has(s) ? s : 'unknown';
+}
+
 router.post('/public/lead-intake', intakeLimiter, (req, res) => {
   try {
     const b = req.body || {};
@@ -216,7 +267,7 @@ router.post('/public/lead-intake', intakeLimiter, (req, res) => {
     const email = String(b.email || '').trim().slice(0, 160).toLowerCase();
     const phoneRaw = String(b.phone || '').trim().slice(0, 40);
     const company = String(b.company || '').trim().slice(0, 160);
-    const site = KNOWN_SITES.has(String(b.site || '').trim()) ? String(b.site).trim() : 'unknown';
+    const site = normaliseSite(b.site);
 
     // Server-side gate. Required: name + email + phone (matches the SMT gate).
     if (!name || !email || !phoneRaw) {
@@ -229,47 +280,12 @@ router.post('/public/lead-intake', intakeLimiter, (req, res) => {
       return res.status(400).json({ error: 'Please enter a valid phone number.' });
     }
 
-    const OWNER_ID = resolveOwnerId(site); // per-site via LEAD_OWNER_MAP; see note above
-    const source = `chatbot_${site}`;
-
-    // Notes fold: self-reported provenance so the CRM shows exactly how this
-    // lead arrived and that it is NOT an externally-verified prospect.
-    const notesLines = [
-      'Lead type: Inbound (self-reported via website chatbot)',
-      'Confidence: Self-reported — verify before outreach',
-      `Site: ${site} (${req.headers['origin'] || req.headers['referer'] || 'unknown origin'})`,
-    ];
-    if (b.message) notesLines.push(`Visitor note: ${String(b.message).slice(0, 500)}`);
-    if (b.page) notesLines.push(`Page: ${String(b.page).slice(0, 300)}`);
-    const notes = notesLines.join('\n');
-
-    // Global UNIQUE(email): if this person already exists as a lead, DON'T
-    // error and DON'T overwrite good CRM data — append a dated intake note and
-    // return the existing lead. Mirrors the AI/Apollo re-ownership pattern.
-    const existing = db.prepare('SELECT * FROM leads WHERE email = ?').get(email);
-    if (existing) {
-      const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
-      const appended = `${existing.notes ? existing.notes + '\n' : ''}[${stamp}] Returned via ${site} chatbot; phone: ${phoneRaw}${company ? `; company: ${company}` : ''}`;
-      db.prepare('UPDATE leads SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .run(appended.slice(0, 4000), existing.id);
-      try {
-        db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
-          .run(existing.user_id || OWNER_ID, existing.id, 'note', `Returned via ${site} chatbot gate`);
-      } catch (e) { /* activities table shape tolerant */ }
-      return res.json({ success: true, deduped: true });
-    }
-
-    const result = db.prepare(`
-      INSERT INTO leads (user_id, name, email, company, phone, source, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, 'new', ?)
-    `).run(OWNER_ID, name, email, company || null, phoneRaw, source, notes);
-
-    try {
-      db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
-        .run(OWNER_ID, result.lastInsertRowid, 'note', `New inbound lead via ${site} chatbot gate`);
-    } catch (e) { /* non-fatal */ }
-
-    res.json({ success: true, deduped: false });
+    const { deduped } = saveInboundLead({
+      name, email, phone: phoneRaw, company, site, channel: 'chatbot',
+      note: b.message, page: b.page,
+      origin: req.headers['origin'] || req.headers['referer'],
+    });
+    res.json({ success: true, deduped });
   } catch (err) {
     console.error('Lead intake error:', err.message);
     res.status(500).json({ error: 'Could not save your details. Please try again.' });

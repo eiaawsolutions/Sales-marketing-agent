@@ -3,24 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Meta Pixel Code -->
-  <script>
-  !function(f,b,e,v,n,t,s)
-  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-  n.queue=[];t=b.createElement(e);t.async=!0;
-  t.src=v;s=b.getElementsByTagName(e)[0];
-  s.parentNode.insertBefore(t,s)}(window,document,'script',
-  'https://connect.facebook.net/en_US/fbevents.js');
-  fbq('init', '1516303113491153');
-  fbq('track', 'PageView');
-  </script>
-  <noscript><img height="1" width="1" style="display:none"
-  src="https://www.facebook.com/tr?id=1516303113491153&ev=PageView&noscript=1"/></noscript>
-  <!-- End Meta Pixel Code -->
-  <title>EIAAW AI Sales Agent — AI That Generates Leads, Writes Outreach & Talks to Prospects</title>
-  <meta name="description" content="AI sales agent that generates verified leads, scores them with written reasoning, writes personalised email outreach, creates marketing content, and talks to prospects by voice — built for SMBs and agencies in Malaysia and APAC. From RM 99/month, billed monthly. Cancel anytime.">
+  <!-- Meta Pixel loads only after the visitor opts in — see consent.js -->
+  <script src="/consent.js?v=20260924a"></script>
+  <title>AI Sales Agent Malaysia — Leads, Outreach &amp; Voice | EIAAW</title>
+  <meta name="description" content="EIAAW AI Sales Agent finds verified leads, writes personalised outreach and talks to prospects by voice. For Malaysian SMBs and agencies. RM 99–399/month.">
   <meta name="keywords" content="AI sales agent, AI lead generation, AI outreach, AI voice agent, sales automation, AI CRM, SDR automation, Malaysia sales software, APAC sales platform, AI cold email, verified leads">
   <meta name="author" content="EIAAW Solutions">
   <meta name="publisher" content="EIAAW Solutions">
@@ -41,20 +27,19 @@
   <!-- Open Graph (Facebook, LinkedIn, WhatsApp) -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="EIAAW AI Sales Agent">
-  <meta property="og:title" content="EIAAW AI Sales Agent — AI That Generates Leads, Writes Outreach & Talks to Prospects">
+  <meta property="og:title" content="AI Sales Agent Malaysia — Leads, Outreach &amp; Voice | EIAAW">
   <meta property="og:description" content="AI sales platform that generates verified leads, scores them with reasoning, writes personalised outreach, and talks to prospects by voice. From RM 99/month. Cancel anytime.">
   <meta property="og:url" content="https://sa.eiaawsolutions.com/">
   <meta property="og:locale" content="en_MY">
   <meta property="og:locale:alternate" content="en_US">
-  <meta property="og:locale:alternate" content="en_SG">
-  <meta property="og:image" content="https://sa.eiaawsolutions.com/media/hero.jpg">
+    <meta property="og:image" content="https://sa.eiaawsolutions.com/media/hero.jpg">
   <meta property="og:image:width" content="1800">
   <meta property="og:image:height" content="1200">
   <meta property="og:image:alt" content="EIAAW AI Sales Agent — editorial hero photograph">
 
   <!-- Twitter / X Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="EIAAW AI Sales Agent — AI That Generates Leads, Writes Outreach & Talks to Prospects">
+  <meta name="twitter:title" content="AI Sales Agent Malaysia — Leads, Outreach &amp; Voice | EIAAW">
   <meta name="twitter:description" content="AI sales platform that generates verified leads, writes personalised outreach, and talks to prospects by voice. From RM 99/month.">
   <meta name="twitter:image" content="https://sa.eiaawsolutions.com/media/hero.jpg">
   <meta name="twitter:image:alt" content="EIAAW AI Sales Agent">
@@ -63,7 +48,7 @@
   <link rel="apple-touch-icon" href="/brand/shield.png?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <!-- Structured data: Organization + SoftwareApplication + WebSite + BreadcrumbList + FAQPage -->
   <script type="application/ld+json">
@@ -74,30 +59,21 @@
         "@type": "Organization",
         "@id": "https://eiaawsolutions.com/#organization",
         "name": "EIAAW Solutions",
-        "alternateName": ["EIAAW", "EIAAW Solutions"],
-        "url": "https://eiaawsolutions.com",
-        "logo": "https://sa.eiaawsolutions.com/brand/shield.png",
-        "email": "eiaawsolutions@gmail.com",
-        "slogan": "AI · Human Partnerships",
-        "foundingDate": "2024",
-        "address": { "@type": "PostalAddress", "addressCountry": "MY" },
-        "areaServed": ["MY", "SG", "ID", "PH", "TH", "VN", "Asia"],
-        "sameAs": [
-          "https://eiaawsolutions.com",
-          "https://ads.eiaawsolutions.com"
-        ]
+        "url": "https://eiaawsolutions.com/"
       },
       {
         "@type": "WebSite",
         "@id": "https://sa.eiaawsolutions.com/#website",
         "url": "https://sa.eiaawsolutions.com/",
         "name": "EIAAW AI Sales Agent",
-        "publisher": { "@id": "https://eiaawsolutions.com/#organization" },
+        "publisher": {
+          "@id": "https://eiaawsolutions.com/#organization"
+        },
         "inLanguage": "en-MY"
       },
       {
         "@type": "SoftwareApplication",
-        "@id": "https://sa.eiaawsolutions.com/#software",
+        "@id": "https://eiaawsolutions.com/products.html#sales-agent",
         "name": "EIAAW AI Sales Agent",
         "applicationCategory": "BusinessApplication",
         "applicationSubCategory": "SalesApplication",
@@ -105,9 +81,13 @@
         "url": "https://sa.eiaawsolutions.com/",
         "screenshot": "https://sa.eiaawsolutions.com/media/hero.jpg",
         "softwareVersion": "1.0",
-        "description": "AI sales platform that generates verified leads, scores them with written reasoning, writes personalised email outreach sequences, creates marketing content, and talks to prospects via real-time AI voice. Built for SMBs and agencies in Malaysia and APAC.",
-        "creator": { "@id": "https://eiaawsolutions.com/#organization" },
-        "publisher": { "@id": "https://eiaawsolutions.com/#organization" },
+        "description": "AI sales platform that generates verified leads, scores them with written reasoning, writes personalised email outreach and LinkedIn drafts, creates marketing content, and talks to prospects by real-time AI voice. Built for SMBs and agencies in Malaysia and APAC. Starter RM 99, Pro RM 199, Business RM 399 per month.",
+        "creator": {
+          "@id": "https://eiaawsolutions.com/#organization"
+        },
+        "publisher": {
+          "@id": "https://eiaawsolutions.com/#organization"
+        },
         "featureList": [
           "AI Lead Generation with verification-first contract",
           "AI Lead Scoring with written reasoning trace",
@@ -117,63 +97,80 @@
           "Sales Pipeline + CRM",
           "AI Chat Assistant"
         ],
-        "offers": [
-          {
-            "@type": "Offer",
-            "name": "Starter",
-            "price": "99",
-            "priceCurrency": "MYR",
-            "priceSpecification": {
-              "@type": "UnitPriceSpecification",
+        "offers": {
+          "@type": "AggregateOffer",
+          "lowPrice": "99",
+          "highPrice": "399",
+          "offerCount": "3",
+          "priceCurrency": "MYR",
+          "url": "https://sa.eiaawsolutions.com/#pricing",
+          "availability": "https://schema.org/InStock",
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Starter",
               "price": "99",
               "priceCurrency": "MYR",
-              "billingDuration": "P1M",
-              "unitCode": "MON"
+              "category": "subscription",
+              "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "price": "99",
+                "priceCurrency": "MYR",
+                "billingDuration": "P1M",
+                "unitCode": "MON"
+              }
             },
-            "category": "subscription",
-            "url": "https://sa.eiaawsolutions.com/#pricing",
-            "availability": "https://schema.org/InStock"
-          },
-          {
-            "@type": "Offer",
-            "name": "Pro",
-            "price": "199",
-            "priceCurrency": "MYR",
-            "priceSpecification": {
-              "@type": "UnitPriceSpecification",
+            {
+              "@type": "Offer",
+              "name": "Pro",
               "price": "199",
               "priceCurrency": "MYR",
-              "billingDuration": "P1M",
-              "unitCode": "MON"
+              "category": "subscription",
+              "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "price": "199",
+                "priceCurrency": "MYR",
+                "billingDuration": "P1M",
+                "unitCode": "MON"
+              }
             },
-            "category": "subscription",
-            "url": "https://sa.eiaawsolutions.com/#pricing",
-            "availability": "https://schema.org/InStock"
-          },
-          {
-            "@type": "Offer",
-            "name": "Business",
-            "price": "399",
-            "priceCurrency": "MYR",
-            "priceSpecification": {
-              "@type": "UnitPriceSpecification",
+            {
+              "@type": "Offer",
+              "name": "Business",
               "price": "399",
               "priceCurrency": "MYR",
-              "billingDuration": "P1M",
-              "unitCode": "MON"
-            },
-            "category": "subscription",
-            "url": "https://sa.eiaawsolutions.com/#pricing",
-            "availability": "https://schema.org/InStock"
-          }
+              "category": "subscription",
+              "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "price": "399",
+                "priceCurrency": "MYR",
+                "billingDuration": "P1M",
+                "unitCode": "MON"
+              }
+            }
+          ]
+        },
+        "alternateName": [
+          "EIAAW Sales Agent",
+          "EIAAW AI Sales Agent"
         ]
       },
       {
         "@type": "BreadcrumbList",
         "@id": "https://sa.eiaawsolutions.com/#breadcrumb",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "EIAAW Solutions", "item": "https://eiaawsolutions.com" },
-          { "@type": "ListItem", "position": 2, "name": "AI Sales Agent", "item": "https://sa.eiaawsolutions.com/" }
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "EIAAW Solutions",
+            "item": "https://eiaawsolutions.com"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "AI Sales Agent",
+            "item": "https://sa.eiaawsolutions.com/"
+          }
         ]
       },
       {
@@ -185,7 +182,7 @@
             "name": "What does EIAAW AI Sales Agent do?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "It is an AI sales platform that generates verified leads, scores them with a written reasoning trace, writes personalised email outreach sequences, creates marketing content, and talks to prospects via a real-time AI voice agent. The human operator stays in charge of every closed deal."
+              "text": "It is an AI sales platform for SMBs and agencies in Malaysia and APAC. It generates verified leads, scores them with a written reasoning trace, writes personalised email outreach and LinkedIn drafts, creates marketing content, and talks to prospects through a real-time AI voice agent. Your people stay in charge of every closed deal."
             }
           },
           {
@@ -193,7 +190,7 @@
             "name": "How much does EIAAW AI Sales Agent cost?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Three plans: Starter at RM 99/month for solo founders, Pro at RM 199/month for growing teams, and Business at RM 399/month for agencies. All plans are billed monthly at checkout — there is no free trial. You can cancel anytime from the billing page and keep access until the end of the cycle you have paid for."
+              "text": "Three plans: Starter at RM 99/month (1 seat), Pro at RM 199/month (up to 3 seats) and Business at RM 399/month (up to 10 seats). All plans are billed monthly at checkout — there is no free trial. You can cancel anytime from the billing page and keep access until the end of the cycle you have paid for. Enterprise pricing is custom."
             }
           },
           {
@@ -209,7 +206,7 @@
             "name": "Where is customer data stored?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "On Railway production infrastructure with Singapore region preferred. Data is logically isolated per tenant. Backups are encrypted. Data subject access and deletion requests are honoured per Malaysia PDPA 2010 and GDPR."
+              "text": "On Railway infrastructure in Singapore (asia-southeast1). Each customer's data is logically isolated. Access, correction and deletion requests are handled under Malaysia's PDPA 2010 — see the privacy notice."
             }
           },
           {
@@ -217,7 +214,7 @@
             "name": "Does it integrate with Salesforce or HubSpot?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "CSV export and webhooks are available out of the box. Bespoke Salesforce, HubSpot, or Pipedrive integration is scoped per engagement on Pro and Business plans."
+              "text": "Not natively yet. You can import leads by CSV and push leads in through an inbound webhook. Bespoke Salesforce, HubSpot or Pipedrive integration can be scoped per engagement on Pro and Business plans."
             }
           },
           {
@@ -225,7 +222,7 @@
             "name": "What languages does the voice agent support?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "English by default. Bahasa Malaysia, Mandarin, Tamil, and other APAC languages are available on request."
+              "text": "English, with some Bahasa Malaysia phrasing. Other languages are not available yet."
             }
           },
           {
@@ -233,7 +230,7 @@
             "name": "Will the AI replace my sales team?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No. The AI handles top-of-funnel work — prospecting, first-touch email, voice triage, follow-up nudges. Closing, negotiation, and relationship management stay with your humans. EIAAW Solutions designs ethical AI-human partnerships, not replacements."
+              "text": "No. The AI handles top-of-funnel work — prospecting, first-touch email, voice triage and follow-up nudges. Closing, negotiation and relationship management stay with your people. EIAAW Solutions designs ethical AI-human partnerships, not replacements."
             }
           }
         ]
@@ -271,7 +268,36 @@
       --tracking-eyebrow: 0.14em;
 
       --ease: cubic-bezier(.2,.7,.2,1);
+
+      /* Aliases used by the modal + chatbot markup (were undefined, so borders
+         and label colours silently didn't render). */
+      --border: var(--line);
+      --text-muted: var(--mute);
+      --text: var(--ink);
+      --primary-light: var(--primary-tint);
     }
+
+    /* ---------- FAQ (visible twin of the FAQPage JSON-LD) ---------- */
+    .faq-wrap { display: grid; grid-template-columns: repeat(12, 1fr); gap: clamp(16px, 1.6vw, 28px); }
+    .faq-list { grid-column: 3 / span 8; border-bottom: 1px solid var(--line); }
+    .faq-item { border-top: 1px solid var(--line); }
+    .faq-item summary { display: grid; grid-template-columns: 56px minmax(0,1fr) 24px; gap: 18px; align-items: baseline; padding: 24px 0; cursor: pointer; list-style: none; }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::after { content: '+'; font-family: var(--mono); font-size: 18px; color: var(--primary-dark); text-align: right; transition: transform .4s var(--ease); }
+    .faq-item[open] summary::after { transform: rotate(45deg); }
+    .faq-item summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 4px; }
+    .faq-item .num { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; color: var(--primary-dark); }
+    .faq-item h3 { font-family: var(--sans); font-weight: 500; font-size: clamp(18px, 1.2vw + 8px, 22px); letter-spacing: -.01em; line-height: 1.3; color: var(--ink); }
+    .faq-a { padding: 0 42px 26px 74px; }
+    .faq-a p { color: var(--ink-2); font-size: 16px; line-height: 1.65; max-width: 64ch; }
+    @media (max-width: 820px) {
+      .faq-list { grid-column: 1 / -1; }
+      .faq-item summary { grid-template-columns: 36px minmax(0,1fr) 20px; gap: 12px; }
+      .faq-a { padding: 0 0 22px 48px; }
+    }
+    .consent-row { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 14px; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); cursor: pointer; text-align: left; }
+    .consent-row input { flex: none; width: 17px; height: 17px; margin-top: 1px; accent-color: var(--primary-dark); cursor: pointer; }
+    .consent-row a { color: var(--primary-dark); text-decoration: underline; }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     *::selection { background: var(--ink); color: var(--bg); }
@@ -1202,7 +1228,7 @@
 
     <div class="hero-meta rvl">
       <p class="lead">
-        Generates leads, scores them with reasoning, writes personalised outreach, creates content, and talks to prospects by voice &mdash; so you spend your day closing, not chasing.
+        EIAAW AI Sales Agent is an AI sales platform for SMBs and agencies in Malaysia and APAC. It finds verified leads, scores them with written reasoning, writes personalised outreach, creates content, and talks to prospects by voice &mdash; from RM&nbsp;99 a month, so you spend your day closing, not chasing.
       </p>
       <div class="hero-cta-row">
         <button class="btn btn-primary btn-lg magnetic" onclick="openSignup('pro')">Subscribe now <span class="arrow">&rarr;</span></button>
@@ -1264,7 +1290,7 @@
         <h3 class="cap-title">Lead <em>generation</em>, on brief.</h3>
         <p class="cap-body">
           <span class="crossed">Hours in LinkedIn, directories, Google.</span>
-          Describe your ICP. The agent returns a ranked list of matching prospects &mdash; verified, enriched, exportable.
+          Describe your ICP. The agent returns a ranked list of matching prospects &mdash; verified and enriched.
         </p>
         <div class="cap-meta">Search &rarr; Enrich &rarr; Export <span class="cap-arrow">&rarr;</span></div>
       </article>
@@ -1288,7 +1314,7 @@
           <span class="crossed">Re-writing the same follow-up, forever.</span>
           Multi-step email sequences, personalised per lead, scheduled and tracked. You review, it sends.
         </p>
-        <div class="cap-meta">Email + SMS + LinkedIn <span class="cap-arrow">&rarr;</span></div>
+        <div class="cap-meta">Email + LinkedIn drafts <span class="cap-arrow">&rarr;</span></div>
       </article>
 
       <article class="cap-row rvl">
@@ -1405,7 +1431,7 @@
           <li>You write every email yourself.</li>
           <li>You decide who to chase next, on vibes.</li>
           <li>Separate tools for CRM, email, content, voice.</li>
-          <li>RM 800&ndash;3,000 / month at the enterprise tier.</li>
+          <li>Per-seat pricing that climbs as the team grows.</li>
           <li>Weeks of setup, consultants, training.</li>
           <li>Pretty reports. No outbound.</li>
         </ul>
@@ -1449,14 +1475,14 @@
           <li>3 campaigns</li>
           <li>50 AI actions / month</li>
           <li>5 voice calls / month</li>
-          <li>Email &amp; social content</li>
+          <li>Email &amp; social content &middot; 1 seat</li>
         </ul>
         <button class="btn btn-ghost" onclick="openSignup('starter')">Subscribe <span class="arrow">&rarr;</span></button>
       </div>
 
       <div class="pricing-row featured rvl">
         <div class="price-tier">
-          <span class="tag">Tier 02 &middot; Most chosen</span>
+          <span class="tag">Tier 02 &middot; Recommended</span>
           Pro
         </div>
         <div class="price-num">RM 199<span class="per">/ mo</span></div>
@@ -1466,7 +1492,7 @@
           <li>10 campaigns</li>
           <li>200 AI actions / month</li>
           <li>20 voice calls / month</li>
-          <li>Auto-outreach + AI lead gen</li>
+          <li>Auto-outreach + AI lead gen &middot; up to 3 seats</li>
         </ul>
         <button class="btn btn-primary" onclick="openSignup('pro')">Subscribe <span class="arrow">&rarr;</span></button>
       </div>
@@ -1483,7 +1509,7 @@
           <li>25 campaigns</li>
           <li>1,000 AI actions / month</li>
           <li>100 voice calls / month</li>
-          <li>Priority model (Claude Sonnet) &middot; up to 10 seats</li>
+          <li>Up to 10 seats</li>
         </ul>
         <button class="btn btn-ghost" onclick="openSignup('business')">Subscribe <span class="arrow">&rarr;</span></button>
       </div>
@@ -1498,10 +1524,53 @@
         <ul class="price-features-inline">
           <li>Custom lead volume &amp; seat count</li>
           <li>Dedicated success manager</li>
-          <li>SLA, SSO, audit log, private data residency</li>
+          <li>SLA and data-residency terms, scoped per contract</li>
           <li>Contract &amp; procurement on your terms</li>
         </ul>
         <button class="btn btn-ghost" onclick="openContact('enterprise')">Talk to sales <span class="arrow">&rarr;</span></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ — text must stay identical to the FAQPage JSON-LD in <head> -->
+<section id="faq" class="section-pad">
+  <div class="wrap">
+    <header class="section-head rvl">
+      <div class="label eyebrow">FAQ</div>
+      <h2 class="title section-h">Straight answers, <em>before you ask</em>.</h2>
+      <div class="aside">Questions &middot; 01&ndash;07</div>
+    </header>
+    <div class="faq-wrap">
+      <div class="faq-list">
+        <details class="faq-item rvl">
+          <summary><span class="num">01</span><h3>What does EIAAW AI Sales Agent do?</h3></summary>
+          <div class="faq-a"><p>It is an AI sales platform for SMBs and agencies in Malaysia and APAC. It generates verified leads, scores them with a written reasoning trace, writes personalised email outreach and LinkedIn drafts, creates marketing content, and talks to prospects through a real-time AI voice agent. Your people stay in charge of every closed deal.</p></div>
+        </details>
+        <details class="faq-item rvl">
+          <summary><span class="num">02</span><h3>How much does EIAAW AI Sales Agent cost?</h3></summary>
+          <div class="faq-a"><p>Three plans: Starter at RM 99/month (1 seat), Pro at RM 199/month (up to 3 seats) and Business at RM 399/month (up to 10 seats). All plans are billed monthly at checkout — there is no free trial. You can cancel anytime from the billing page and keep access until the end of the cycle you have paid for. Enterprise pricing is custom.</p></div>
+        </details>
+        <details class="faq-item rvl">
+          <summary><span class="num">03</span><h3>Are the leads real or AI-fabricated?</h3></summary>
+          <div class="faq-a"><p>Real. EIAAW enforces a verification-first lead contract: every lead must have a verifiable digital footprint such as a LinkedIn profile, company website, media mention, or public directory listing. Emails and phone numbers are never guessed. Unverified leads are discarded, not stored.</p></div>
+        </details>
+        <details class="faq-item rvl">
+          <summary><span class="num">04</span><h3>Where is customer data stored?</h3></summary>
+          <div class="faq-a"><p>On Railway infrastructure in Singapore (asia-southeast1). Each customer&#x27;s data is logically isolated. Access, correction and deletion requests are handled under Malaysia&#x27;s PDPA 2010 — see the privacy notice.</p></div>
+        </details>
+        <details class="faq-item rvl">
+          <summary><span class="num">05</span><h3>Does it integrate with Salesforce or HubSpot?</h3></summary>
+          <div class="faq-a"><p>Not natively yet. You can import leads by CSV and push leads in through an inbound webhook. Bespoke Salesforce, HubSpot or Pipedrive integration can be scoped per engagement on Pro and Business plans.</p></div>
+        </details>
+        <details class="faq-item rvl">
+          <summary><span class="num">06</span><h3>What languages does the voice agent support?</h3></summary>
+          <div class="faq-a"><p>English, with some Bahasa Malaysia phrasing. Other languages are not available yet.</p></div>
+        </details>
+        <details class="faq-item rvl">
+          <summary><span class="num">07</span><h3>Will the AI replace my sales team?</h3></summary>
+          <div class="faq-a"><p>No. The AI handles top-of-funnel work — prospecting, first-touch email, voice triage and follow-up nudges. Closing, negotiation and relationship management stay with your people. EIAAW Solutions designs ethical AI-human partnerships, not replacements.</p></div>
+        </details>
       </div>
     </div>
   </div>
@@ -1531,6 +1600,7 @@
   <div class="sm-row" data-target="approach"><span class="sm-num">02</span> Approach <span class="sm-dot"></span></div>
   <div class="sm-row" data-target="compare"><span class="sm-num">03</span> Delta <span class="sm-dot"></span></div>
   <div class="sm-row" data-target="pricing"><span class="sm-num">04</span> Pricing <span class="sm-dot"></span></div>
+  <div class="sm-row" data-target="faq"><span class="sm-num">05</span> FAQ <span class="sm-dot"></span></div>
 </aside>
 
 <!-- Footer -->
@@ -1574,6 +1644,7 @@
           <li><a href="#capabilities">Capabilities</a></li>
           <li><a href="#approach">Approach</a></li>
           <li><a href="#pricing">Pricing</a></li>
+          <li><a href="#faq">FAQ</a></li>
           <li><a href="/app">Sign in</a></li>
         </ul>
       </div>
@@ -1593,6 +1664,7 @@
           <li><a href="/privacy.html">Privacy</a></li>
           <li><a href="/terms.html">Terms</a></li>
           <li><a href="/security.html">Security</a></li>
+          <li><a href="#cookies" data-cookie-settings>Cookie settings</a></li>
         </ul>
       </div>
     </div>
@@ -1605,7 +1677,7 @@
 </footer>
 
 <!-- AI Chatbot Widget -->
-<div id="chatbot-toggle" onclick="toggleChatbot()" class="chat-toggle" aria-label="Open chat">
+<div id="chatbot-toggle" onclick="toggleChatbot()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleChatbot()}" class="chat-toggle" role="button" tabindex="0" aria-label="Open chat">
   <span id="chatbot-icon" aria-hidden="true">&#128172;</span>
 </div>
 
@@ -1655,6 +1727,7 @@
         <label style="display:block;font-size:13px;color:var(--text-muted);margin-bottom:4px">How can we help? *</label>
         <textarea id="ct-message" rows="4" placeholder="Tell us about your sales needs, team size, or any questions..." style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
       </div>
+      <label class="consent-row" for="ct-consent"><input type="checkbox" id="ct-consent"><span>I agree that EIAAW may use these details to reply to me, including through service providers outside my country, as described in the <a href="/privacy.html" target="_blank" rel="noopener">privacy notice</a>.</span></label>
       <div id="ct-error" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none"></div>
       <button id="ct-btn" onclick="submitContact()" class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px">
         Send Enquiry
@@ -1701,6 +1774,7 @@
       </select>
     </div>
     <p style="font-size:11px;color:var(--text-muted);margin-bottom:20px;text-align:center">Your card is charged for the first month when you complete checkout. Cancel anytime &mdash; access continues to the end of the cycle you've paid for.</p>
+    <label class="consent-row" for="su-terms"><input type="checkbox" id="su-terms"><span>I agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a> and the <a href="/privacy.html" target="_blank" rel="noopener">privacy notice</a>.</span></label>
     <div id="su-error" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none"></div>
     <button id="su-btn" onclick="startCheckout()" class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px">
       Continue to Payment &rarr;
@@ -1862,6 +1936,15 @@
 
 let selectedPlan = 'pro';
 
+// Explicit, unticked consent before we collect contact details (Malaysia PDPA
+// + the stricter APAC regimes). The record rides in fields the API already
+// stores: the enquiry message, and the chat-gate lead note.
+const PRIVACY_VERSION = '2026-09-24';
+function consentRecord() {
+  return `Consent: agreed to privacy notice (${PRIVACY_VERSION}) on ${new Date().toISOString()} via ${location.href}`;
+}
+const CONSENT_ERR = 'Please tick the box so we can use your details to reply.';
+
 async function bookSession() {
   // Create a voice call link for this visitor — no login needed
   try {
@@ -1874,9 +1957,8 @@ async function bookSession() {
     if (data.callUrl) {
       // Open the voice call page
       window.open(data.callUrl, '_blank');
-    } else if (data.error) {
-      // Fallback: open contact form
-      alert('Voice agent is being set up. Please use the contact form instead.');
+    } else {
+      // Voice agent unavailable — fall back to the enquiry form.
       openContact();
     }
   } catch (e) {
@@ -1924,6 +2006,12 @@ async function startCheckout() {
     return;
   }
 
+  if (!document.getElementById('su-terms').checked) {
+    errEl.textContent = 'Please agree to the Terms of Service and privacy notice to continue.';
+    errEl.style.display = 'block';
+    return;
+  }
+
   errEl.style.display = 'none';
   btn.disabled = true;
   btn.textContent = 'Redirecting to payment...';
@@ -1932,7 +2020,7 @@ async function startCheckout() {
     const res = await fetch('/api/billing/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, email, username, displayName: name }),
+      body: JSON.stringify({ plan, email, username, displayName: name, termsAcceptedAt: new Date().toISOString() }),
     });
     const data = await res.json();
 
@@ -2001,6 +2089,11 @@ async function submitContact() {
     errEl.style.display = 'block';
     return;
   }
+  if (!document.getElementById('ct-consent').checked) {
+    errEl.textContent = CONSENT_ERR;
+    errEl.style.display = 'block';
+    return;
+  }
 
   errEl.style.display = 'none';
   btn.disabled = true;
@@ -2010,7 +2103,7 @@ async function submitContact() {
     const res = await fetch('/api/contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, phone, company, message }),
+      body: JSON.stringify({ name, email, phone, company, message: `${message}\n\n— ${consentRecord()}`, site: 'sales_agent' }),
     });
     const data = await res.json();
 
@@ -2067,6 +2160,7 @@ function renderChatGate(pendingMsg) {
     + '<input id="sag-email" type="email" placeholder="Email" maxlength="160" style="'+fld+'">'
     + '<input id="sag-phone" type="tel" placeholder="Phone" maxlength="40" style="'+fld+'">'
     + '<input id="sag-company" type="text" placeholder="Company (optional)" maxlength="160" style="'+fld+'">'
+    + '<label class="consent-row" for="sag-consent" style="margin:6px 0 2px"><input type="checkbox" id="sag-consent"><span>I agree that EIAAW may use these details to reply to me, including through service providers outside my country, as described in the <a href="/privacy.html" target="_blank" rel="noopener">privacy notice</a>.</span></label>'
     + '<div id="sag-err" style="color:var(--danger);font-size:12px;min-height:14px;margin:2px 0"></div>'
     + '<button id="sag-go" style="width:100%;padding:9px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">Start chatting</button>';
   messages.appendChild(wrap);
@@ -2086,12 +2180,13 @@ async function submitChatGate(pendingMsg) {
   if (!name || !email || !phone) { err.textContent = 'Name, email, and phone are required.'; return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = 'Please enter a valid email.'; return; }
   if (String(phone).replace(/\D/g, '').length < 7) { err.textContent = 'Please enter a valid phone number.'; return; }
+  if (!document.getElementById('sag-consent').checked) { err.textContent = CONSENT_ERR; return; }
   const btn = document.getElementById('sag-go');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
     await fetch('/api/forms/public/lead-intake', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, phone, company, site: 'sales_agent', page: location.pathname }),
+      body: JSON.stringify({ name, email, phone, company, site: 'sales_agent', page: location.pathname, message: consentRecord() }),
     });
   } catch (e) { /* soft-fail: don't trap the visitor */ }
   _saGatePassed = true;
@@ -2147,15 +2242,6 @@ async function sendChatbotMsg() {
   messages.scrollTop = messages.scrollHeight;
 }
 
-// Handle welcome redirect from successful signup
-if (window.location.search.includes('welcome=1')) {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
-  if (token) {
-    sessionStorage.setItem('auth_token', token);
-    window.location.href = '/app';
-  }
-}
 </script>
 
 </body>

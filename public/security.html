@@ -3,22 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Meta Pixel Code -->
-  <script>
-  !function(f,b,e,v,n,t,s)
-  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-  n.queue=[];t=b.createElement(e);t.async=!0;
-  t.src=v;s=b.getElementsByTagName(e)[0];
-  s.parentNode.insertBefore(t,s)}(window,document,'script',
-  'https://connect.facebook.net/en_US/fbevents.js');
-  fbq('init', '1516303113491153');
-  fbq('track', 'PageView');
-  </script>
-  <noscript><img height="1" width="1" style="display:none"
-  src="https://www.facebook.com/tr?id=1516303113491153&ev=PageView&noscript=1"/></noscript>
-  <!-- End Meta Pixel Code -->
+  <!-- Meta Pixel loads only after the visitor opts in — see consent.js -->
+  <script src="/consent.js?v=20260924a"></script>
   <title>Security &amp; Compliance — EIAAW AI Sales Agent</title>
   <meta name="description" content="The security controls, compliance posture, and trust practices behind EIAAW AI Sales Agent — encryption, authentication, AI safety, incident response, and responsible disclosure.">
   <meta name="robots" content="index, follow">
@@ -499,8 +485,8 @@
 
     <h2 id="infra">10. Infrastructure</h2>
     <ul>
-      <li><strong>Hosting:</strong> Railway (US-West region), containerised deployment, managed TLS.</li>
-      <li><strong>Data store:</strong> managed SQLite / Postgres on Railway with encryption at rest.</li>
+      <li><strong>Hosting:</strong> Railway in Singapore (asia-southeast1), containerised deployment, behind Cloudflare, managed TLS.</li>
+      <li><strong>Data store:</strong> SQLite on a persistent Railway volume; stored credentials are additionally encrypted with AES-256-GCM.</li>
       <li><strong>Build isolation:</strong> each deploy is an immutable container image; only the running container has access to production secrets, which are injected at runtime.</li>
       <li><strong>Source control:</strong> GitHub with protected <code>main</code> branch; deploys require manual trigger (<code>railway up</code>).</li>
       <li><strong>Logs:</strong> structured application logs. Retention and redaction follow our hosting provider's defaults; we do not write passwords, session tokens, payment card data, or AI message bodies to application logs.</li>
@@ -519,7 +505,7 @@
     <ul>
       <li><strong>Malaysia PDPA 2010</strong> — Notice &amp; Choice, data subject rights, and sub-processor transparency reflected in our Privacy Policy.</li>
       <li><strong>EU GDPR</strong> — design-aligned: lawful basis, data subject rights, processor transparency, and reliance on sub-processors' Standard Contractual Clauses for cross-border transfers.</li>
-      <li><strong>UK GDPR &amp; PECR</strong> — equivalent treatment for UK residents; we do not set tracking cookies on public pages, so a cookie banner is not required.</li>
+      <li><strong>UK GDPR &amp; PECR</strong> — equivalent treatment for UK residents. Our only non-essential cookie on public pages (Meta ad measurement) loads only after the visitor opts in through the cookie banner.</li>
       <li><strong>CAN-SPAM (US), CASL (Canada), Spam Act 2003 (Australia)</strong> — obligations passed through to the customer as the sender, and reinforced by <a href="/terms.html#anti-spam">Terms §6</a>.</li>
       <li><strong>TCPA (US) &amp; equivalent voice-calling laws</strong> — the customer is the caller of record; the Service assists with compliance but does not replace the customer's due diligence.</li>
       <li><strong>PCI-DSS</strong> — card data is never handled by our servers. Stripe tokenises at source; our environment is in SAQ-A scope.</li>
