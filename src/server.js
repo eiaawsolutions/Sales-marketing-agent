@@ -25,6 +25,7 @@ import systemLogicRouter from './routes/system-logic.js';
 import voiceRouter from './routes/voice.js';
 import appointmentsRouter from './routes/appointments.js';
 import trackingRouter from './routes/tracking.js';
+import unsubscribeRouter from './routes/unsubscribe.js';
 import uploadsRouter from './routes/uploads.js';
 import formsRouter, { saveInboundLead, normaliseSite } from './routes/forms.js';
 import ingestRouter from './routes/ingest.js';
@@ -136,7 +137,7 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
   // Skip for GET/HEAD/OPTIONS and public routes
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/lookup') || req.path.startsWith('/api/auth/forgot') || req.path.startsWith('/api/auth/reset-password-with-token') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/billing/checkout') || req.path.startsWith('/api/contact') || req.path.startsWith('/api/voice/webhook') || req.path.startsWith('/api/voice/tool-callback') || req.path.startsWith('/api/voice/call-link-token') || req.path.startsWith('/api/voice/public-session') || req.path.startsWith('/api/voice/refresh-prompt-with-token') || req.path.startsWith('/api/tracking/') || req.path.startsWith('/api/forms/public/') || req.path.startsWith('/api/ingest/') || req.path.startsWith('/api/_internal/')) return next();
+  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/lookup') || req.path.startsWith('/api/auth/forgot') || req.path.startsWith('/api/auth/reset-password-with-token') || req.path.startsWith('/api/billing/webhook') || req.path.startsWith('/api/billing/checkout') || req.path.startsWith('/api/contact') || req.path.startsWith('/api/voice/webhook') || req.path.startsWith('/api/voice/tool-callback') || req.path.startsWith('/api/voice/call-link-token') || req.path.startsWith('/api/voice/public-session') || req.path.startsWith('/api/voice/refresh-prompt-with-token') || req.path.startsWith('/api/tracking/') || req.path.startsWith('/unsubscribe/') || req.path.startsWith('/api/forms/public/') || req.path.startsWith('/api/ingest/') || req.path.startsWith('/api/_internal/')) return next();
 
   // For authenticated requests, Bearer token in Authorization header provides CSRF protection
   // because third-party sites cannot set custom headers in cross-origin requests
@@ -771,6 +772,9 @@ app.use('/api/system-logic', requireAuth, systemLogicRouter);
 app.use('/api/voice', voiceRouter);
 app.use('/api/appointments', appointmentsRouter);
 app.use('/api/tracking', trackingRouter);
+// Outreach unsubscribe links (public, signed per recipient). Form posts and
+// RFC 8058 one-click posts are urlencoded; limit per IP like the other public routes.
+app.use('/unsubscribe', rateLimit({ windowMs: 60000, max: 30, validate: false }), express.urlencoded({ extended: false, limit: '2kb' }), unsubscribeRouter);
 app.use('/api/uploads', requireAuth, uploadsRouter);
 // Forms router handles its own auth split — public submit/fetch routes come
 // before requireAuth inside the router. Don't wrap with requireAuth here.

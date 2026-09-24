@@ -1,6 +1,7 @@
 import db from '../db/index.js';
 import { sendEmail } from '../utils/email.js';
 import { signTracking } from '../utils/tracking-token.js';
+import { isSuppressed, prepareOutreachEmail, UNSUBSCRIBE_PATH } from './unsubscribe.js';
 
 export const campaignsService = {
   getAll(userId, filters = {}) {
@@ -96,16 +97,23 @@ export const campaignsService = {
 
     for (const lead of campaign.leads) {
       if (lead.campaign_status !== 'pending') continue;
+      // Opted out of this account's email: never send, leave the row pending.
+      if (isSuppressed(campaign.user_id, lead.email)) {
+        results.push({ leadId: lead.id, status: 'suppressed' });
+        continue;
+      }
       try {
         // Append form CTA if a form is attached to this campaign
         const bodyWithForm = appendFormCta(campaign.body, campaign.form_id, campaignId, lead.id, baseUrl);
-        // Inject tracking pixel and link tracking into email HTML
-        const trackedHtml = injectTracking(bodyWithForm, campaignId, lead.id, baseUrl);
+        // Unsubscribe link + one-click headers, then tracking (which skips the unsubscribe link)
+        const { html: withUnsub, headers } = prepareOutreachEmail({ html: bodyWithForm, baseUrl, campaignId, leadId: lead.id });
+        const trackedHtml = injectTracking(withUnsub, campaignId, lead.id, baseUrl);
 
         await sendEmail({
           to: lead.email,
           subject: campaign.subject,
           html: trackedHtml,
+          headers,
         });
 
         db.prepare('UPDATE campaign_leads SET status = ?, sent_at = CURRENT_TIMESTAMP WHERE campaign_id = ? AND lead_id = ?')
@@ -181,8 +189,9 @@ export function injectTracking(html, campaignId, leadId, baseUrl) {
   let tracked = html.replace(
     /href="(https?:\/\/[^"]+)"/g,
     (match, url) => {
-      // Don't track our own tracking URLs
-      if (url.includes('/api/tracking/')) return match;
+      // Don't track our own tracking URLs, and never route an unsubscribe
+      // through the click tracker (opt-outs must not count as engagement)
+      if (url.includes('/api/tracking/') || url.includes(UNSUBSCRIBE_PATH)) return match;
       return `href="${base}/api/tracking/click/${campaignId}/${leadId}?t=${tk}&url=${encodeURIComponent(url)}"`;
     }
   );

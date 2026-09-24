@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import db from '../db/index.js';
 import { sendEmail } from '../utils/email.js';
 import { injectTracking, appendFormCta } from './campaigns.js';
+import { isSuppressed, prepareOutreachEmail } from './unsubscribe.js';
 import { refreshMetrics } from './metrics.js';
 import { runRetention } from './retention.js';
 
@@ -47,7 +48,8 @@ export function startScheduler() {
   console.log('[Scheduler] Started — outreach every 30min, metrics daily at midnight MYT, retention daily at 03:15 MYT');
 }
 
-async function processOutreachQueue() {
+// Exported for tests.
+export async function processOutreachQueue() {
   try {
     const pendingItems = db.prepare(`
       SELECT oq.*, l.email as lead_email, l.name as lead_name, c.name as campaign_name, c.user_id, c.form_id
@@ -74,15 +76,23 @@ async function processOutreachQueue() {
           continue;
         }
 
-        // Inject tracking into the email
+        // Opted out of this account's email: skip, never send.
+        if (isSuppressed(item.user_id, item.lead_email)) {
+          db.prepare("UPDATE outreach_queue SET status = 'skipped' WHERE id = ?").run(item.id);
+          continue;
+        }
+
+        // Unsubscribe link + one-click headers, then tracking
         const emailBody = item.message || `<p>Hi ${item.lead_name},</p><p>${item.goal || 'Just following up on our previous conversation.'}</p>`;
         const withForm = appendFormCta(emailBody, item.form_id, item.campaign_id, item.lead_id, baseUrl);
-        const trackedHtml = injectTracking(withForm, item.campaign_id, item.lead_id, baseUrl);
+        const { html: withUnsub, headers } = prepareOutreachEmail({ html: withForm, baseUrl, campaignId: item.campaign_id, leadId: item.lead_id });
+        const trackedHtml = injectTracking(withUnsub, item.campaign_id, item.lead_id, baseUrl);
 
         await sendEmail({
           to: item.lead_email,
           subject: item.subject || `Following up: ${item.campaign_name}`,
           html: trackedHtml,
+          headers,
         });
 
         db.prepare("UPDATE outreach_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE id = ?")

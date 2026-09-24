@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { migrateOmnichannel } from './schema-omnichannel.js';
+import { migrateSuppressions } from './schema-suppressions.js';
 import { FOUNDER_HQ_EMAIL } from '../config/hq.js';
 
 export function initializeDatabase(db) {
@@ -429,6 +430,9 @@ export function initializeDatabase(db) {
   // nullable and unique per-tenant instead of globally. Runs last so it sees
   // the final shape of every base table (notably the campaigns rebuild above).
   migrateOmnichannel(db);
+
+  // Unsubscribe / suppression list (see schema-suppressions.js).
+  migrateSuppressions(db);
 
   // Seed system logic from codebase on every startup (auto-update)
   seedSystemLogic(db);

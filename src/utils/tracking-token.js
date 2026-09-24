@@ -23,6 +23,21 @@ export function signTracking(campaignId, leadId) {
   return h.slice(0, TOKEN_LEN);
 }
 
+// Unsubscribe links carry a separate, longer token. The "unsubscribe:" prefix
+// is domain separation: a click-tracking token (same secret, same pair) can
+// never be replayed as an opt-out.
+const UNSUB_TOKEN_LEN = 16;
+
+export function signUnsubscribe(campaignId, leadId) {
+  const h = crypto.createHmac('sha256', getSecret()).update(`unsubscribe:${campaignId}:${leadId}`).digest('hex');
+  return h.slice(0, UNSUB_TOKEN_LEN);
+}
+
+export function verifyUnsubscribe(campaignId, leadId, token) {
+  if (typeof token !== 'string' || !/^[0-9a-f]{16}$/.test(token)) return false;
+  return crypto.timingSafeEqual(Buffer.from(signUnsubscribe(campaignId, leadId), 'hex'), Buffer.from(token, 'hex'));
+}
+
 export function verifyTracking(campaignId, leadId, token) {
   if (!token || typeof token !== 'string' || token.length !== TOKEN_LEN) return false;
   const expected = signTracking(campaignId, leadId);
