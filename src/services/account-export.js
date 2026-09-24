@@ -61,6 +61,11 @@ export function exportAccountData(db, userId) {
     });
   }
 
+  // The do-not-email list holds hashes only (see db/schema-suppressions.js),
+  // so that is what the export carries; the note says how to match them.
+  data.email_suppressions = all(`SELECT email_hash, reason, campaign_id, lead_id, created_at
+                                 FROM email_suppressions WHERE user_id = @uid ORDER BY id`);
+
   const summary = {};
   for (const [k, v] of Object.entries(data)) summary[k] = v.length;
 
@@ -69,6 +74,10 @@ export function exportAccountData(db, userId) {
     format: 'EIAAW SalesAgent account export (JSON)',
     account: user,
     summary,
+    notes: {
+      email_suppressions: 'Your do-not-email list: recipients who unsubscribed, marked your email as spam, or were added manually. '
+        + 'Addresses are stored only as SHA-256 hex of the address trimmed and lower-cased; hash your own list the same way to match them.',
+    },
     data,
   };
 }

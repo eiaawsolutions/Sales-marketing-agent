@@ -42,3 +42,15 @@ test('account export holds only that account, without secrets', () => {
   assert.equal(out.data.lead_sources[0].secret_enc, undefined);
   assert.equal(exportAccountData(db, 999), null);
 });
+
+test('account export includes that account\'s do-not-email list', () => {
+  db.prepare("INSERT INTO email_suppressions (user_id, email_hash, reason, campaign_id, lead_id) VALUES (8, 'hash-of-mine', 'unsubscribe', 3, 4)").run();
+  db.prepare("INSERT INTO email_suppressions (user_id, email_hash, reason) VALUES (8, 'hash-of-complaint', 'complaint')").run();
+  db.prepare("INSERT INTO email_suppressions (user_id, email_hash, reason) VALUES (9, 'hash-of-theirs', 'unsubscribe')").run();
+
+  const out = exportAccountData(db, 8);
+  assert.deepEqual(out.data.email_suppressions.map((r) => [r.email_hash, r.reason]), [['hash-of-mine', 'unsubscribe'], ['hash-of-complaint', 'complaint']]);
+  assert.equal(out.data.email_suppressions[0].user_id, undefined, 'internal ids stay out');
+  assert.equal(out.summary.email_suppressions, 2);
+  assert.match(out.notes.email_suppressions, /SHA-256/);
+});
