@@ -704,6 +704,17 @@
     }
     .price-features-inline li::before { content: '· '; color: var(--primary); }
     .pricing-row .btn-ghost { justify-self: end; }
+    .price-note { margin-top: 28px; font-size: 14px; color: var(--ink-2); line-height: 1.6; max-width: 72ch; }
+    .seller-block {
+      margin-top: 20px; padding: 18px 22px; max-width: 86ch;
+      border: 1px solid var(--line-soft); border-radius: 8px; background: var(--surface);
+      font-size: 13px; color: var(--ink-2); line-height: 1.6;
+    }
+    .seller-block h3 {
+      font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: var(--tracking-eyebrow); color: var(--mute); margin-bottom: 8px;
+    }
+    .seller-block a { color: var(--primary-dark); }
 
     /* Quote block — serif moment */
     .quote-block {
@@ -1530,6 +1541,13 @@
         <button class="btn btn-ghost" onclick="openContact('enterprise')">Talk to sales <span class="arrow">&rarr;</span></button>
       </div>
     </div>
+
+    <p class="price-note">Prices are in Malaysian ringgit per month, paid by card at checkout. EIAAW SOLUTIONS is not registered for Sales and Service Tax (SST), so no SST is charged and the price shown is the full price. See the <a href="/terms.html#subscription">Terms of Service</a>.</p>
+
+    <div class="seller-block" lang="ms">
+      <h3>Maklumat pembekal</h3>
+      <p>EIAAW SOLUTIONS, sebuah perusahaan berdaftar di Malaysia (SSM 202603133419, CT0164540-H), Kuala Lumpur, Malaysia. E-mel: <a href="mailto:eiaawsolutions@gmail.com">eiaawsolutions@gmail.com</a>. Perkhidmatan: platform automasi jualan berasaskan AI untuk penjanaan prospek, e-mel jangkauan dan panggilan ejen suara, untuk kegunaan perniagaan. Harga sebulan dalam ringgit Malaysia: Starter RM 99, Pro RM 199, Business RM 399, dibilkan setiap bulan. EIAAW SOLUTIONS tidak berdaftar untuk Cukai Jualan dan Perkhidmatan (SST), jadi tiada SST dikenakan dan harga yang disenaraikan ialah harga penuh. Pembayaran: kad melalui Stripe semasa pembayaran. Langganan bermula sebaik sahaja pembayaran berjaya, dan kami menghantar e-mel pengesahan. Terma: <a href="/terms.html">Terma Perkhidmatan</a> (dalam Bahasa Inggeris) dan <a href="/privacy.html#ms">notis privasi</a>.</p>
+    </div>
   </div>
 </section>
 
@@ -1663,6 +1681,7 @@
         <ul>
           <li><a href="/privacy.html">Privacy</a></li>
           <li><a href="/terms.html">Terms</a></li>
+          <li><a href="/dpa.html">Data Processing Agreement</a></li>
           <li><a href="/security.html">Security</a></li>
           <li><a href="#cookies" data-cookie-settings>Cookie settings</a></li>
         </ul>
