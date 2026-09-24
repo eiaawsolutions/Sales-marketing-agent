@@ -1,0 +1,62 @@
+# EIAAW Solutions
+
+> EIAAW Solutions is an AI engineering and integration firm based in Kuala Lumpur, building production AI systems, agents and SaaS platforms for businesses. It runs four live products — Sales Agent, Ai Ads Agency, Workforce and Social Media Team — that take on repetitive work in sales, paid advertising, HR and payroll, and social media, with a human approval gate before anything externally visible happens. It also designs, builds and integrates custom AI systems and agents. Serves Malaysia and Asia-Pacific.
+
+EIAAW Solutions (legal name EIAAW SOLUTIONS, SSM registration 202603133419, CT0164540-H) is registered in Malaysia. Every engagement starts with an AI Impact Assessment grounded in seven non-negotiable ethics principles: Human Dignity First, Transparency, Fairness, Human Oversight, Privacy & Data, Continuous Learning, and True Partnership.
+
+## Which product fits
+
+- Need more qualified sales pipeline → Sales Agent
+- Running paid ads on Google, Meta, TikTok, LinkedIn, Microsoft, Apple or YouTube → Ai Ads Agency
+- Running HR, payroll (EPF / SOCSO / EIS / PCB), IT assets and accounting in Malaysia → Workforce
+- Need consistent, on-brand social media content without a full in-house team → Social Media Team
+
+## Products
+
+- [Sales Agent (sa.eiaawsolutions.com)](https://sa.eiaawsolutions.com): An AI sales partner that generates qualified leads with written reasoning, drafts personalised email and LinkedIn outreach, runs voice AI for first conversations (always identified as AI), and supports marketing content. Humans control strategy and close. Pricing: Starter RM 99/month, Pro RM 199/month, Business RM 399/month. Billed monthly at checkout; no free trial; cancel anytime.
+- [Ai Ads Agency (ads.eiaawsolutions.com)](https://ads.eiaawsolutions.com): A multi-agent paid-advertising studio. Brand DNA extraction from any website, multi-platform campaign planning, on-brand AI ad creatives sized per placement, and 250+ audit checks across Google, Meta, TikTok, LinkedIn, Microsoft, Apple and YouTube. Budget, ROAS / CPA modelling and A/B-test design built in. Pricing: Starter RM 2,088/month (up to RM 84k monthly ad spend, 3 platforms), Growth RM 6,288/month (up to RM 420k monthly ad spend, all 7 platforms), Enterprise custom. Billed monthly at checkout; no free trial.
+- [Workforce (ep.eiaawsolutions.com)](https://ep.eiaawsolutions.com): Runs three departments — HR, IT, and Accounting — on one AI-native, multi-tenant platform. The full employee journey, IT asset workflow with auto-AARF, full HRM (leave, payroll, EA forms, attendance, EPF, SOCSO, EIS and PCB calculated on every payroll run; EA forms at year-end) and a full accounting ledger (Chart of Accounts, GL, AR/AP, invoices, POs, banking, fixed assets, budgeting, tax returns) on one tenant with zero CSV exports. Postgres Row-Level Security per tenant. HR AI assistant grounded on tenant data with row-level citations. Pricing per active employee per month: Starter RM 25, Growth RM 59, Scale RM 119; Enterprise custom. Billed monthly at checkout; no free trial.
+- [Social Media Team (smt.eiaawsolutions.com)](https://smt.eiaawsolutions.com): An autonomous AI social media platform with receipts. Six specialised agents — Strategist, Researcher, Writer, Designer, Video, and Compliance — plan a monthly calendar, research each post, draft brand-grounded captions, and produce posters, infographics and short videos in the brand's colours; approved posts publish on schedule, and inbox replies are drafted for human approval. A hard compliance gate runs eight checks per post (platform publishability, learned rules, banned phrases, embargo, prior-post deduplication, brand voice, factual grounding, legal compliance); a post that fails any check is held with the reason shown. Every post ships with receipts: source brand evidence, modelled-on prior post, brand-voice score, compliance result, model and cost. Flat per-brand pricing, no per-user tax: Solo RM 688/month (1 brand, 25 branded image + 4 short-video posts), Studio RM 1,688/month (3 brands, 75 branded image + 12 short-video posts), Agency RM 6,888/month (10 brands, 300 branded image + 48 short-video posts, per-client guardrail isolation). Annual billing saves two months. Enterprise is bespoke. Billed on checkout; no free trial.
+
+## Custom AI systems and integrations
+
+Beyond its own products, EIAAW designs, builds and integrates production AI systems and agents for businesses, connected to the tools and data they already use. Every build is held to the same seven ethics principles as the products, including human oversight. Custom work is scoped with the client and quoted per project; start with "Talk to us" on the homepage.
+
+## Getting started
+
+- One of the four products: sign up on that product's own site. Every product is paid in ringgit at checkout; there is no free trial on any product.
+- A custom AI system, agent or integration: "Talk to us" on the homepage. Reply within one working day.
+
+## Company
+
+- [Homepage](https://eiaawsolutions.com/)
+- [All products, with comparison table](https://eiaawsolutions.com/products.html)
+- [FAQ](https://eiaawsolutions.com/#faq)
+- [Privacy notice](https://eiaawsolutions.com/privacy.html)
+- Contact: eiaawsolutions@gmail.com — or "Talk to us" on the homepage (reply within one working day)
+- Headquartered in: Kuala Lumpur, Malaysia
+- Areas served: Malaysia, Singapore, Indonesia, Thailand, Philippines, Vietnam — Asia-Pacific
+- Languages: English, Bahasa Malaysia
+
+## Human oversight
+
+Every product places a human approval gate before any externally visible action. Sales Agent drafts outreach for human review before send. Ai Ads Agency requires sign-off on creatives and audit fixes. Workforce routes payroll, claims, asset assignments and ledger postings through role-based approvals. Social Media Team holds any post that fails a compliance check, with the reason shown.
+
+## Ethics framework
+
+1. Human Dignity First — every solution must make work more meaningful, not obsolete.
+2. Transparency — no black boxes; we explain how systems work in plain language.
+3. Fairness — active, measured testing to reduce algorithmic bias.
+4. Human Oversight — AI suggests, drafts, analyses; humans make the final call.
+5. Privacy & Data — TLS 1.3 in transit, AES-256 at rest, row-level tenant isolation; GDPR / CCPA / PDPA-aligned, clear data residency.
+6. Continuous Learning — built-in feedback loops to detect drift and measure impact.
+7. True Partnership — we collaborate with teams, we don't dictate.
+
+## Social
+
+- [LinkedIn](https://www.linkedin.com/in/eiaawsolutions)
+- [YouTube](https://www.youtube.com/@EIAAWSOLUTIONS)
+- [Instagram](https://www.instagram.com/eiaawsolutions)
+- [TikTok](https://www.tiktok.com/@eiaawsolutions)
+- [Threads](https://www.threads.com/@eiaawsolutions)
+- [Facebook](https://www.facebook.com/profile.php?id=61590414930468)
