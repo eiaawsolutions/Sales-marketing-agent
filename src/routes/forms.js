@@ -209,15 +209,17 @@ function resolveOwnerId(site) {
 }
 
 // Persist a self-reported inbound lead (chatbot gate or contact form). Shared so
-// every inbound channel lands in the CRM the same way. Global UNIQUE(email): a
-// returning person is never overwritten — we append a dated note instead, and
+// every inbound channel lands in the CRM the same way. Emails are unique per
+// account (not globally), so a returning person is matched only within EIAAW's
+// own owner account: a customer's lead with the same email is never touched.
+// A returning person is never overwritten — we append a dated note instead, and
 // that note keeps the visitor note, which carries the consent record.
 export function saveInboundLead({ name, email, phone, company, site, channel, note, page, origin }) {
   const OWNER_ID = resolveOwnerId(site); // per-site via LEAD_OWNER_MAP; see note above
   const label = channel === 'contact_form' ? 'contact form' : 'chatbot';
   const visitorNote = note ? String(note).slice(0, 500) : '';
 
-  const existing = db.prepare('SELECT * FROM leads WHERE email = ?').get(email);
+  const existing = db.prepare('SELECT * FROM leads WHERE email = ? AND user_id = ?').get(email, OWNER_ID);
   if (existing) {
     const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
     const extra = [phone && `phone: ${phone}`, company && `company: ${company}`, visitorNote && `note: ${visitorNote}`]
