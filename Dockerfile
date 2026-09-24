@@ -1,4 +1,6 @@
-FROM node:20-slim
+# Node 24 LTS (Node 20 reached end of life). better-sqlite3 compiles from
+# source below, so a Node major bump needs no prebuilt binary.
+FROM node:24-slim
 
 # Install build tools for better-sqlite3
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
