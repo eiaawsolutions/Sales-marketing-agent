@@ -326,6 +326,7 @@
     <a href="/">Home</a>
     <a href="/privacy.html">Privacy</a>
     <a href="/terms.html">Terms</a>
+    <a href="/dpa.html">DPA</a>
     <a href="/app" class="btn-primary">Sign in</a>
   </div>
 </nav>
@@ -389,7 +390,7 @@
     <h2 id="status">1. Service status</h2>
     <div class="status-row">
       <span class="status-dot"></span>
-      <span><strong>Target monthly uptime: 99.5% on paid plans.</strong> This is an operational target, not a contractual SLA. Material incidents affecting customer data are emailed to account owners within 24 hours. A dedicated status page is on our roadmap.</span>
+      <span><strong>Target monthly uptime: 99.5% on paid plans.</strong> This is an operational target, not a contractual SLA. Material incidents affecting customer data are emailed to account owners within 48 hours of our becoming aware of them. A dedicated status page is on our roadmap.</span>
     </div>
 
     <h2 id="data-protection">2. Data protection</h2>
@@ -478,7 +479,7 @@
     <h2 id="voice-security">9. Voice security</h2>
     <ul>
       <li>Voice calls are placed and recorded via <strong>Retell AI</strong>. Transport is encrypted end-to-end between Retell's infrastructure and our application.</li>
-      <li>Call links shared with prospects are single-use and expire after 24 hours (prospect-initiated) or 7 days (outbound invite).</li>
+      <li>Call links expire after 2 hours (calls started from our website), 24 hours (links shared with a lead) or 7 days (demo links the agent emails).</li>
       <li>Transcript previews stored in our database are capped at 500 characters; full audio remains with Retell subject to their retention policy.</li>
       <li>The AI agent discloses its nature at the start of each call where local law requires.</li>
     </ul>
@@ -503,7 +504,7 @@
     <h2 id="compliance">12. Compliance alignment</h2>
     <p>We design the Service to align with the frameworks below. <strong>Unless explicitly noted otherwise, these are design-alignment statements, not third-party certifications.</strong></p>
     <ul>
-      <li><strong>Malaysia PDPA 2010</strong> — Notice &amp; Choice, data subject rights, and sub-processor transparency reflected in our Privacy Policy.</li>
+      <li><strong>Malaysia PDPA 2010 (as amended in 2024)</strong> — Notice &amp; Choice, data subject rights, breach notification and sub-processor transparency reflected in our <a href="/privacy.html">privacy notice</a> and <a href="/dpa.html">Data Processing Agreement</a>.</li>
       <li><strong>EU GDPR</strong> — design-aligned: lawful basis, data subject rights, processor transparency, and reliance on sub-processors' Standard Contractual Clauses for cross-border transfers.</li>
       <li><strong>UK GDPR &amp; PECR</strong> — equivalent treatment for UK residents. Our only non-essential cookie on public pages (Meta ad measurement) loads only after the visitor opts in through the cookie banner.</li>
       <li><strong>CAN-SPAM (US), CASL (Canada), Spam Act 2003 (Australia)</strong> — obligations passed through to the customer as the sender, and reinforced by <a href="/terms.html#anti-spam">Terms §6</a>.</li>
@@ -519,8 +520,8 @@
     <ul>
       <li><strong>Detection:</strong> we monitor platform alerts for elevated error rates, authentication anomalies, and sub-processor webhook failures.</li>
       <li><strong>Triage target:</strong> an incident owner takes charge within 30 minutes of a confirmed issue during business hours (Kuala Lumpur, UTC+8), within 2 hours outside business hours.</li>
-      <li><strong>Customer notification commitment:</strong> account owners notified within 24 hours where their data is materially affected.</li>
-      <li><strong>Regulator notification:</strong> within 72 hours where required under GDPR Art. 33 or equivalent law.</li>
+      <li><strong>Customer notification commitment:</strong> account owners notified without undue delay and within 48 hours of our becoming aware of a breach affecting their data (<a href="/dpa.html#breach">DPA §9</a>).</li>
+      <li><strong>Regulator notification:</strong> to Malaysia's Personal Data Protection Commissioner within 72 hours under section 12B of the PDPA, and to affected individuals within 7 days of that, where the breach is likely to cause significant harm; other regulators as their law requires (for example GDPR Art. 33).</li>
       <li><strong>Post-mortem commitment:</strong> a written root-cause analysis is shared with affected customers within 14 days of resolution.</li>
     </ul>
 
@@ -537,7 +538,7 @@
     </div>
 
     <h2 id="sub-processors">15. Sub-processors</h2>
-    <p>See the <a href="/privacy.html#processors">Privacy Policy §6</a> for the full, current list of sub-processors. We notify account owners by email at least 30 days before onboarding a new sub-processor that processes Customer Data.</p>
+    <p>See the <a href="/privacy.html#processors">privacy notice §6</a> for the full, current list of sub-processors. We notify account owners by email at least 30 days before adding or replacing a sub-processor that processes Customer Data; a customer who objects on reasonable data-protection grounds can cancel and receive a pro-rata refund of prepaid fees (<a href="/dpa.html#subprocessors">DPA §6</a>).</p>
 
     <h2 id="contact">16. Contact</h2>
     <p>Security, compliance, or trust enquiries:</p>
@@ -584,6 +585,7 @@
         <ul>
           <li><a href="/privacy.html">Privacy</a></li>
           <li><a href="/terms.html">Terms</a></li>
+          <li><a href="/dpa.html">Data Processing Agreement</a></li>
           <li><a href="/security.html">Security</a></li>
         </ul>
       </div>

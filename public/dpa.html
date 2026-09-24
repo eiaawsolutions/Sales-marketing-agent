@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en-MY">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Meta Pixel loads only after the visitor opts in — see consent.js -->
+  <script src="/consent.js?v=20260924a"></script>
+  <title>Data Processing Agreement — EIAAW AI Sales Agent</title>
+  <meta name="description" content="How EIAAW SOLUTIONS processes customer personal data as a data processor for EIAAW AI Sales Agent: instructions, security, sub-processors, breach notice, transfers and deletion.">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#11766A">
+  <link rel="canonical" href="https://sa.eiaawsolutions.com/dpa.html">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="EIAAW AI Sales Agent">
+  <meta property="og:title" content="Data Processing Agreement — EIAAW AI Sales Agent">
+  <meta property="og:description" content="How EIAAW processes customer personal data as a data processor for EIAAW AI Sales Agent.">
+  <meta property="og:url" content="https://sa.eiaawsolutions.com/dpa.html">
+  <meta property="og:image" content="https://sa.eiaawsolutions.com/media/hero.jpg">
+  <meta property="og:locale" content="en_MY">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Data Processing Agreement — EIAAW AI Sales Agent">
+  <meta name="twitter:description" content="How EIAAW processes customer personal data as a data processor.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" href="/brand/shield.png?v=3">
+  <link rel="apple-touch-icon" href="/brand/shield.png?v=3">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #FAF7F2;
+      --bg-warm: #F3EDE0;
+      --surface: #FFFFFF;
+      --ink: #0F1A1D;
+      --ink-2: #2A3438;
+      --mute: #6B7A7F;
+      --line: #D9CFBC;
+      --line-soft: #E8DFCC;
+      --primary: #1FA896;
+      --primary-dark: #11766A;
+      --primary-tint: #E5F4F1;
+      --gradient: linear-gradient(135deg, #22B8A5 0%, #11766A 55%, #0A4D47 100%);
+      --serif: 'Instrument Serif', 'Times New Roman', serif;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: 'JetBrains Mono', Menlo, monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+    }
+
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: radial-gradient(rgba(15,26,29,0.035) 1px, transparent 1px);
+      background-size: 3px 3px;
+      mix-blend-mode: multiply;
+      opacity: 0.5;
+    }
+
+    a { color: var(--primary-dark); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+    a:hover { color: var(--primary); }
+
+    .wrap { max-width: 820px; margin: 0 auto; padding: 0 28px; position: relative; z-index: 1; }
+
+    /* Nav */
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250,247,242,0.88);
+      backdrop-filter: saturate(180%) blur(14px);
+      -webkit-backdrop-filter: saturate(180%) blur(14px);
+      border-bottom: 1px solid var(--line-soft);
+      padding: 14px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
+    .nav-logo img { width: 34px; height: 34px; object-fit: contain; }
+    .nav-logo-text strong { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--primary-dark); }
+    .nav-logo-text small { font-size: 10px; color: var(--mute); letter-spacing: 0.1em; text-transform: uppercase; }
+    .nav-links { display: flex; align-items: center; gap: 22px; }
+    .nav-links a { color: var(--ink-2); text-decoration: none; font-size: 14px; }
+    .nav-links a:hover { color: var(--primary-dark); }
+    .btn-primary { background: var(--gradient); color: #fff !important; padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 13px; }
+    .btn-primary:hover { color: #fff !important; opacity: 0.92; }
+
+    /* Hero */
+    .legal-hero { padding: 72px 0 40px; border-bottom: 1px solid var(--line-soft); }
+    .eyebrow {
+      font-family: var(--mono); font-size: 11px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--primary-dark);
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-bottom: 18px;
+    }
+    .eyebrow::before { content: ''; width: 28px; height: 1px; background: currentColor; opacity: 0.5; }
+    .legal-hero h1 {
+      font-family: var(--sans);
+      font-size: clamp(38px, 5vw, 58px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+      margin-bottom: 18px;
+    }
+    .legal-hero h1 em { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--primary-dark); letter-spacing: 0; }
+    .legal-hero .lead { font-size: 19px; color: var(--ink-2); max-width: 680px; }
+    .legal-meta {
+      display: flex; flex-wrap: wrap; gap: 18px; margin-top: 28px;
+      font-family: var(--mono); font-size: 11px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--mute);
+    }
+    .legal-meta span strong { color: var(--ink); }
+
+    /* Body */
+    .legal-body { padding: 56px 0 80px; }
+    .legal-body h2 {
+      font-size: 26px; font-weight: 700; letter-spacing: -0.025em;
+      margin: 48px 0 12px; padding-top: 28px;
+      border-top: 1px solid var(--line-soft);
+    }
+    .legal-body h2:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+    .legal-body h3 { font-size: 17px; font-weight: 700; margin: 28px 0 8px; color: var(--ink); }
+    .legal-body p { margin: 0 0 14px; color: var(--ink-2); font-size: 16px; }
+    .legal-body ul, .legal-body ol { margin: 0 0 14px 22px; color: var(--ink-2); }
+    .legal-body li { margin-bottom: 6px; }
+    .legal-body strong { color: var(--ink); font-weight: 600; }
+    .legal-body code { font-family: var(--mono); font-size: 13px; background: var(--bg-warm); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line-soft); }
+
+    .callout {
+      background: var(--primary-tint);
+      border-left: 3px solid var(--primary);
+      padding: 18px 22px; border-radius: 0 8px 8px 0;
+      margin: 24px 0; font-size: 15px;
+    }
+    .callout strong { color: var(--primary-dark); }
+
+    /* Processors table */
+    .proc-table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14px; }
+    .proc-table th, .proc-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+    .proc-table th { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mute); font-weight: 500; background: var(--bg-warm); }
+    .proc-table td { color: var(--ink-2); }
+    .proc-table td:first-child { font-weight: 600; color: var(--ink); }
+
+    /* TOC */
+    .toc {
+      border: 1px solid var(--line-soft); border-radius: 10px;
+      padding: 22px 26px; background: var(--surface);
+      margin-bottom: 40px;
+    }
+    .toc h4 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--mute); font-weight: 500; margin-bottom: 12px; }
+    .toc ol { list-style: none; margin: 0; counter-reset: section; }
+    .toc ol li { counter-increment: section; margin-bottom: 4px; font-size: 14px; }
+    .toc ol li::before { content: counter(section, decimal-leading-zero) " "; font-family: var(--mono); color: var(--mute); margin-right: 8px; }
+    .toc a { color: var(--ink-2); text-decoration: none; }
+    .toc a:hover { color: var(--primary-dark); }
+
+    /* Footer — editorial, flows out of the body cream */
+    footer {
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
+      color: var(--ink);
+      padding: clamp(80px, 10vh, 120px) 0 48px;
+      margin-top: 80px;
+      border-top: 1px solid var(--line-soft);
+      position: relative;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: clamp(16px, 1.6vw, 28px);
+      padding-bottom: 72px;
+      margin-bottom: 0;
+      border-bottom: 1px solid rgba(15,26,29,0.08);
+    }
+    .footer-lockup-blk { grid-column: 1 / span 6; }
+    .footer-lockup-blk .lockup {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 32px;
+    }
+    .footer-lockup-blk .lockup img { width: 56px; height: 56px; object-fit: contain; }
+    .footer-lockup-blk .brand { display: flex; flex-direction: column; line-height: 1.1; }
+    .footer-lockup-blk .brand strong {
+      font-size: 18px; font-weight: 700; letter-spacing: 0.1em;
+      color: var(--primary-dark); text-transform: uppercase;
+    }
+    .footer-lockup-blk .brand span {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--mute); margin-top: 8px;
+    }
+    .footer-statement {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: clamp(24px, 2.4vw, 34px); line-height: 1.18;
+      color: var(--ink); max-width: 18ch; letter-spacing: -0.01em;
+    }
+    .footer-col { grid-column: span 2; }
+    .footer-col h4 {
+      font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: 0.14em; color: var(--mute); margin-bottom: 20px;
+    }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .footer-col li { margin-bottom: 0; }
+    .footer-col a {
+      color: var(--ink-2); text-decoration: none; font-size: 14px;
+      transition: color 0.25s ease;
+      display: inline-block; position: relative;
+    }
+    .footer-col a::after {
+      content: ''; position: absolute; left: 0; bottom: -2px; height: 1px; width: 0;
+      background: var(--primary-dark); transition: width 0.35s ease;
+    }
+    .footer-col a:hover { color: var(--primary-dark); }
+    .footer-col a:hover::after { width: 100%; }
+    .footer-bottom {
+      padding-top: 32px;
+      border-top: none;
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--mono); font-size: 11px; color: var(--mute);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      flex-wrap: wrap; gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .nav-links a:not(.btn-primary) { display: none; }
+      .legal-hero { padding: 48px 0 32px; }
+      .legal-body { padding: 40px 0 60px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 32px; padding-bottom: 40px; }
+      .footer-lockup-blk { grid-column: 1 / -1; }
+      .footer-col { grid-column: 1 / -1; }
+      .footer-lockup-blk .lockup img { width: 44px; height: 44px; }
+      .footer-statement { font-size: clamp(20px, 6vw, 26px); max-width: 22ch; }
+      .footer-bottom { flex-direction: column; align-items: flex-start; gap: 10px; font-size: 10px; padding-top: 24px; }
+      .proc-table { font-size: 13px; }
+      .proc-table th, .proc-table td { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/brand/shield.png?v=3" alt="EIAAW Solutions shield">
+    <span class="nav-logo-text">
+      <strong>EIAAW SOLUTIONS</strong>
+      <small>AI &middot; Human Partnerships</small>
+    </span>
+  </a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/privacy.html">Privacy</a>
+    <a href="/terms.html">Terms</a>
+    <a href="/security.html">Security</a>
+    <a href="/app" class="btn-primary">Sign in</a>
+  </div>
+</nav>
+
+<section class="legal-hero">
+  <div class="wrap">
+    <div class="eyebrow">Data Processing Agreement</div>
+    <h1>Your leads, <em>our duties</em>.</h1>
+    <p class="lead">How EIAAW SOLUTIONS processes personal data on behalf of customers of EIAAW AI Sales Agent. It forms part of our <a href="/terms.html">Terms of Service</a> and applies automatically when you subscribe; you don't need to sign anything.</p>
+    <div class="legal-meta">
+      <span>Effective <strong>25 September 2026</strong></span>
+      <span>Version <strong>1.0</strong></span>
+      <span>Governing law <strong>Malaysia</strong></span>
+    </div>
+  </div>
+</section>
+
+<section class="legal-body">
+  <div class="wrap">
+
+    <nav class="toc" aria-label="Table of contents">
+      <h4>Contents</h4>
+      <ol>
+        <li><a href="#parties">Parties, roles and when this applies</a></li>
+        <li><a href="#what">What we process</a></li>
+        <li><a href="#instructions">The Customer's instructions</a></li>
+        <li><a href="#people">Our people</a></li>
+        <li><a href="#security">Security</a></li>
+        <li><a href="#subprocessors">Sub-processors</a></li>
+        <li><a href="#transfers">Transfers outside Malaysia</a></li>
+        <li><a href="#assistance">Helping the Customer</a></li>
+        <li><a href="#breach">Personal data breaches</a></li>
+        <li><a href="#deletion">Return and deletion</a></li>
+        <li><a href="#audits">Information and audits</a></li>
+        <li><a href="#precedence">Precedence and contact</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="parties">1. Parties, roles and when this applies</h2>
+    <p>This Data Processing Agreement ("DPA") is part of the <a href="/terms.html">Terms of Service</a> between <strong>EIAAW SOLUTIONS</strong>, an enterprise registered in Malaysia (SSM 202603133419, CT0164540-H), Kuala Lumpur ("EIAAW", "we", the data processor), and the business that subscribes to EIAAW AI Sales Agent (the "Customer", the data controller). It applies automatically when the Customer accepts the Terms, and covers personal data in Customer Data that we process for the Customer ("Customer Personal Data"). A signed order form may change it.</p>
+    <p>How we handle the personal data of account holders, and of visitors to our own website, is set out in our <a href="/privacy.html">privacy notice</a>, where we act as controller.</p>
+
+    <h2 id="what">2. What we process</h2>
+    <ul>
+      <li><strong>Subject matter and purpose:</strong> hosting and processing Customer Personal Data to provide, secure and support the Service: lead management, lead generation, outreach email, forms, AI voice calls, AI scoring and pipeline automation.</li>
+      <li><strong>Duration:</strong> for the life of the subscription, then until deletion under section 10.</li>
+      <li><strong>People concerned:</strong> the Customer's leads, prospects and their business contacts; people who receive the Customer's outreach emails or calls, or fill in the Customer's forms; and the Customer's own users.</li>
+      <li><strong>Types of data:</strong> names, job titles, companies, business email addresses and phone numbers, LinkedIn and company website addresses, notes, lead scores, pipeline status, activity history, outreach content and delivery, open and click events, form submissions, call audio (held by our voice provider), transcript previews of up to 500 characters and AI-generated call sentiment. The Customer must not put sensitive personal data into the Service (Terms &sect;5).</li>
+    </ul>
+
+    <h2 id="instructions">3. The Customer's instructions</h2>
+    <p>We process Customer Personal Data only on the Customer's documented instructions, which are the Terms, this DPA and the Customer's use of the Service's features, unless the law requires otherwise; if so, we tell the Customer first unless the law forbids it. If we believe an instruction breaks data-protection law, we will say so.</p>
+    <p>When the Customer uses our lead-generation tools, we search the B2B contact database of Apollo.io and, when that returns no match or isn't available, public web sources through our AI provider, using the target audience the Customer sets, and we record where each lead was found. The Customer is responsible for having a lawful basis for the leads it adds, generates or contacts, and for the notices and opt-outs the law requires (Terms &sect;&sect;6&ndash;7).</p>
+
+    <h2 id="people">4. Our people</h2>
+    <p>Only EIAAW personnel who need access to run and support the Service can reach Customer Personal Data, and they are bound by confidentiality.</p>
+
+    <h2 id="security">5. Security</h2>
+    <p>We apply technical and organisational measures appropriate to the risk, as the Security Principle of Malaysia's Personal Data Protection Act 2010 requires of processors, including those on our <a href="/security.html">Security page</a>:</p>
+    <ul>
+      <li>TLS for all traffic in transit;</li>
+      <li>AES-256-GCM encryption for stored credentials and connector secrets;</li>
+      <li>bcrypt password hashing;</li>
+      <li>opaque session tokens that expire 24 hours after issue and after 30 minutes idle;</li>
+      <li>each customer's leads, campaigns and pipeline scoped to that customer's account;</li>
+      <li>account lockout after repeated failed logins, and per-route rate limits.</li>
+    </ul>
+
+    <h2 id="subprocessors">6. Sub-processors</h2>
+    <p>The Customer authorises the sub-processors listed in <a href="/privacy.html#processors">section 6 of our privacy notice</a> for Customer Personal Data. We bind every sub-processor to data-protection terms at least as protective as this DPA and remain responsible for them.</p>
+    <p>We email account owners at least 30 days before adding or replacing a sub-processor of Customer Personal Data. The Customer may object on reasonable data-protection grounds by replying to that email. If we can't address the concern, the Customer may cancel before the change takes effect and receive a pro-rata refund of prepaid fees for the unused part of its billing period.</p>
+
+    <h2 id="transfers">7. Transfers outside Malaysia</h2>
+    <p>Customer Personal Data is hosted in Singapore. Some sub-processors process it in other countries, including the United States. We transfer it only as section 129 of the PDPA (as amended in 2024) allows, relying on sub-processors bound by data-protection terms (including standard contractual clauses where the sub-processor offers them), in line with the Personal Data Protection Commissioner's cross-border transfer guideline. We keep a record of the mechanism for each sub-processor, and will put in place any additional transfer mechanism the Customer's law requires where we reasonably can.</p>
+
+    <h2 id="assistance">8. Helping the Customer</h2>
+    <p>Taking into account what the Service does, we help the Customer respond to requests from individuals exercising their rights (access, correction, deletion, portability, objection to direct marketing and withdrawal of consent), and with data protection impact assessments and regulator enquiries about the Service. If an individual contacts us directly about Customer Personal Data, we pass the request to the Customer and don't respond to it ourselves unless the Customer asks us to, except that we may tell the individual the source we recorded for their details.</p>
+
+    <h2 id="breach">9. Personal data breaches</h2>
+    <p>If we become aware of a breach affecting Customer Personal Data, we notify the Customer without undue delay and within 48 hours of becoming aware of it, with what we know about its nature, the data and people affected, likely consequences and the steps we are taking, and we update the Customer as we learn more. This lets the Customer meet its own duty to notify the Personal Data Protection Commissioner within 72 hours and, where required, affected individuals within 7 days of notifying the Commissioner. We don't notify the Commissioner or individuals about Customer Personal Data on the Customer's behalf unless the Customer asks us to or the law requires us to.</p>
+
+    <h2 id="deletion">10. Return and deletion</h2>
+    <p>The Customer can ask us for an export of Customer Personal Data at any time by emailing us from the account owner's address, and we provide it in a machine-readable format (JSON, or CSV on request) within 14 days. The Service has no self-serve export tool.</p>
+    <p>After the subscription ends, we keep Customer Personal Data for 30 days so the Customer can ask for a final export, then delete it 90 days after the subscription ends, unless the law requires us to keep it. This deletion runs automatically for subscriptions that end through our billing system on or after 25 September 2026; accounts that ended earlier, or were closed another way, are deleted by hand. Copies may remain in our hosting provider's backups until those backups expire on the provider's schedule. On request, we confirm in writing when deletion is complete.</p>
+
+    <h2 id="audits">11. Information and audits</h2>
+    <p>We make available the information reasonably needed to show we meet this DPA, and answer reasonable security questionnaires once a year, or after a breach. Other audits can be agreed in a signed order form, at the Customer's cost and with reasonable notice.</p>
+
+    <h2 id="precedence">12. Precedence and contact</h2>
+    <p>If this DPA and the Terms conflict on the processing of personal data, this DPA prevails. The liability limits in the Terms apply. We may update this DPA in the same way as the Terms (Terms &sect;17), with at least 30 days' notice of material changes.</p>
+    <p>
+      <strong>EIAAW SOLUTIONS</strong>, an enterprise registered in Malaysia (SSM Reg. No. 202603133419 / CT0164540-H)<br>
+      Kuala Lumpur, Malaysia<br>
+      Data Protection Officer: <a href="mailto:eiaawsolutions@gmail.com?subject=DPA">eiaawsolutions@gmail.com</a> (subject "DPA")
+    </p>
+
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="max-width: 1200px;">
+    <div class="footer-grid">
+      <div class="footer-lockup-blk">
+        <div class="lockup">
+          <img src="/brand/shield.png?v=3" alt="EIAAW Solutions">
+          <div class="brand">
+            <strong>EIAAW SOLUTIONS</strong>
+            <span>AI &middot; Human Partnerships</span>
+          </div>
+        </div>
+        <p class="footer-statement">Sales, written and spoken by an agent that doesn't sleep.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="/#capabilities">Capabilities</a></li>
+          <li><a href="/#approach">Approach</a></li>
+          <li><a href="/#pricing">Pricing</a></li>
+          <li><a href="/app">Sign in</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://eiaawsolutions.com" target="_blank" rel="noopener">EIAAW Solutions</a></li>
+          <li><a href="/#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="/privacy.html">Privacy</a></li>
+          <li><a href="/terms.html">Terms</a></li>
+          <li><a href="/dpa.html">Data Processing Agreement</a></li>
+          <li><a href="/security.html">Security</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div>&copy; 2026 EIAAW SOLUTIONS &middot; SSM Reg. No. 202603133419 (CT0164540-H) &mdash; All rights reserved</div>
+      <div>Kuala Lumpur &middot; Built for sales teams that act</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
