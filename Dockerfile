@@ -24,4 +24,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
   CMD node -e "fetch('http://localhost:3000/api/health').then(r=>{if(r.ok)process.exit(0);else process.exit(1)}).catch(()=>process.exit(1))"
 
-CMD ["node", "src/server.js"]
+# The --import preload resolves Infisical secret:// handles before the app
+# loads (no-op unless INFISICAL_RESOLVER_ENABLED=true). This CMD is the only
+# start command: the Railway service deliberately has none set.
+CMD ["node", "--import", "./src/bootstrap/secrets.js", "src/server.js"]

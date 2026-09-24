@@ -7,8 +7,9 @@ export default defineRailway(() => {
     // Carried over from railway.toml (Config as Code stops being read 2026-12-01).
     // Railway does not read this file on deploy — `railway config apply` stores
     // these on the service, so they must match the Dockerfile + /api/health.
+    // No start command here on purpose: the Dockerfile CMD is the single source
+    // (it carries the --import preload that resolves Infisical secret:// handles).
     build: { builder: "DOCKERFILE", dockerfilePath: "./Dockerfile" },
-    start: "node src/server.js",
     healthcheck: "/api/health",
     healthcheckTimeout: 60,
     // Restart policy type is left at Railway's default, On Failure (Railway
