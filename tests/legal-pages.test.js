@@ -18,7 +18,7 @@ test('published versions match the versions checkout records', () => {
 });
 
 test('superseded versions are archived, linked and kept out of search', () => {
-  for (const [page, file] of [[terms, 'terms-2026-04-19.html'], [privacy, 'privacy-2026-09-24.html']]) {
+  for (const [page, file] of [[terms, 'terms-2026-04-19.html'], [terms, 'terms-2026-09-25-v2.0.html'], [privacy, 'privacy-2026-09-24.html']]) {
     assert.ok(page.includes(`/legal/archive/${file}`), `current page does not link ${file}`);
     const url = new URL(`../public/legal/archive/${file}`, import.meta.url);
     assert.ok(existsSync(url), `${file} missing`);
@@ -74,6 +74,15 @@ test('Apollo.io is disclosed as a lead source and a recipient (EN and BM)', () =
   assert.match(privacy, /B2B contact database of <strong>Apollo\.io<\/strong>/);
   assert.match(privacy, /pangkalan data kenalan B2B <strong>Apollo\.io<\/strong>/);
   assert.match(privacy, /Apollo\.io \(data kenalan perniagaan untuk penjanaan prospek, Amerika Syarikat\)/);
+});
+
+test('Terms §6: sender identity and postal address are the customer\'s to add; the Service adds the unsubscribe link', () => {
+  const s6 = terms.slice(terms.indexOf('id="anti-spam"'), terms.indexOf('id="voice-consent"'));
+  assert.match(s6, /the Service does not insert your name or address for you/);
+  assert.match(s6, /The Service adds a working unsubscribe link to every campaign email and automated follow-up/);
+  assert.ok(!/does not add or manage an unsubscribe link/.test(s6), 'stale claim that the Service adds no unsubscribe link');
+  assert.match(security, /Your sender identity and postal address are yours to add/);
+  assert.ok(!/Every outreach template must include a working unsubscribe link/.test(security));
 });
 
 test('no visible placeholders left in published legal pages', () => {

@@ -471,9 +471,9 @@
     <h2 id="email-security">8. Email security</h2>
     <ul>
       <li>Primary delivery via <strong>Resend</strong>; SMTP fallback uses TLS connections.</li>
-      <li>Bounce and complaint feedback from Resend is ingested at <code>/api/tracking/webhook</code> and used to update lead engagement state.</li>
+      <li>Delivery events from Resend (opens, clicks, bounces, spam complaints) are accepted at <code>/api/tracking/webhook</code> only with a valid Resend signature, and are matched to the exact email sent. When a recipient marks a campaign email as spam, they go on the sending account's do-not-email list.</li>
       <li><strong>Customer commitment:</strong> customers using their own sending domain are responsible for configuring SPF, DKIM, and DMARC records so that outbound mail is authenticated. We publish a setup guide and will not enable a custom domain until the records validate.</li>
-      <li>Every outreach template must include a working unsubscribe link (see <a href="/terms.html#anti-spam">Terms §6</a>).</li>
+      <li>Every campaign email and automated follow-up carries a signed, per-recipient unsubscribe link and one-click unsubscribe headers (RFC 8058); opt-outs are honoured before every send. Your sender identity and postal address are yours to add to your templates (see <a href="/terms.html#anti-spam">Terms §6</a>).</li>
     </ul>
 
     <h2 id="voice-security">9. Voice security</h2>
