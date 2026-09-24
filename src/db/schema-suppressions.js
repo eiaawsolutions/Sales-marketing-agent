@@ -1,4 +1,5 @@
-// Email suppression list (unsubscribes).
+// Email suppression list (unsubscribes and spam complaints), plus the provider
+// message ids that tie Resend's delivery webhooks back to one outreach send.
 //
 // One row per (sending account, recipient). The recipient is stored only as a
 // SHA-256 of the normalised address: enough to block a send, nothing to leak.
@@ -19,4 +20,11 @@ export function migrateSuppressions(db) {
       UNIQUE(user_id, email_hash)
     );
   `);
+
+  // Resend's email id for each outreach send (campaign send or follow-up), so
+  // a webhook event resolves to exactly one send in one account.
+  for (const table of ['campaign_leads', 'outreach_queue']) {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN provider_message_id TEXT`); } catch (e) { /* exists */ }
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_${table}_provider_message_id ON ${table}(provider_message_id)`);
+  }
 }

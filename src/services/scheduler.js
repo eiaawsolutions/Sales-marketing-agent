@@ -88,15 +88,15 @@ export async function processOutreachQueue() {
         const { html: withUnsub, headers } = prepareOutreachEmail({ html: withForm, baseUrl, campaignId: item.campaign_id, leadId: item.lead_id });
         const trackedHtml = injectTracking(withUnsub, item.campaign_id, item.lead_id, baseUrl);
 
-        await sendEmail({
+        const sent = await sendEmail({
           to: item.lead_email,
           subject: item.subject || `Following up: ${item.campaign_name}`,
           html: trackedHtml,
           headers,
         });
 
-        db.prepare("UPDATE outreach_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE id = ?")
-          .run(item.id);
+        db.prepare("UPDATE outreach_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP, provider_message_id = ? WHERE id = ?")
+          .run(sent?.id || null, item.id);
         db.prepare("UPDATE campaign_leads SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE campaign_id = ? AND lead_id = ? AND status = 'pending'")
           .run(item.campaign_id, item.lead_id);
         db.prepare('UPDATE campaigns SET sent_count = sent_count + 1 WHERE id = ?')

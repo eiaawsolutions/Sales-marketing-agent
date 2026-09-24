@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import db from '../db/index.js';
 import { verifyTracking } from '../utils/tracking-token.js';
+import { verifySvix } from '../services/ingest-auth.js';
+import { recordEmailEvent } from '../services/email-events.js';
 
 const router = Router();
 
@@ -98,60 +100,36 @@ router.get('/click/:campaignId/:leadId', (req, res) => {
   }
 });
 
-// POST /api/tracking/webhook — Resend webhook receiver
+// POST /api/tracking/webhook — Resend webhook receiver.
+// Resend signs every delivery with Svix; server.js mounts a raw-body parser on
+// this path because the signature covers the exact bytes sent. Fails closed:
+// with no signing secret configured nothing is accepted, so nobody can post
+// fake opens, clicks, bounces or complaints. A processing error returns 500
+// so Svix retries; the handlers are idempotent.
 router.post('/webhook', (req, res) => {
-  try {
-    const event = req.body;
-    const type = event.type;
-    const data = event.data || {};
+  const secret = process.env.RESEND_WEBHOOK_SIGNING_SECRET;
+  if (!secret) {
+    console.error('[resend-webhook] RESEND_WEBHOOK_SIGNING_SECRET is not set; rejecting event');
+    return res.status(503).json({ error: 'Webhook not configured' });
+  }
+  if (!Buffer.isBuffer(req.body)) return res.status(400).json({ error: 'Expected application/json' });
 
-    if (type === 'email.opened' && data.to) {
-      const email = Array.isArray(data.to) ? data.to[0] : data.to;
-      // Find the lead by email and update their latest campaign_leads entry
-      const lead = db.prepare('SELECT id FROM leads WHERE email = ?').get(email);
-      if (lead) {
-        const cl = db.prepare(`
-          SELECT campaign_id FROM campaign_leads WHERE lead_id = ? AND status = 'sent'
-          ORDER BY sent_at DESC LIMIT 1
-        `).get(lead.id);
-        if (cl) {
-          db.prepare("UPDATE campaign_leads SET status = 'opened', opened_at = CURRENT_TIMESTAMP WHERE campaign_id = ? AND lead_id = ? AND status = 'sent'")
-            .run(cl.campaign_id, lead.id);
-          db.prepare('UPDATE campaigns SET open_count = open_count + 1 WHERE id = ?').run(cl.campaign_id);
-          db.prepare('UPDATE leads SET score = MIN(score + 5, 100) WHERE id = ?').run(lead.id);
-        }
-      }
-    }
-
-    if (type === 'email.clicked' && data.to) {
-      const email = Array.isArray(data.to) ? data.to[0] : data.to;
-      const lead = db.prepare('SELECT id FROM leads WHERE email = ?').get(email);
-      if (lead) {
-        const cl = db.prepare(`
-          SELECT campaign_id FROM campaign_leads WHERE lead_id = ? AND status IN ('sent','opened')
-          ORDER BY sent_at DESC LIMIT 1
-        `).get(lead.id);
-        if (cl) {
-          db.prepare("UPDATE campaign_leads SET status = 'clicked', clicked_at = CURRENT_TIMESTAMP WHERE campaign_id = ? AND lead_id = ?")
-            .run(cl.campaign_id, lead.id);
-          db.prepare('UPDATE campaigns SET click_count = click_count + 1 WHERE id = ?').run(cl.campaign_id);
-          db.prepare('UPDATE leads SET score = MIN(score + 10, 100) WHERE id = ?').run(lead.id);
-        }
-      }
-    }
-
-    if (type === 'email.bounced' && data.to) {
-      const email = Array.isArray(data.to) ? data.to[0] : data.to;
-      const lead = db.prepare('SELECT id FROM leads WHERE email = ?').get(email);
-      if (lead) {
-        db.prepare("UPDATE campaign_leads SET status = 'bounced' WHERE lead_id = ? AND status = 'sent'").run(lead.id);
-      }
-    }
-  } catch (e) {
-    console.error('Tracking webhook error:', e.message);
+  const check = verifySvix(secret, req.body, req.headers);
+  if (!check.ok) {
+    console.warn('[resend-webhook] rejected:', check.reason);
+    return res.status(check.status === 500 ? 500 : 401).json({ error: 'Invalid signature' });
   }
 
-  // Always return 200 for webhooks
+  let event;
+  try { event = JSON.parse(req.body.toString('utf8')); } catch { return res.status(400).json({ error: 'Invalid JSON' }); }
+
+  try {
+    const result = recordEmailEvent(event);
+    if (result !== 'ignored') console.log(`[resend-webhook] ${event.type} -> ${result}`);
+  } catch (e) {
+    console.error('[resend-webhook] processing failed:', e.message);
+    return res.status(500).json({ error: 'Processing failed' });
+  }
   res.json({ received: true });
 });
 

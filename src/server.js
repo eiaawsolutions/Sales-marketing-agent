@@ -93,6 +93,9 @@ app.use('/api/billing/webhook', express.raw({ type: 'application/json', limit: '
 // parses the buffer itself and rejects anything that is not a JSON object.
 app.use('/api/ingest', express.raw({ type: '*/*', limit: '512kb' }));
 
+// Resend delivery webhooks are Svix-signed over the raw bytes too.
+app.use('/api/tracking/webhook', express.raw({ type: 'application/json', limit: '256kb' }));
+
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 

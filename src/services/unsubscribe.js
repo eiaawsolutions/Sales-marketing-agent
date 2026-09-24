@@ -35,16 +35,18 @@ export function isSuppressed(userId, email) {
 
 /**
  * Record an opt-out for one sending account and cancel that recipient's
- * pending follow-ups in the account's campaigns. Idempotent.
+ * pending follow-ups in the account's campaigns. Idempotent; returns true
+ * only when the recipient was not already on the list.
  */
 export function suppress({ userId, email, reason = 'unsubscribe', campaignId = null, leadId = null }) {
-  db.prepare(`INSERT OR IGNORE INTO email_suppressions (user_id, email_hash, reason, campaign_id, lead_id)
+  const { changes } = db.prepare(`INSERT OR IGNORE INTO email_suppressions (user_id, email_hash, reason, campaign_id, lead_id)
               VALUES (?, ?, ?, ?, ?)`).run(userId, emailHash(email), reason, campaignId, leadId);
   if (leadId) {
     db.prepare(`UPDATE outreach_queue SET status = 'skipped'
                 WHERE lead_id = ? AND status = 'pending'
                   AND campaign_id IN (SELECT id FROM campaigns WHERE user_id = ?)`).run(leadId, userId);
   }
+  return changes > 0;
 }
 
 /**

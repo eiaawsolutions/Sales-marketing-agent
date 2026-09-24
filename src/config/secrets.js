@@ -26,6 +26,7 @@ export const REQUIRED_ENV_KEYS = [
 /** A 404 for any of these is logged and the var is dropped; the code has a fallback. */
 export const OPTIONAL_ENV_KEYS = [
   'RESEND_API_KEY',  // email: falls back to SMTP
+  'RESEND_WEBHOOK_SIGNING_SECRET', // delivery webhooks: rejected (503) when absent
   'SMTP_USER',
   'SMTP_PASS',
   'APOLLO_API_KEY',  // lead source: disabled when absent

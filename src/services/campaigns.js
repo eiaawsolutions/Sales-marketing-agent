@@ -109,15 +109,16 @@ export const campaignsService = {
         const { html: withUnsub, headers } = prepareOutreachEmail({ html: bodyWithForm, baseUrl, campaignId, leadId: lead.id });
         const trackedHtml = injectTracking(withUnsub, campaignId, lead.id, baseUrl);
 
-        await sendEmail({
+        const sent = await sendEmail({
           to: lead.email,
           subject: campaign.subject,
           html: trackedHtml,
           headers,
         });
 
-        db.prepare('UPDATE campaign_leads SET status = ?, sent_at = CURRENT_TIMESTAMP WHERE campaign_id = ? AND lead_id = ?')
-          .run('sent', campaignId, lead.id);
+        // Resend's id ties later webhook events (opened, bounced, complained) to this send.
+        db.prepare('UPDATE campaign_leads SET status = ?, sent_at = CURRENT_TIMESTAMP, provider_message_id = ? WHERE campaign_id = ? AND lead_id = ?')
+          .run('sent', sent?.id || null, campaignId, lead.id);
         db.prepare('INSERT INTO activities (user_id, lead_id, campaign_id, type, description) VALUES (?, ?, ?, ?, ?)')
           .run(userId || campaign.user_id, lead.id, campaignId, 'email', `Sent campaign: ${campaign.name}`);
         sentCount++;
