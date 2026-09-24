@@ -3,6 +3,7 @@ import db from '../db/index.js';
 import { sendEmail } from '../utils/email.js';
 import { injectTracking, appendFormCta } from './campaigns.js';
 import { refreshMetrics } from './metrics.js';
+import { runRetention } from './retention.js';
 
 /**
  * Background scheduler — runs every 30 minutes.
@@ -23,6 +24,18 @@ export function startScheduler() {
     await refreshMetrics();
   }, { timezone: 'Asia/Kuala_Lumpur' });
 
+  // Daily 03:15 MYT: retention deletes promised in the privacy notice §8,
+  // Terms §9 and DPA §10 (enquiries 24 months after last contact; accounts 90
+  // days after the subscription ends). Idempotent; logs counts only.
+  // RETENTION_DRY_RUN=1 reports what it would delete without deleting.
+  cron.schedule('15 3 * * *', () => {
+    try {
+      runRetention({ dryRun: process.env.RETENTION_DRY_RUN === '1' });
+    } catch (err) {
+      console.error('[Retention] failed:', err.message);
+    }
+  }, { timezone: 'Asia/Kuala_Lumpur' });
+
   // Also run once on startup (after 15-second delay to let DB initialize)
   setTimeout(async () => {
     console.log('[Scheduler] Initial run');
@@ -31,7 +44,7 @@ export function startScheduler() {
     await refreshMetrics();
   }, 15000);
 
-  console.log('[Scheduler] Started — outreach every 30min, metrics daily at midnight MYT');
+  console.log('[Scheduler] Started — outreach every 30min, metrics daily at midnight MYT, retention daily at 03:15 MYT');
 }
 
 async function processOutreachQueue() {

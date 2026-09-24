@@ -860,6 +860,12 @@ router.post('/webhook', async (req, res) => {
             db.prepare('DELETE FROM sessions WHERE user_id = ?').run(usrId);
             // Cancellation is now complete — the pending marker is obsolete.
             db.prepare("DELETE FROM settings WHERE key = ?").run(`cancel_pending_${usrId}`);
+            // Start the post-subscription retention clock (privacy notice §8,
+            // Terms §9, DPA §10): services/retention.js deletes the account 90
+            // days after this date. INSERT OR IGNORE so a redelivered webhook
+            // never pushes the date later.
+            db.prepare("INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
+              .run(`subscription_ended_${usrId}`, new Date().toISOString());
           }
         }
         break;
