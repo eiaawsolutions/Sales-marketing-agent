@@ -6,6 +6,7 @@ import { hashPassword, generateToken, getPlanLimits, requireAuth } from '../midd
 import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
 import { isFounderHq } from '../config/hq.js';
+import { readTermsAcceptance } from '../config/legal.js';
 
 const router = Router();
 
@@ -435,10 +436,19 @@ router.post('/portal', requireAuth, async (req, res) => {
 // POST /api/billing/checkout — create Stripe checkout session for signup
 router.post('/checkout', async (req, res) => {
   try {
-    const { plan, email, username, displayName, founderToken, termsAcceptedAt } = req.body;
+    const { plan, email, username, displayName, founderToken } = req.body || {};
 
     if (!plan || !PLANS[plan]) return res.status(400).json({ error: 'Invalid plan. Choose starter, pro, or business.' });
     if (!email || !username) return res.status(400).json({ error: 'Email and username required.' });
+
+    // Click-wrap evidence is mandatory: no Stripe session is created until the
+    // buyer has ticked "I agree to the Terms of Service and privacy notice".
+    // Every caller (landing, proposal, and any manual founder checkout) must
+    // send termsAccepted: true.
+    const acceptance = readTermsAcceptance(req.body);
+    if (!acceptance) {
+      return res.status(400).json({ error: 'Please agree to the Terms of Service and privacy notice to continue.' });
+    }
 
     // Check if username/email already exists
     const existing = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email);
@@ -484,8 +494,13 @@ router.post('/checkout', async (req, res) => {
     // No trial by default (PLANS[*].trial_days === 0) — the card is charged when
     // Checkout completes. Stripe rejects trial_period_days: 0, so only send the
     // key when a plan genuinely carries a trial.
+    const acceptanceMetadata = {
+      terms_version: acceptance.termsVersion,
+      privacy_version: acceptance.privacyVersion,
+      terms_accepted_at: acceptance.acceptedAt,
+    };
     const subscriptionData = {
-      metadata: { plan, username, displayName: displayName || username },
+      metadata: { plan, username, displayName: displayName || username, ...acceptanceMetadata },
     };
     if (planInfo.trial_days > 0) {
       subscriptionData.trial_period_days = planInfo.trial_days;
@@ -499,11 +514,11 @@ router.post('/checkout', async (req, res) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${baseUrl}/api/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/#pricing`,
-      metadata: { plan, username, email, displayName: displayName || username },
+      // The acceptance record rides on both the session and the subscription,
+      // so it survives in Stripe (kept with billing records) even after the
+      // local account is deleted.
+      metadata: { plan, username, email, displayName: displayName || username, ...acceptanceMetadata },
     };
-    // Evidence that the buyer ticked "I agree to the Terms and Privacy notice"
-    // on the landing signup (other callers may not send it yet).
-    if (termsAcceptedAt) checkoutPayload.metadata.terms_accepted_at = String(termsAcceptedAt).slice(0, 40);
 
     if (isFounderSignup) {
       checkoutPayload.discounts = [{ coupon: 'FOUNDER_HQ' }];
@@ -585,6 +600,17 @@ export async function provisionFromSession(session, baseUrl) {
     put.run(`verify_code_${uid}`, verifyCode);
     put.run(`stripe_customer_${uid}`, session.customer);
     put.run(`stripe_subscription_${uid}`, session.subscription?.id || '');
+
+    // Local copy of the click-wrap evidence stamped at checkout. Sessions
+    // created before acceptance became mandatory carry no record.
+    if (md.terms_accepted_at) {
+      put.run(`terms_acceptance_${uid}`, JSON.stringify({
+        terms_version: md.terms_version || null,
+        privacy_version: md.privacy_version || null,
+        accepted_at: md.terms_accepted_at,
+        stripe_session: session.id || null,
+      }));
+    }
 
     // Only stamp a trial marker when the plan actually granted one. GET /usage
     // derives isTrialing from this key, so its absence is what makes a new

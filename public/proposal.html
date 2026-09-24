@@ -243,6 +243,9 @@
       transition: all 0.3s var(--ease);
     }
     .modal-btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .consent-row { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 14px; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); cursor: pointer; text-align: left; }
+    .consent-row input { flex: none; width: 17px; height: 17px; margin-top: 1px; accent-color: var(--primary-dark); cursor: pointer; }
+    .consent-row a { color: var(--primary-dark); text-decoration: underline; }
     .modal-foot { text-align: center; margin-top: 16px; font-size: 13px; color: var(--mute); }
     .modal-foot a { color: var(--primary-dark); text-decoration: none; border-bottom: 1px solid currentColor; }
 
@@ -817,6 +820,7 @@
       </select>
     </div>
     <p style="font-family:var(--mono);font-size:10px;color:var(--mute);margin-bottom:20px;text-align:center;letter-spacing:0.1em;text-transform:uppercase">Charged on checkout &middot; Cancel anytime</p>
+    <label class="consent-row" for="su-terms"><input type="checkbox" id="su-terms"><span>I agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a> and the <a href="/privacy.html" target="_blank" rel="noopener">privacy notice</a>, and I'm subscribing for my business.</span></label>
     <div id="su-error" class="modal-err"></div>
     <button id="su-btn" onclick="startCheckout()" class="modal-btn">Continue to payment &rarr;</button>
     <p class="modal-foot">Already have an account? <a href="/app">Sign in</a></p>
@@ -853,13 +857,14 @@ async function startCheckout() {
 
   if (!name || !email || !username) { errEl.textContent = 'Please fill in all fields.'; errEl.style.display = 'block'; return; }
   if (username.length < 3) { errEl.textContent = 'Username must be at least 3 characters.'; errEl.style.display = 'block'; return; }
+  if (!document.getElementById('su-terms').checked) { errEl.textContent = 'Please agree to the Terms of Service and privacy notice to continue.'; errEl.style.display = 'block'; return; }
 
   errEl.style.display = 'none'; btn.disabled = true; btn.textContent = 'Redirecting\u2026';
 
   try {
     const res = await fetch('/api/billing/checkout', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, email, username, displayName: name }),
+      body: JSON.stringify({ plan, email, username, displayName: name, termsAccepted: true, termsAcceptedAt: new Date().toISOString() }),
     });
     const data = await res.json();
     if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; btn.disabled = false; btn.innerHTML = 'Continue to payment &rarr;'; return; }

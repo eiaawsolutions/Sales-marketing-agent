@@ -1774,7 +1774,7 @@
       </select>
     </div>
     <p style="font-size:11px;color:var(--text-muted);margin-bottom:20px;text-align:center">Your card is charged for the first month when you complete checkout. Cancel anytime &mdash; access continues to the end of the cycle you've paid for.</p>
-    <label class="consent-row" for="su-terms"><input type="checkbox" id="su-terms"><span>I agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a> and the <a href="/privacy.html" target="_blank" rel="noopener">privacy notice</a>.</span></label>
+    <label class="consent-row" for="su-terms"><input type="checkbox" id="su-terms"><span>I agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a> and the <a href="/privacy.html" target="_blank" rel="noopener">privacy notice</a>, and I'm subscribing for my business.</span></label>
     <div id="su-error" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none"></div>
     <button id="su-btn" onclick="startCheckout()" class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px">
       Continue to Payment &rarr;
@@ -2020,7 +2020,7 @@ async function startCheckout() {
     const res = await fetch('/api/billing/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, email, username, displayName: name, termsAcceptedAt: new Date().toISOString() }),
+      body: JSON.stringify({ plan, email, username, displayName: name, termsAccepted: true, termsAcceptedAt: new Date().toISOString() }),
     });
     const data = await res.json();
 
