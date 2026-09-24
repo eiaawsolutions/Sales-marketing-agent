@@ -432,14 +432,14 @@ router.get('/call-link-token', async (req, res) => {
       && !rawSource.includes('ads.eiaawsolutions.com');
 
     const beginMessage = isWorkforceSite
-      ? `Hey! Thanks for clicking. I'm Sarah from EIAAW Workforce — I can answer questions about features, pricing, security, and getting set up. What brought you to the site today?`
+      ? `Hey! Thanks for clicking. I'm Sarah, the AI assistant for EIAAW Workforce — I can answer questions about features, pricing, security, and getting set up. What brought you to the site today?`
       : isParentSite
-      ? `Hey! Thanks for clicking. I'm Sarah from EIAAW Solutions — I can give you a quick overview of our four products and our custom AI work, and help you find the right fit. What brought you to the site today?`
+      ? `Hey! Thanks for clicking. I'm Sarah, the AI assistant for EIAAW Solutions — I can give you a quick overview of our four products and our custom AI work, and help you find the right fit. What brought you to the site today?`
       : isLandingVisitor
       ? `Hey! Thanks for clicking. I'm Sarah, the AI sales assistant for E-I-A-A-W. I can give you a quick overview of what we do and help you get started. What's your name?`
       : lead
-        ? `Hey ${lead.name}! I'm Sarah from E-I-A-A-W A.I. Sales Agent. Let me quickly walk you through what we can do for ${lead.company || 'your business'} — I think you'll like this.`
-        : `Hey! I'm Sarah from E-I-A-A-W A.I. Sales Agent. Let me give you a quick rundown of what we do — it'll take a minute.`;
+        ? `Hey ${lead.name}! I'm Sarah, an AI assistant from E-I-A-A-W A.I. Sales Agent. Let me quickly walk you through what we can do for ${lead.company || 'your business'} — I think you'll like this.`
+        : `Hey! I'm Sarah, an AI assistant from E-I-A-A-W A.I. Sales Agent. Let me give you a quick rundown of what we do — it'll take a minute.`;
 
     const siteScope = isWorkforceSite ? 'workforce'
       : isParentSite ? 'parent'
@@ -841,16 +841,16 @@ router.post('/call', async (req, res) => {
     let callObjective, beginMessage;
     if (stage === 'new' || stage === 'cold') {
       callObjective = 'introduce_and_qualify';
-      beginMessage = `Hey, is this ${lead.name}? Hi — I'm Sarah calling from E-I-A-A-W A.I. Sales Agent. I'll be super quick — do you have one minute?`;
+      beginMessage = `Hey, is this ${lead.name}? Hi — I'm Sarah, an AI assistant calling from E-I-A-A-W A.I. Sales Agent. I'll be super quick — do you have one minute?`;
     } else if (stage === 'contacted' || stage === 'warm') {
       callObjective = 'follow_up';
-      beginMessage = `Hey ${lead.name}, it's Sarah from E-I-A-A-W. We connected a while back and I wanted to follow up — got a minute?`;
+      beginMessage = `Hey ${lead.name}, it's Sarah, an AI assistant from E-I-A-A-W. We connected a while back and I wanted to follow up — got a minute?`;
     } else if (stage === 'qualified' || stage === 'hot') {
       callObjective = 'book_meeting';
-      beginMessage = `Hey ${lead.name}, Sarah from E-I-A-A-W here. Listen, I think it's time I actually showed you how this works for ${lead.company || 'your team'}. Do you have a quick sec?`;
+      beginMessage = `Hey ${lead.name}, Sarah here, an AI assistant from E-I-A-A-W. Listen, I think it's time I actually showed you how this works for ${lead.company || 'your team'}. Do you have a quick sec?`;
     } else {
       callObjective = 'general_followup';
-      beginMessage = `Hey ${lead.name}, it's Sarah from E-I-A-A-W. Just checking in — how's everything going on your end?`;
+      beginMessage = `Hey ${lead.name}, it's Sarah, an AI assistant from E-I-A-A-W. Just checking in — how's everything going on your end?`;
     }
 
     let callResult;
@@ -1021,11 +1021,11 @@ router.post('/web-call', async (req, res) => {
 
       let beginMessage;
       if (callObjective === 'introduce_and_qualify') {
-        beginMessage = `Hey there! I'm Sarah from E-I-A-A-W A.I. Sales Agent. Thanks for jumping on — let me quickly show you what we can do for ${lead.company || 'your business'}.`;
+        beginMessage = `Hey there! I'm Sarah, an AI assistant from E-I-A-A-W A.I. Sales Agent. Thanks for jumping on — let me quickly show you what we can do for ${lead.company || 'your business'}.`;
       } else if (callObjective === 'follow_up') {
-        beginMessage = `Hey ${lead.name}! It's Sarah from E-I-A-A-W. Good to reconnect — I've got some updates I think you'll find interesting.`;
+        beginMessage = `Hey ${lead.name}! It's Sarah, an AI assistant from E-I-A-A-W. Good to reconnect — I've got some updates I think you'll find interesting.`;
       } else {
-        beginMessage = `Hey ${lead.name}! Sarah from E-I-A-A-W. Let me walk you through exactly how this works for ${lead.company || 'your team'} — it'll take 2 minutes.`;
+        beginMessage = `Hey ${lead.name}! Sarah here, an AI assistant from E-I-A-A-W. Let me walk you through exactly how this works for ${lead.company || 'your team'} — it'll take 2 minutes.`;
       }
 
       dynamicVars = {
@@ -1043,7 +1043,7 @@ router.post('/web-call', async (req, res) => {
         lead_company: '',
         lead_stage: 'new',
         call_objective: 'introduce_and_qualify',
-        begin_message: 'Hey! I\'m Sarah from E-I-A-A-W A.I. Sales Agent. Let me tell you what we do — it\'ll take 60 seconds and I think you\'ll find it interesting.',
+        begin_message: 'Hey! I\'m Sarah, an AI assistant from E-I-A-A-W A.I. Sales Agent. Let me tell you what we do — it\'ll take 60 seconds and I think you\'ll find it interesting.',
       };
       description = 'Web call (no lead)';
     }
@@ -1122,7 +1122,7 @@ router.post('/auto-call', async (req, res) => {
             lead_company: lead.company || 'their company',
             lead_stage: stage,
             call_objective: stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify',
-            begin_message: `Hey, is this ${lead.name}? I'm Sarah from E-I-A-A-W A.I. Sales Agent — I'll be super quick, do you have one minute?`,
+            begin_message: `Hey, is this ${lead.name}? I'm Sarah, an AI assistant from E-I-A-A-W A.I. Sales Agent — I'll be super quick, do you have one minute?`,
           },
           metadata: { lead_id: String(lead.id), user_id: String(req.user.id), campaign_id: String(campaignId) },
         };
