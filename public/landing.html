@@ -1197,6 +1197,32 @@
       .wrap { padding: 0 16px; }
       .hero-index { grid-template-columns: 1fr; }
     }
+  
+    /* Hero film (silent loop + narrated "Play with sound") */
+    .hero-scene-figure.hero-video::before { display: none; }
+    .hero-scene-figure.hero-video::after { background: none; }
+    .hero-scene-figure.hero-video:hover { transform: none; }
+    @media (max-width: 720px) { .hero-scene-figure.hero-video { aspect-ratio: 4 / 5; } }
+    .hero-video video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; background: var(--bg-warm); }
+    .hero-video .hv-film[hidden] { display: none; }
+    .hv-sound {
+      position: absolute; left: clamp(14px, 2vw, 24px); bottom: clamp(14px, 2vw, 24px); z-index: 4;
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 12px 20px 12px 16px; border: 0; border-radius: 999px; cursor: pointer;
+      background: var(--ink); color: #FFFFFF; font: 600 15px/1 var(--sans);
+      box-shadow: 0 8px 24px rgba(15,26,29,0.22);
+      transition: transform 0.25s var(--ease), background 0.25s var(--ease);
+    }
+    .hv-sound:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .hv-sound:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+    .hv-ico { width: 20px; height: 20px; fill: currentColor; flex: none; }
+    .hv-ico-off { display: none; }
+    .hero-video[data-mode="sound"][data-muted="true"] .hv-ico-on { display: none; }
+    .hero-video[data-mode="sound"][data-muted="true"] .hv-ico-off { display: block; }
+    .hv-progress { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; height: 4px; background: rgba(15,26,29,0.08); opacity: 0; transition: opacity 0.3s var(--ease); }
+    .hv-progress span { display: block; height: 100%; width: 0; background: var(--primary-dark); }
+    .hero-video[data-mode="sound"] .hv-progress { opacity: 1; }
+    @media (max-width: 640px) { .hv-sound { padding: 10px 16px 10px 12px; font-size: 14px; } }
   </style>
 </head>
 <body>
@@ -1249,12 +1275,27 @@
 
     <!-- Hero editorial photo scene -->
     <div class="hero-scene rvl">
-      <figure class="hero-scene-figure" data-parallax>
-        <img src="/media/hero.jpg" alt="A sales team at work" loading="eager">
+      <!-- Hero film: silent loop on load; "Play with sound" plays the narrated 25s tour (see /hero-video.js) -->
+      <figure class="hero-scene-figure hero-video" data-hero-video
+        data-loop-desktop="/media/hero/sa-hero-16x9.mp4"
+        data-film-desktop="/media/hero/sa-film-narrated-16x9.mp4"
+        data-poster-desktop="/media/hero/sa-poster-16x9.jpg"
+        data-loop-mobile="/media/hero/sa-hero-4x5.mp4"
+        data-film-mobile="/media/hero/sa-film-narrated-4x5.mp4"
+        data-poster-mobile="/media/hero/sa-poster-4x5.jpg">
+        <video class="hv-loop" playsinline muted loop preload="auto" poster="/media/hero/sa-poster-16x9.jpg" aria-hidden="true"></video>
+        <video class="hv-film" playsinline preload="none" hidden aria-label="EIAAW AI Sales Agent: 25-second narrated tour"></video>
+        <button class="hv-sound" type="button" aria-pressed="false">
+          <svg class="hv-ico hv-ico-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <svg class="hv-ico hv-ico-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 9.5l5 5M21.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span class="hv-label">Play with sound</span>
+        </button>
+        <div class="hv-progress" aria-hidden="true"><span></span></div>
+        <noscript><img src="/media/hero/sa-poster-16x9.jpg" alt="EIAAW AI Sales Agent" width="1920" height="1080"></noscript>
       </figure>
       <div class="hero-scene-caption">
         <span class="fig">Fig. 001</span>
-        The last team that still makes<br>the calls themselves.<br><br>&mdash; Before EIAAW
+        The agent at work.<br>A 25-second tour,<br>with sound.
       </div>
     </div>
 
@@ -2285,5 +2326,6 @@ async function sendChatbotMsg() {
 
 </script>
 
+<script src="/hero-video.js?v=20261004a" defer></script>
 </body>
 </html>
