@@ -1205,8 +1205,11 @@
     @media (max-width: 720px) { .hero-scene-figure.hero-video { aspect-ratio: 4 / 5; } }
     .hero-video video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; background: var(--bg-warm); }
     .hero-video .hv-film[hidden] { display: none; }
-    .hv-sound {
+    .hv-controls {
       position: absolute; left: clamp(14px, 2vw, 24px); bottom: clamp(14px, 2vw, 24px); z-index: 4;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .hv-sound {
       display: inline-flex; align-items: center; gap: 10px;
       padding: 12px 20px 12px 16px; border: 0; border-radius: 999px; cursor: pointer;
       background: var(--ink); color: #FFFFFF; font: 600 15px/1 var(--sans);
@@ -1219,6 +1222,20 @@
     .hv-ico-off { display: none; }
     .hero-video[data-mode="sound"][data-muted="true"] .hv-ico-on { display: none; }
     .hero-video[data-mode="sound"][data-muted="true"] .hv-ico-off { display: block; }
+    /* Pause / Play: quieter than the sound pill so "Play with sound" stays the primary action */
+    .hv-pause {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
+      background: var(--surface); color: var(--ink);
+      box-shadow: 0 8px 24px rgba(15,26,29,0.16);
+      transition: transform 0.25s var(--ease), background 0.25s var(--ease);
+    }
+    .hv-pause:hover { background: var(--bg-warm); transform: translateY(-1px); }
+    .hv-pause:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+    .hv-pause .hv-ico { width: 18px; height: 18px; }
+    .hv-ico-play { display: none; }
+    .hero-video[data-paused="true"] .hv-ico-pause { display: none; }
+    .hero-video[data-paused="true"] .hv-ico-play { display: block; }
     .hv-progress { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; height: 4px; background: rgba(15,26,29,0.08); opacity: 0; transition: opacity 0.3s var(--ease); }
     .hv-progress span { display: block; height: 100%; width: 0; background: var(--primary-dark); }
     .hero-video[data-mode="sound"] .hv-progress { opacity: 1; }
@@ -1275,7 +1292,7 @@
 
     <!-- Hero editorial photo scene -->
     <div class="hero-scene rvl">
-      <!-- Hero film: silent loop on load; "Play with sound" plays the narrated 25s tour (see /hero-video.js) -->
+      <!-- Hero film: silent loop autoplays on load; "Play with sound" plays the narrated 25s tour; pause/play controls whichever is showing (see /hero-video.js) -->
       <figure class="hero-scene-figure hero-video" data-hero-video
         data-loop-desktop="/media/hero/sa-hero-16x9.mp4"
         data-film-desktop="/media/hero/sa-film-narrated-16x9.mp4"
@@ -1285,11 +1302,17 @@
         data-poster-mobile="/media/hero/sa-poster-4x5.jpg">
         <video class="hv-loop" playsinline muted loop preload="auto" poster="/media/hero/sa-poster-16x9.jpg" aria-hidden="true"></video>
         <video class="hv-film" playsinline preload="none" hidden aria-label="EIAAW AI Sales Agent: 25-second narrated tour"></video>
-        <button class="hv-sound" type="button" aria-pressed="false">
-          <svg class="hv-ico hv-ico-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          <svg class="hv-ico hv-ico-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 9.5l5 5M21.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          <span class="hv-label">Play with sound</span>
-        </button>
+        <div class="hv-controls">
+          <button class="hv-sound" type="button" aria-pressed="false">
+            <svg class="hv-ico hv-ico-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <svg class="hv-ico hv-ico-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 9.5l5 5M21.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span class="hv-label">Play with sound</span>
+          </button>
+          <button class="hv-pause" type="button" aria-label="Pause video">
+            <svg class="hv-ico hv-ico-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+            <svg class="hv-ico hv-ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+          </button>
+        </div>
         <div class="hv-progress" aria-hidden="true"><span></span></div>
         <noscript><img src="/media/hero/sa-poster-16x9.jpg" alt="EIAAW AI Sales Agent" width="1920" height="1080"></noscript>
       </figure>
@@ -2326,6 +2349,6 @@ async function sendChatbotMsg() {
 
 </script>
 
-<script src="/hero-video.js?v=20261004a" defer></script>
+<script src="/hero-video.js?v=20261005a" defer></script>
 </body>
 </html>
