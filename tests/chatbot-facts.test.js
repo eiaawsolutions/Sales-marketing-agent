@@ -125,7 +125,11 @@ test('voice prompt quotes every price the parent site publishes', () => {
 });
 
 test('voice prompt drops claims the sites no longer make', () => {
-  for (const stale of ['USD 6', 'USD 499', '14-day', 'scoped per engagement', 'five compliance checks', 'FAL.AI', 'Up to 50 users']) {
+  // Ai Ads Agency (ads.eiaawsolutions.com/llms.txt, 10 Oct 2026): Meta is the only live platform, audits return a
+  // score and up to 25 findings, brand DNA does not read the website, image generation is in preview, no SSO.
+  for (const stale of ['USD 6', 'USD 499', '14-day', 'scoped per engagement', 'five compliance checks', 'FAL.AI', 'Up to 50 users',
+    '250+', 'two hundred and fifty', 'all 7 platforms', 'on all seven', 'Google and LinkedIn are in private preview',
+    'straight from a website URL', 'from any website', 'Creatives are AI-generated', 'unlimited spend, SSO']) {
     assert.ok(!VOICE_SOURCE.includes(stale), `voice.js still says "${stale}"`);
   }
 });
