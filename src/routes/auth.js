@@ -213,7 +213,8 @@ router.post('/mfa/verify-setup', requireAuth, (req, res) => {
   if (user.mfa_enabled) return res.status(400).json({ error: 'MFA already enabled.' });
 
   if (!verifyTotp(user.mfa_secret, code)) {
-    return res.status(401).json({ error: 'Code did not match. Check your authenticator app clock.' });
+    // 400, not 401 — a 401 signs the SPA out (see /reset-password).
+    return res.status(400).json({ error: 'Code did not match. Check your authenticator app clock.' });
   }
 
   const codes = generateRecoveryCodes(10);
@@ -251,7 +252,7 @@ router.post('/mfa/disable', requireAuth, (req, res) => {
   const user = db.prepare('SELECT mfa_secret, mfa_enabled FROM users WHERE id = ?').get(req.user.id);
   if (!user.mfa_enabled) return res.status(400).json({ error: 'MFA not enabled' });
   if (!verifyTotp(user.mfa_secret, code || '')) {
-    return res.status(401).json({ error: 'Invalid code' });
+    return res.status(400).json({ error: 'Invalid code' });
   }
   db.prepare(`
     UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_recovery_codes = NULL, mfa_enrolled_at = NULL
@@ -423,11 +424,19 @@ router.post('/reset-password', requireAuth, (req, res) => {
   const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
   const passResult = verifyPassword(currentPassword, user.password_hash);
   if (!passResult) {
-    return res.status(401).json({ error: 'Current password is incorrect' });
+    // 400, not 401: the session is valid, the answer is wrong. The SPA treats
+    // any 401 as an expired session and bounces to the login page, so a typo
+    // here used to sign the user out with no error shown.
+    return res.status(400).json({ error: 'Current password is incorrect' });
   }
 
   const newHash = hashPassword(newPassword);
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, req.user.id);
+
+  // Anyone holding an old session (e.g. the reason the password is being
+  // changed) is signed out; this device stays in.
+  const currentToken = req.headers['authorization']?.replace('Bearer ', '');
+  displaceOtherSessions(req.user.id, currentToken, 'Your password was changed. Please sign in again.');
 
   res.json({ success: true });
 });

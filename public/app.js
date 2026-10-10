@@ -4922,17 +4922,21 @@ async function loadAccount() {
         <button class="btn btn-primary" onclick="saveAccountProfile()">Save profile</button>
       </div>
 
-      <!-- Password card -->
+      <!-- Password card — a real <form> so Enter submits, and autocomplete hints so
+           password managers fill only "current" and offer to save the new one -->
       <div class="card">
         <h3>Password</h3>
         <p class="text-muted text-sm mb-4">Use at least 8 characters. A password manager is recommended.</p>
-        <div class="form-group"><label>Current password</label><input id="acc-cur-pass" type="password"></div>
-        <div class="grid-2">
-          <div class="form-group"><label>New password</label><input id="acc-new-pass" type="password"></div>
-          <div class="form-group"><label>Confirm new password</label><input id="acc-new-pass2" type="password"></div>
-        </div>
-        <div id="acc-pass-msg" style="font-size:13px;margin-bottom:12px;display:none"></div>
-        <button class="btn btn-primary" onclick="changeAccountPassword()">Change password</button>
+        <form onsubmit="event.preventDefault(); changeAccountPassword()">
+          <input type="text" name="username" autocomplete="username" value="${esc(me.username || '')}" style="display:none" aria-hidden="true" tabindex="-1">
+          <div class="form-group"><label for="acc-cur-pass">Current password</label><input id="acc-cur-pass" type="password" autocomplete="current-password"></div>
+          <div class="grid-2">
+            <div class="form-group"><label for="acc-new-pass">New password</label><input id="acc-new-pass" type="password" autocomplete="new-password"></div>
+            <div class="form-group"><label for="acc-new-pass2">Confirm new password</label><input id="acc-new-pass2" type="password" autocomplete="new-password"></div>
+          </div>
+          <div id="acc-pass-msg" role="status" style="font-size:13px;margin-bottom:12px;display:none"></div>
+          <button type="submit" id="acc-pass-btn" class="btn btn-primary">Change password</button>
+        </form>
       </div>
 
       <!-- Security card (canonical home — 2FA + active sessions) -->
@@ -4979,6 +4983,9 @@ async function changeAccountPassword() {
   if (!cur || !newPass) { msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='Enter current and new password.'; return; }
   if (newPass !== newPass2) { msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='New passwords do not match.'; return; }
   if (newPass.length < 8) { msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='New password must be at least 8 characters.'; return; }
+  const btn = document.getElementById('acc-pass-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Changing…'; }
+  msg.style.display = 'none';
   try {
     await api.post('/auth/reset-password', { currentPassword: cur, newPassword: newPass });
     msg.style.display='block'; msg.style.color='var(--success)'; msg.textContent='Password changed. Other sessions have been signed out.';
@@ -4987,6 +4994,8 @@ async function changeAccountPassword() {
     document.getElementById('acc-new-pass2').value = '';
   } catch (e) {
     msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent=e.message;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Change password'; }
   }
 }
 
@@ -5812,6 +5821,7 @@ async function init() {
       currentUser = await fetch('/api/auth/me', {
         headers: { 'Authorization': `Bearer ${authToken}` }
       }).then(r => r.json());
+      if (currentUser.code === 'session_displaced') sessionStorage.setItem('displaced_notice', currentUser.error);
       if (currentUser.error) throw new Error();
     } catch {
       authToken = null; currentUser = null;
