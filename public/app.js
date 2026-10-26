@@ -5031,10 +5031,9 @@ async function loadSettings() {
         <div class="form-group">
           <label>AI Model</label>
           <select id="s-model">
-            <option value="claude-sonnet-4-20250514" ${settings.ai_model === 'claude-sonnet-4-20250514' ? 'selected' : ''}>Claude Sonnet 4 (Recommended)</option>
-            <option value="claude-opus-4-20250514" ${settings.ai_model === 'claude-opus-4-20250514' ? 'selected' : ''}>Claude Opus 4 (Most capable)</option>
-            <option value="claude-haiku-4-5-20251001" ${settings.ai_model === 'claude-haiku-4-5-20251001' ? 'selected' : ''}>Claude Haiku 4.5 (Fastest)</option>
+            ${(settings._models || []).map(m => `<option value="${m.id}" ${settings._effective_model === m.id ? 'selected' : ''}>${m.label}</option>`).join('')}
           </select>
+          ${settings._model_retired ? `<div class="text-sm" style="color:var(--danger);margin-top:6px">The saved model (${esc(settings.ai_model)}) has been retired by Anthropic. The agent is using ${esc(settings._effective_model)} instead. Save to make that permanent.</div>` : ''}
         </div>
 
         <div class="form-group">

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db from '../db/index.js';
 import { requireSuperadmin } from '../middleware/auth.js';
 import { encrypt, decrypt, isSensitive } from '../utils/crypto.js';
+import { resolveModel, isAcceptableModelId, SELECTABLE_MODELS } from '../config/models.js';
 
 const router = Router();
 
@@ -49,6 +50,10 @@ router.get('/', (req, res) => {
   const decryptedResendKey = resendKeyRow?.value ? decrypt(resendKeyRow.value) : '';
   settings._resend_key_set = !!(decryptedResendKey && decryptedResendKey.length > 5 && !decryptedResendKey.startsWith('enc:'));
 
+  settings._models = SELECTABLE_MODELS;
+  settings._effective_model = resolveModel(settings.ai_model);
+  settings._model_retired = !!settings.ai_model && settings._effective_model !== settings.ai_model;
+
   const apolloKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'apollo_api_key'").get();
   const decryptedApolloKey = apolloKeyRow?.value ? decrypt(apolloKeyRow.value) : '';
   settings._apollo_key_set = !!(decryptedApolloKey && decryptedApolloKey.length > 5 && !decryptedApolloKey.startsWith('enc:'));
@@ -62,6 +67,10 @@ router.put('/', (req, res) => {
   const upsert = db.prepare(
     'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP'
   );
+
+  if ('ai_model' in req.body && !isAcceptableModelId(req.body.ai_model)) {
+    return res.status(400).json({ error: 'That model is retired or not a Claude model id. Pick one from the list.' });
+  }
 
   const updated = [];
   for (const [key, value] of Object.entries(req.body)) {
@@ -90,7 +99,7 @@ router.post('/test-ai', async (req, res) => {
 
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: modelRow?.value || 'claude-sonnet-4-20250514',
+      model: resolveModel(modelRow?.value),
       max_tokens: 50,
       messages: [{ role: 'user', content: 'Reply with exactly: CONNECTION_OK' }],
     });

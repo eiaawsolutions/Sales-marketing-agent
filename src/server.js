@@ -37,6 +37,7 @@ import { SALES_AGENT_PROMPT } from './routes/voice.js';
 import { buildChatbotPrompt } from './prompts/chatbot.js';
 import { getParentFacts } from './services/site-facts.js';
 import { GIT_SHA, BUILT_AT } from './version.js';
+import { resolveModel } from './config/models.js';
 
 // Fingerprint of the voice prompt that /refresh-prompt-with-token pushes to
 // Retell. Computed once at boot — the prompt is a module-level constant.
@@ -734,11 +735,7 @@ app.post('/api/chatbot', rateLimit({ windowMs: 60000, max: 5, message: { error: 
     if (!apiKey) return res.json({ response: "Chat is currently unavailable. Please use the contact form or email eiaawsolutions@gmail.com" });
 
     const client = new Anthropic({ apiKey });
-    const CHATBOT_DEFAULT_MODEL = 'claude-sonnet-4-6';
-    const RETIRED_MODELS = new Set(['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-5-sonnet-20240620']);
-    const modelRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_model'").get();
-    const storedModel = modelRow?.value;
-    const model = (!storedModel || RETIRED_MODELS.has(storedModel)) ? CHATBOT_DEFAULT_MODEL : storedModel;
+    const model = resolveModel(db.prepare("SELECT value FROM settings WHERE key = 'ai_model'").get()?.value);
 
     const response = await client.messages.create({
       model,

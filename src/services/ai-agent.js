@@ -5,6 +5,7 @@ import { decrypt } from '../utils/crypto.js';
 import { isApolloConfigured, searchPeople, enrichPerson, describeApolloSource, detectHotSignal } from './apollo.js';
 import { leadSourcesService } from './lead-sources.js';
 import { normalizePhone } from '../utils/normalize.js';
+import { DEFAULT_MODEL, resolveModel } from '../config/models.js';
 
 function getSettings() {
   const rows = db.prepare('SELECT key, value FROM settings').all();
@@ -25,8 +26,7 @@ function getClient() {
 }
 
 function getModel() {
-  const settings = getSettings();
-  return settings.ai_model || 'claude-sonnet-4-20250514';
+  return resolveModel(getSettings().ai_model);
 }
 
 // Extract clean error message from Anthropic SDK errors
@@ -77,18 +77,21 @@ function validateShape(obj, schema) {
   return true;
 }
 
-// Cost per 1M tokens (USD) — Claude pricing as of 2025
+// Cost per 1M tokens (USD), Anthropic list prices checked 2026-10-26. Retired
+// ids stay so historical ai_cost_log rows still price correctly.
 const MODEL_PRICING = {
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
+  'claude-haiku-4-5': { input: 1.00, output: 5.00 },
+  'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
   'claude-sonnet-4-20250514': { input: 3.00, output: 15.00 },
   'claude-opus-4-20250514': { input: 15.00, output: 75.00 },
-  'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
 };
 
 // Anthropic web search tool: $10 per 1,000 searches
 const WEB_SEARCH_COST_PER_REQUEST = 0.01;
 
 function calculateCost(model, inputTokens, outputTokens, webSearchRequests = 0) {
-  const pricing = MODEL_PRICING[model] || MODEL_PRICING['claude-sonnet-4-20250514'];
+  const pricing = MODEL_PRICING[model] || MODEL_PRICING[DEFAULT_MODEL];
   const tokenCost = (inputTokens * pricing.input / 1_000_000) + (outputTokens * pricing.output / 1_000_000);
   const searchCost = (webSearchRequests || 0) * WEB_SEARCH_COST_PER_REQUEST;
   return tokenCost + searchCost;
@@ -403,8 +406,11 @@ async function chat(userMessage, extraContext = '', options = {}) {
   throw lastError;
 }
 
+// Replaced only by __testing.setChat().
+let chatImpl = chat;
+
 async function chatJSON(userMessage, extraContext = '', options = {}) {
-  const raw = await chat(
+  const raw = await chatImpl(
     userMessage + '\n\nRespond ONLY with valid JSON, no markdown fences.',
     extraContext,
     options
@@ -1658,3 +1664,18 @@ Total AI spend: $${totalCost.total.toFixed(4)}\n`;
     throw new Error(cleanAIError(error));
   }
 }
+
+// Test seam: swap the Claude call for a stub so task handlers run without the
+// network. The stub reports one web search per web-search call, which is what
+// the lead generator's "did the model actually browse" check looks for.
+export const __testing = {
+  getModel,
+  setChat(fn) {
+    chatImpl = async (message, extraContext, options = {}) => {
+      const out = await fn(message, extraContext, options);
+      _lastUsage = { model: 'test', inputTokens: 0, outputTokens: 0, webSearchRequests: options.useWebSearch ? 1 : 0 };
+      return out;
+    };
+  },
+  resetChat() { chatImpl = chat; },
+};
