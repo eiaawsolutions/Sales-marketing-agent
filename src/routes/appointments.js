@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import db from '../db/index.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, actAsAccount } from '../middleware/auth.js';
 import { sendEmail } from '../utils/email.js';
 import { getProfile, senderFor, isHqAccount } from '../services/account-profile.js';
 
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuth, actAsAccount);
 
 // Meeting location: what the user typed, else the account's own meeting room
 // from its brief, else none — the host sends the link. (This used to invent a

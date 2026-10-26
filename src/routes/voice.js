@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import db from '../db/index.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, actAsAccount } from '../middleware/auth.js';
 import { checkPlanLimit, checkPlanLimitForUser, loadPlanUser, VOICE_ADDONS } from '../middleware/auth.js';
 import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
@@ -652,7 +652,7 @@ router.post('/refresh-prompt-with-token', async (req, res) => {
 });
 
 // --- Authenticated routes ---
-router.use(requireAuth);
+router.use(requireAuth, actAsAccount);
 
 const BRIEF_NEEDED = 'Fill in your Brief (business name and what you offer) first — the voice assistant speaks for your business and needs to know what it sells.';
 

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import Stripe from 'stripe';
 import db from '../db/index.js';
-import { hashPassword, generateToken, getPlanLimits, requireAuth } from '../middleware/auth.js';
+import { hashPassword, generateToken, getPlanLimits, requireAuth, actAsAccount, requireAccountOwner } from '../middleware/auth.js';
 import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
 import { isFounderHq } from '../config/hq.js';
@@ -98,7 +98,7 @@ const AI_CREDIT_ADDONS = {
 };
 
 // GET /api/billing/usage — current user's usage vs plan limits
-router.get('/usage', requireAuth, (req, res) => {
+router.get('/usage', requireAuth, actAsAccount, (req, res) => {
   const userId = req.user.id;
   const plan = req.user.plan || 'starter';
   const limits = getPlanLimits(plan);
@@ -176,7 +176,7 @@ router.get('/usage', requireAuth, (req, res) => {
 });
 
 // POST /api/billing/buy-reveals — purchase extra contact reveal credits
-router.post('/buy-reveals', requireAuth, async (req, res) => {
+router.post('/buy-reveals', requireAuth, requireAccountOwner, async (req, res) => {
   try {
     const { pack } = req.body;
     if (!pack || !REVEAL_ADDONS[pack]) return res.status(400).json({ error: 'Invalid add-on pack.' });
@@ -240,7 +240,7 @@ router.get('/reveal-success', async (req, res) => {
 });
 
 // POST /api/billing/buy-ai-credits — purchase extra AI action credits
-router.post('/buy-ai-credits', requireAuth, async (req, res) => {
+router.post('/buy-ai-credits', requireAuth, requireAccountOwner, async (req, res) => {
   try {
     const { pack } = req.body;
     if (!pack || !AI_CREDIT_ADDONS[pack]) return res.status(400).json({ error: 'Invalid AI credit pack.' });
@@ -304,7 +304,7 @@ router.get('/ai-credit-success', async (req, res) => {
 });
 
 // POST /api/billing/upgrade — upgrade plan via Stripe checkout
-router.post('/upgrade', requireAuth, async (req, res) => {
+router.post('/upgrade', requireAuth, requireAccountOwner, async (req, res) => {
   try {
     const { plan } = req.body;
     if (!plan || !PLANS[plan]) return res.status(400).json({ error: 'Invalid plan.' });
@@ -409,7 +409,7 @@ async function ensurePortalConfig(stripe, baseUrl) {
 // (effective end-of-cycle). The Stripe customer id is resolved server-side from
 // the authenticated user, so a user can only ever manage their own
 // subscription (no IDOR).
-router.post('/portal', requireAuth, async (req, res) => {
+router.post('/portal', requireAuth, requireAccountOwner, async (req, res) => {
   try {
     const userId = req.user.id;
     const customerId = db.prepare("SELECT value FROM settings WHERE key = ?").get(`stripe_customer_${userId}`)?.value;

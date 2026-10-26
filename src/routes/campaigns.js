@@ -354,7 +354,7 @@ router.get('/:id/outreach-queue', (req, res) => {
 // Approval queue. Nothing the agent drafts is sent until approved here.
 router.post('/:id/outreach/approve', (req, res) => {
   const approved = approveDrafts({
-    campaignId: req.campaign.id, leadIds: req.body?.leadIds, itemIds: req.body?.itemIds, approvedBy: req.user.id,
+    campaignId: req.campaign.id, leadIds: req.body?.leadIds, itemIds: req.body?.itemIds, approvedBy: req.user.memberId ?? req.user.id,
   });
   res.json({ approved });
 });

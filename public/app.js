@@ -610,6 +610,50 @@ async function afterRender() {
   }
 }
 
+// ========== Team (seats) ==========
+async function loadTeamSection() {
+  const el = document.getElementById('team-body');
+  if (!el) return;
+  try {
+    const t = await api.get('/team');
+    if (!t.is_owner) {
+      el.innerHTML = `<p style="margin:0">You're a member of <strong>${esc(t.owner.name || '')}</strong>'s account. Billing and seats are managed by the account owner.</p>`;
+      return;
+    }
+    const full = t.seats_used >= t.seats_limit;
+    el.innerHTML = `
+      <p style="margin:0 0 10px"><strong>${t.seats_used}</strong> of ${t.seats_limit} seat${t.seats_limit === 1 ? '' : 's'} used (you included). Teammates work in this account — finding leads, approving outreach, logging replies — with their own login. They can't change billing.</p>
+      ${t.members.length ? `<table style="margin-bottom:12px"><tr><th>Name</th><th>Email</th><th>Username</th><th></th></tr>
+        ${t.members.map(m => `<tr><td>${esc(m.name)}</td><td>${esc(m.email)}</td><td>${esc(m.username)}</td>
+          <td style="text-align:right"><button class="btn btn-sm btn-outline" onclick="removeTeammate(${Number(m.id)})">Remove</button></td></tr>`).join('')}</table>` : ''}
+      ${full ? `<p class="text-muted" style="margin:0">All seats are in use. Remove a teammate or upgrade your plan to add more.</p>` : `
+        <div class="grid-2">
+          <div class="form-group"><label for="tm-name">Name</label><input id="tm-name" maxlength="80" placeholder="e.g. Shaun"></div>
+          <div class="form-group"><label for="tm-email">Work email</label><input id="tm-email" type="email" maxlength="254"></div>
+        </div>
+        <button class="btn btn-primary" onclick="inviteTeammate()">Send invite</button>`}`;
+  } catch (e) {
+    el.textContent = 'Could not load your team: ' + e.message;
+  }
+}
+
+async function inviteTeammate() {
+  try {
+    await api.post('/team/invite', { name: document.getElementById('tm-name').value, email: document.getElementById('tm-email').value });
+    showNotification('Invite sent. They will get an email to set their password.', 'success');
+    loadTeamSection();
+  } catch (e) { showNotification(e.message, 'error'); }
+}
+
+async function removeTeammate(id) {
+  if (!confirm('Remove this teammate? They are signed out straight away. Their work stays in the account.')) return;
+  try {
+    await api.del(`/team/${id}`);
+    showNotification('Teammate removed.', 'success');
+    loadTeamSection();
+  } catch (e) { showNotification(e.message, 'error'); }
+}
+
 // ========== Brief ==========
 // What this account sells, the claims it may make and who its email comes
 // from. Every message, score and voice call is written from it.
@@ -5177,6 +5221,12 @@ async function loadAccount() {
         </form>
       </div>
 
+      <!-- Team card — seats on this account -->
+      <div class="card" id="team-card">
+        <h3>Team</h3>
+        <div id="team-body" class="text-sm text-muted" style="padding:8px 0">Loading&hellip;</div>
+      </div>
+
       <!-- Security card (canonical home — 2FA + active sessions) -->
       <div class="card" id="security-card">
         <h3>Security</h3>
@@ -5184,6 +5234,7 @@ async function loadAccount() {
       </div>
     `;
     loadSecuritySection();
+    loadTeamSection();
   } catch (e) {
     document.getElementById('page').innerHTML = `<div class="empty">Error loading account: ${esc(e.message)}</div>`;
   }

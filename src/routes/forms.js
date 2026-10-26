@@ -2,7 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import db from '../db/index.js';
 import { formsService } from '../services/forms.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, actAsAccount } from '../middleware/auth.js';
 import { leadSourcesService } from '../services/lead-sources.js';
 import { ingest, IngestRejected } from '../services/lead-ingest.js';
 
@@ -295,7 +295,7 @@ router.post('/public/lead-intake', intakeLimiter, (req, res) => {
 });
 
 // ---------- Authenticated CRUD ----------
-router.use(requireAuth);
+router.use(requireAuth, actAsAccount);
 
 router.get('/', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;

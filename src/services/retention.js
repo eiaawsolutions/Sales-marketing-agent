@@ -187,6 +187,11 @@ export function deleteAccountData(db, userId) {
     if (tableExists(db, 'lead_settings')) run('lead_settings', 'DELETE FROM lead_settings WHERE user_id = @uid');
     if (tableExists(db, 'account_profiles')) run('account_profiles', 'DELETE FROM account_profiles WHERE user_id = @uid');
     run('agent_tasks', 'DELETE FROM agent_tasks WHERE user_id = @uid');
+    // Teammates' logins go with the account (their work is stored under it).
+    if (db.prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'account_owner_id'").get()) {
+      run('sessions', 'DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE account_owner_id = @uid)');
+      run('team_members', 'DELETE FROM users WHERE account_owner_id = @uid');
+    }
     run('sessions', 'DELETE FROM sessions WHERE user_id = @uid');
     const delSetting = db.prepare('DELETE FROM settings WHERE key = ?');
     counts.settings = 0;

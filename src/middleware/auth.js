@@ -77,14 +77,32 @@ export function requireAuth(req, res, next) {
 
   // Get email verification + MFA status (columns may not exist on older DBs)
   let userRow;
-  try { userRow = db.prepare('SELECT email_verified, mfa_enabled FROM users WHERE id = ?').get(session.user_id); } catch (e) { userRow = null; }
+  try { userRow = db.prepare('SELECT email_verified, mfa_enabled, account_owner_id FROM users WHERE id = ?').get(session.user_id); } catch (e) { userRow = null; }
+
+  // A teammate works in the owner's account: the owner's plan applies, and an
+  // owner whose subscription is suspended locks the whole team out.
+  let accountId = session.user_id;
+  let plan = session.plan || 'starter';
+  let accountName = null;
+  if (userRow?.account_owner_id) {
+    const owner = db.prepare('SELECT id, plan, status, display_name, username FROM users WHERE id = ?').get(userRow.account_owner_id);
+    if (!owner || owner.status === 'suspended') {
+      return res.status(403).json({ error: "This team's account is not active. Ask the account owner to check their subscription." });
+    }
+    accountId = owner.id;
+    plan = owner.plan || 'starter';
+    accountName = owner.display_name || owner.username;
+  }
 
   req.user = {
     id: session.user_id,
+    accountId,
+    isMember: accountId !== session.user_id,
+    accountName,
     username: session.username,
     email: session.email,
     role: session.role,
-    plan: session.plan || 'starter',
+    plan,
     displayName: session.display_name,
     budgetLimit: session.budget_limit,
     monthlySystemCost: session.monthly_system_cost,
@@ -92,6 +110,24 @@ export function requireAuth(req, res, next) {
     mfaEnabled: !!(userRow?.mfa_enabled),
   };
 
+  next();
+}
+
+// For routes that work on account data (leads, campaigns, brief, pipeline,
+// sources...): act as the account. Every one of those routes scopes by
+// req.user.id, so a teammate's requests are re-pointed at the owner's id here,
+// once, with the person kept in req.user.memberId. Never mounted on personal
+// routes (password, 2FA, sessions, /me) — those must stay the person's own.
+export function actAsAccount(req, res, next) {
+  if (req.user && req.user.isMember) {
+    req.user = { ...req.user, id: req.user.accountId, memberId: req.user.id };
+  }
+  next();
+}
+
+// Billing and seats belong to the account owner alone.
+export function requireAccountOwner(req, res, next) {
+  if (req.user?.isMember) return res.status(403).json({ error: 'Only the account owner can do this.' });
   next();
 }
 

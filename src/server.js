@@ -10,7 +10,7 @@ import { config } from './config/index.js';
 import { FOUNDER_HQ_EMAIL, isFounderHq } from './config/hq.js';
 
 import db from './db/index.js';
-import { requireAuth } from './middleware/auth.js';
+import { requireAuth, actAsAccount } from './middleware/auth.js';
 import { decrypt } from './utils/crypto.js';
 import { sendEmail } from './utils/email.js';
 import authRouter from './routes/auth.js';
@@ -19,6 +19,7 @@ import usersRouter from './routes/users.js';
 import leadsRouter from './routes/leads.js';
 import campaignsRouter from './routes/campaigns.js';
 import profileRouter from './routes/profile.js';
+import teamRouter from './routes/team.js';
 import pipelineRouter from './routes/pipeline.js';
 import agentRouter from './routes/agent.js';
 import settingsRouter from './routes/settings.js';
@@ -766,13 +767,16 @@ app.post('/api/chatbot', rateLimit({ windowMs: 60000, max: 5, message: { error: 
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);
 
-// Protected routes
+// Protected routes. Account-data routers run with actAsAccount: a teammate
+// works on the account owner's data (see middleware/auth.js). Personal routes
+// (/api/auth) and superadmin routes never do.
 app.use('/api/users', usersRouter);
-app.use('/api/leads', requireAuth, leadsRouter);
-app.use('/api/campaigns', requireAuth, campaignsRouter);
-app.use('/api/profile', requireAuth, profileRouter);
-app.use('/api/pipeline', requireAuth, pipelineRouter);
-app.use('/api/agent', requireAuth, agentRouter);
+app.use('/api/team', requireAuth, teamRouter);
+app.use('/api/leads', requireAuth, actAsAccount, leadsRouter);
+app.use('/api/campaigns', requireAuth, actAsAccount, campaignsRouter);
+app.use('/api/profile', requireAuth, actAsAccount, profileRouter);
+app.use('/api/pipeline', requireAuth, actAsAccount, pipelineRouter);
+app.use('/api/agent', requireAuth, actAsAccount, agentRouter);
 app.use('/api/settings', requireAuth, settingsRouter);
 app.use('/api/system-logic', requireAuth, systemLogicRouter);
 app.use('/api/voice', voiceRouter);
@@ -781,7 +785,7 @@ app.use('/api/tracking', trackingRouter);
 // Outreach unsubscribe links (public, signed per recipient). Form posts and
 // RFC 8058 one-click posts are urlencoded; limit per IP like the other public routes.
 app.use('/unsubscribe', rateLimit({ windowMs: 60000, max: 30, validate: false }), express.urlencoded({ extended: false, limit: '2kb' }), unsubscribeRouter);
-app.use('/api/uploads', requireAuth, uploadsRouter);
+app.use('/api/uploads', requireAuth, actAsAccount, uploadsRouter);
 // Forms router handles its own auth split — public submit/fetch routes come
 // before requireAuth inside the router. Don't wrap with requireAuth here.
 app.use('/api/forms', formsRouter);
@@ -791,11 +795,11 @@ app.use('/api/forms', formsRouter);
 // tenant and the signature authenticates the sender. It must NOT be wrapped in
 // requireAuth: Google, Calendly, and Resend have no session.
 app.use('/api/ingest', ingestRouter);
-app.use('/api/sources', requireAuth, sourcesRouter);
-app.use('/api/segments', requireAuth, segmentsRouter);
+app.use('/api/sources', requireAuth, actAsAccount, sourcesRouter);
+app.use('/api/segments', requireAuth, actAsAccount, segmentsRouter);
 
 // Dashboard overview endpoint
-app.get('/api/dashboard', requireAuth, (req, res) => {
+app.get('/api/dashboard', requireAuth, actAsAccount, (req, res) => {
   const userId = req.user.id;
   const isSuperadmin = req.user.role === 'superadmin';
   const uf = isSuperadmin ? '' : ' AND user_id = ?';

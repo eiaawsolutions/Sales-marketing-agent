@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { migrateOmnichannel } from './schema-omnichannel.js';
 import { migrateSuppressions } from './schema-suppressions.js';
 import { migrateOutreach } from './schema-outreach.js';
+import { migrateTeam } from './schema-team.js';
 import { FOUNDER_HQ_EMAIL } from '../config/hq.js';
 
 export function initializeDatabase(db) {
@@ -438,6 +439,9 @@ export function initializeDatabase(db) {
   // Outreach approval states, bounce suppression, per-account brief
   // (see schema-outreach.js). After migrateSuppressions: it rebuilds that table.
   migrateOutreach(db);
+
+  // Seats: teammates attached to a paying account (see schema-team.js).
+  migrateTeam(db);
 
   // Seed system logic from codebase on every startup (auto-update)
   seedSystemLogic(db);
