@@ -854,6 +854,7 @@ async function loadLeads() {
                   <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id})">AI Score</button>
                   <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id})">Qualify</button>
                   <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id})">Outreach</button>
+                  <button class="btn btn-sm btn-outline" onclick="logReply(${l.id})" title="They replied? Paste it here">Reply</button>
                   <button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="shareCallLink(${l.id})">&#128279; Call Link</button>
                   ${currentUser?.role === 'superadmin' ? `<button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>
                   <button class="btn btn-sm btn-danger" onclick="deleteLead(${l.id})">X</button>` : ''}
@@ -1641,6 +1642,7 @@ async function toggleCampaignLeads(id) {
                       <button class="btn btn-sm btn-outline" onclick="aiScoreLead(${l.id}, ${id})" title="Re-score with BANT reasoning">Score</button>
                       <button class="btn btn-sm btn-outline" onclick="aiQualifyLead(${l.id}, ${id})" title="Qualify lead">Qualify</button>
                       <button class="btn btn-sm btn-outline" onclick="aiOutreach(${l.id}, ${id})" title="Write outreach for this lead">Outreach</button>
+                      <button class="btn btn-sm btn-outline" onclick="logReply(${l.id}, ${id})" title="They replied? Paste it here">Reply</button>
                       <button class="btn btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none" onclick="shareCallLink(${l.id})" title="Share voice call link">&#128279; Call</button>
                       ${currentUser?.role === 'superadmin' ? `<button class="btn btn-sm btn-outline" onclick="showLeadModal(${l.id})">Edit</button>` : ''}
                     </div>
@@ -1741,6 +1743,62 @@ async function aiAutoOutreach(campaignId) {
   } catch (e) {
     showNotification('Error: ' + e.message, 'error');
   }
+}
+
+// ===== Replies =====
+// Replies arrive in the user's own inbox (outreach is sent with their
+// reply-to). Pasting one here stops every sequence to that person, labels it,
+// and drafts an answer to approve.
+const REPLY_LABELS = {
+  interested: ['active', 'Interested'], referral: ['draft', 'Referral'], not_now: ['paused', 'Not now'],
+  not_interested: ['paused', 'Not interested'], opt_out: ['paused', 'Opt-out'], out_of_office: ['draft', 'Out of office'], question: ['draft', 'Question'],
+};
+
+function logReply(leadId, campaignId) {
+  modal = {
+    title: 'Log a reply',
+    body: `
+      <p class="text-sm text-muted" style="margin:0 0 10px">Paste their reply. Their follow-ups stop in every campaign, the agent labels it and drafts an answer for you to check.</p>
+      <div class="form-group"><textarea id="rp-text" style="min-height:160px" maxlength="10000" placeholder="Paste the reply here"></textarea></div>`,
+    saveLabel: 'Read reply',
+    onSave: async () => {
+      const text = document.getElementById('rp-text').value;
+      const r = await api.post(`/leads/${leadId}/reply`, { text });
+      showReplyResult(leadId, campaignId, r);
+    },
+  };
+  render();
+}
+
+function showReplyResult(leadId, campaignId, r) {
+  const [badge, label] = REPLY_LABELS[r.intent] || ['draft', r.intent];
+  const action = r.intent === 'opt_out' ? 'Removed from every campaign and added to your do-not-email list.'
+    : r.intent === 'out_of_office' ? 'Auto-reply: their sequence carries on.'
+    : `${r.sequences_stopped} scheduled or draft message${r.sequences_stopped === 1 ? '' : 's'} cancelled.`;
+  modal = {
+    title: 'Reply read',
+    body: `
+      <p><span class="badge badge-${badge}">${esc(label)}</span> <span class="text-sm text-muted">${Math.round((r.confidence || 0) * 100)}% sure</span></p>
+      ${r.summary ? `<p class="text-sm">${esc(r.summary)}</p>` : ''}
+      <p class="text-sm text-muted">${esc(action)}${r.next_step ? ` Next: ${esc(r.next_step)}` : ''}</p>
+      ${r.referral?.name ? `<p class="text-sm"><strong>Referred to:</strong> ${esc(r.referral.name)}${r.referral.role ? ` (${esc(r.referral.role)})` : ''} — a task was added to find and verify them.</p>` : ''}
+      ${r.suggested_reply ? `
+        <div class="form-group"><label>Subject</label><input id="rp-subject" value="${esc(r.suggested_reply.subject || '')}" maxlength="200"></div>
+        <div class="form-group"><label>Suggested answer — edit before sending</label><textarea id="rp-body" style="min-height:180px">${esc(r.suggested_reply.body || '')}</textarea></div>` : ''}`,
+    ...(r.suggested_reply ? {
+      saveLabel: 'Send answer',
+      onSave: async () => {
+        await api.post(`/leads/${leadId}/send-reply`, {
+          subject: document.getElementById('rp-subject').value,
+          body: document.getElementById('rp-body').value,
+        });
+        modal = null;
+        showNotification('Answer sent.', 'success');
+        if (campaignId) { toggleCampaignLeads(campaignId); toggleCampaignLeads(campaignId); } else render();
+      },
+    } : {}),
+  };
+  render();
 }
 
 // ===== Outreach approval queue =====

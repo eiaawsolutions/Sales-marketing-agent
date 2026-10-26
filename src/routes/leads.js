@@ -3,6 +3,7 @@ import { leadsService, maskLeads, maskLead } from '../services/leads.js';
 import { runAgent } from '../services/ai-agent.js';
 import { checkPlanLimit } from '../middleware/auth.js';
 import db from '../db/index.js';
+import { handleReply, sendReply } from '../services/replies.js';
 
 const router = Router();
 
@@ -111,6 +112,36 @@ router.post('/:id/outreach', async (req, res) => {
       valueProposition: req.body.valueProposition,
     });
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/leads/:id/reply — log a prospect's reply (pasted from the inbox):
+// stops their sequences, labels the intent, drafts an answer.
+router.post('/:id/reply', async (req, res) => {
+  try {
+    const lead = requireOwnedLead(req, res);
+    if (!lead) return;
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (!text) return res.status(400).json({ error: 'Paste the reply text.' });
+    checkPlanLimit(req, 'ai_action');
+    res.json(await handleReply({ userId: lead.user_id, lead, text: text.slice(0, 10000) }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/leads/:id/send-reply — send the answer the user approved
+router.post('/:id/send-reply', async (req, res) => {
+  try {
+    const lead = requireOwnedLead(req, res);
+    if (!lead) return;
+    const body = typeof req.body?.body === 'string' ? req.body.body.trim() : '';
+    if (!body) return res.status(400).json({ error: 'The reply is empty.' });
+    const r = await sendReply({ userId: lead.user_id, lead, subject: req.body?.subject, body });
+    if (r.error) return res.status(r.status).json({ error: r.error });
+    res.json(r);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
