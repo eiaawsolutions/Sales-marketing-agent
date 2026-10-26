@@ -7,6 +7,7 @@ import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
 import { generateMeetLink, sendCalendarInviteEmail } from './appointments.js';
 import { GIT_SHA } from '../version.js';
+import { verifyRetell } from '../services/ingest-auth.js';
 
 const router = Router();
 
@@ -38,10 +39,39 @@ async function retellAPI(apiKey, endpoint, method = 'GET', body = null) {
   return data;
 }
 
-// --- Webhook routes (NO auth — called by Retell) ---
+// --- Webhook routes (no user session — called by Retell, signature-checked) ---
+
+// Calls with no lead (website visitors) belong to EIAAW's own account, the same
+// convention as FOUNDER_ID in routes/forms.js.
+const EIAAW_ACCOUNT_ID = 1;
+
+// Retell signs both routes below with X-Retell-Signature over the raw body, so
+// server.js mounts express.raw() on them and req.body arrives as a Buffer.
+// Unsigned, both were open to anyone: a forged tool call read back any lead's
+// email address and emailed them, and a forged webhook rewrote lead status and
+// created appointments in any account.
+function requireRetellSignature(req, res, next) {
+  if (!Buffer.isBuffer(req.body)) return res.status(400).json({ error: 'Expected a JSON body' });
+  const check = verifyRetell(getVoiceConfig().apiKey, req.body, req.headers['x-retell-signature']);
+  if (!check.ok) {
+    console.warn(`[voice] rejected ${req.path}: ${check.reason}`);
+    return res.status(check.status).json({ error: check.status === 503 ? 'Voice not configured' : 'Invalid signature' });
+  }
+  try { req.body = JSON.parse(req.body.toString('utf8')); } catch { return res.status(400).json({ error: 'Invalid JSON' }); }
+  next();
+}
+
+// The account a call acts for is the lead's owner. Never taken from the call
+// metadata: it is only as trustworthy as whoever created the call.
+function leadForCall(metadata) {
+  const leadId = metadata?.lead_id ? parseInt(metadata.lead_id, 10) : null;
+  if (!Number.isInteger(leadId)) return { lead: null, userId: EIAAW_ACCOUNT_ID };
+  const lead = db.prepare('SELECT id, user_id, name, company, email FROM leads WHERE id = ?').get(leadId) || null;
+  return { lead, userId: lead ? lead.user_id : EIAAW_ACCOUNT_ID };
+}
 
 // POST /api/voice/webhook — Retell webhook for call events
-router.post('/webhook', async (req, res) => {
+router.post('/webhook', requireRetellSignature, async (req, res) => {
   try {
     const event = req.body;
     const callId = event.call?.call_id || event.call_id;
@@ -49,7 +79,8 @@ router.post('/webhook', async (req, res) => {
 
     if (eventType === 'call_ended' || eventType === 'call_analyzed') {
       const metadata = event.call?.metadata || {};
-      const leadId = metadata.lead_id ? parseInt(metadata.lead_id) : null;
+      const { lead: callLead, userId: ownerId } = leadForCall(metadata);
+      const leadId = callLead?.id || null;
 
       const duration = event.call?.end_timestamp && event.call?.start_timestamp
         ? Math.round((event.call.end_timestamp - event.call.start_timestamp) / 1000)
@@ -85,12 +116,10 @@ router.post('/webhook', async (req, res) => {
           const existingAppt = db.prepare('SELECT id FROM appointments WHERE call_id = ?').get(callId);
           if (!existingAppt) {
             // Create a placeholder appointment — the tool-callback may have already created one
-            const userId = metadata.user_id ? parseInt(metadata.user_id) : 1;
-            const lead = db.prepare('SELECT name FROM leads WHERE id = ?').get(leadId);
             db.prepare(
               `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, call_id, status)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-            ).run(leadId, userId, `Follow-up with ${lead?.name || 'Lead'}`,
+            ).run(leadId, ownerId, `Follow-up with ${callLead.name || 'Lead'}`,
               new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // Default 3 days out
               15, 'demo', `Auto-created from voice call. Summary: ${callSummary}`, callId, 'scheduled');
           }
@@ -106,15 +135,15 @@ router.post('/webhook', async (req, res) => {
 });
 
 // POST /api/voice/tool-callback — Retell tool callback dispatcher
-router.post('/tool-callback', async (req, res) => {
+router.post('/tool-callback', requireRetellSignature, async (req, res) => {
   try {
     // Retell sends: { tool_call_id, name, args, call } or { tool_name, arguments, call_id, metadata }
     const toolName = req.body.name || req.body.tool_name || req.body.tool_call_name || '';
     const args = req.body.args || req.body.arguments || {};
     const callId = req.body.call_id || req.body.call?.call_id || '';
     const metadata = req.body.call?.metadata || req.body.metadata || {};
-    const leadId = metadata.lead_id ? parseInt(metadata.lead_id) : null;
-    const userId = metadata.user_id ? parseInt(metadata.user_id) : 1;
+    const { lead: callLead, userId } = leadForCall(metadata);
+    const leadId = callLead?.id || null;
 
     // Log the dispatch with PII-bounded args (truncate, no full transcripts).
     // Previously dumped JSON.stringify(req.body, null, 2) — full call objects
@@ -218,7 +247,9 @@ async function handleSendOverview(args, callId, leadId, userId, res) {
       .run(userId, leadId, 'email', `Sent product overview email to ${lead.email}`);
   }
 
-  res.json({ result: `Done! I've just sent a quick overview to ${lead.email}. They should see it in their inbox shortly.` });
+  // The caller is a voice session, not the account owner: confirm without
+  // reading the address back.
+  res.json({ result: "Done! I've just sent a quick overview to the email address we have on file. It should arrive shortly." });
 }
 
 async function handleSendDemoLink(args, callId, leadId, userId, res) {
@@ -242,7 +273,7 @@ async function handleSendDemoLink(args, callId, leadId, userId, res) {
       .run(userId, leadId, 'email', `Sent interactive demo link to ${lead.email}`);
   }
 
-  res.json({ result: `I've sent an interactive demo link to ${lead.email}. It's a self-guided walkthrough they can explore at their own pace.` });
+  res.json({ result: "I've sent an interactive demo link to the email address we have on file. It's a self-guided walkthrough they can explore at their own pace." });
 }
 
 // --- Email helpers ---

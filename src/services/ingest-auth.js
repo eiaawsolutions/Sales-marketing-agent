@@ -217,4 +217,25 @@ export function verifyGoogleAds(secret, parsedBody) {
   return { ok: true };
 }
 
+// Retell (voice): `X-Retell-Signature: v=<unix ms>,d=<64 hex>`, HMAC-SHA256
+// keyed with the Retell API key over the raw body followed directly by the
+// timestamp string — the construction in retell-sdk's lib/webhook_auth.ts.
+// Retell signs call webhooks and custom-function (tool) calls the same way.
+export function signRetell(apiKey, rawBody, timestamp = Date.now()) {
+  const digest = crypto.createHmac('sha256', apiKey).update(rawBody).update(String(timestamp)).digest('hex');
+  return `v=${timestamp},d=${digest}`;
+}
+
+export function verifyRetell(apiKey, rawBody, header, now = Date.now()) {
+  if (!apiKey || apiKey.startsWith('enc:')) return { ok: false, status: 503, reason: 'Retell API key not configured' };
+  const m = /^v=(\d+),d=([0-9a-f]{64})$/i.exec(String(header || '').trim());
+  if (!m) return { ok: false, status: 401, reason: 'missing or malformed X-Retell-Signature' };
+  if (Math.abs(now - Number(m[1])) > REPLAY_WINDOW_SECONDS * 1000) {
+    return { ok: false, status: 401, reason: 'timestamp outside replay window' };
+  }
+  const expected = crypto.createHmac('sha256', apiKey).update(rawBody).update(m[1]).digest('hex');
+  if (!timingSafeEqualHex(expected, m[2].toLowerCase())) return { ok: false, status: 401, reason: 'signature mismatch' };
+  return { ok: true };
+}
+
 export const __testing = { parseSignatureHeader, timingSafeEqualHex, timingSafeEqualStr };

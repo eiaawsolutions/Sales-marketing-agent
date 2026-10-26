@@ -97,6 +97,10 @@ app.use('/api/ingest', express.raw({ type: '*/*', limit: '512kb' }));
 // Resend delivery webhooks are Svix-signed over the raw bytes too.
 app.use('/api/tracking/webhook', express.raw({ type: 'application/json', limit: '256kb' }));
 
+// Retell signs its call webhook and custom-function (tool) calls over the raw
+// bytes as well; routes/voice.js verifies X-Retell-Signature, then parses.
+app.use(['/api/voice/webhook', '/api/voice/tool-callback'], express.raw({ type: '*/*', limit: '1mb' }));
+
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
