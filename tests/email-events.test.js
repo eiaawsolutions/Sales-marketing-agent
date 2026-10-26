@@ -171,6 +171,18 @@ test('a bounce marks the send bounced and cancels that lead\'s pending follow-up
   assert.equal(db.prepare('SELECT status FROM outreach_queue').get().status, 'skipped');
 });
 
+test('a hard bounce stops every campaign in the account from emailing that address again', async () => {
+  addUser(1); addLead(10, 1, 'jane@example.com'); addCampaign(1, 1); addCampaign(3, 1);
+  addSent(1, 10, 'em_1'); addPendingFollowUp(3, 10);
+  await withServer(async (url) => {
+    const body = event('email.bounced', 'em_1', 'jane@example.com');
+    assert.equal((await post(url, body, signed(body))).status, 200);
+  });
+  assert.ok(unsub.isSuppressed(1, 'jane@example.com'), 'on the do-not-email list');
+  assert.equal(db.prepare('SELECT reason FROM email_suppressions').get().reason, 'bounce');
+  assert.equal(db.prepare('SELECT status FROM outreach_queue WHERE campaign_id = 3').get().status, 'skipped', 'the other campaign is stopped too');
+});
+
 test('events for mail this app did not send as outreach are ignored', async () => {
   addUser(1); addLead(10, 1, 'jane@example.com'); addCampaign(1, 1); addSent(1, 10, 'em_1');
   await withServer(async (url) => {

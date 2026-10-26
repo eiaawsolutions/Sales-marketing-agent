@@ -54,11 +54,15 @@ export function recordEmailEvent(event) {
       return 'clicked';
     }
 
-    // Resend sends email.bounced only for permanent rejections, so further
-    // follow-ups in this campaign would bounce too and hurt sender reputation.
+    // Resend sends email.bounced only for permanent rejections: the address is
+    // dead for every campaign in the account, and each further send would hurt
+    // sender reputation. Suppressing it (which also cancels drafts and
+    // scheduled follow-ups account-wide) keeps it off every future list.
     case 'email.bounced': {
       db.prepare("UPDATE campaign_leads SET status = 'bounced' WHERE campaign_id = ? AND lead_id = ? AND status = 'sent'").run(campaignId, leadId);
-      db.prepare("UPDATE outreach_queue SET status = 'skipped' WHERE campaign_id = ? AND lead_id = ? AND status = 'pending'").run(campaignId, leadId);
+      const email = send.lead_email || (Array.isArray(event.data.to) ? event.data.to[0] : event.data.to);
+      if (email) suppress({ userId, email, reason: 'bounce', campaignId, leadId });
+      else db.prepare("UPDATE outreach_queue SET status = 'skipped' WHERE campaign_id = ? AND lead_id = ? AND status IN ('draft', 'pending')").run(campaignId, leadId);
       return 'bounced';
     }
 
