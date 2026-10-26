@@ -1,5 +1,8 @@
 import db from '../db/index.js';
 import { runAgent } from './ai-agent.js';
+import { loadPlanUser, checkPlanLimitForUser, remainingMonthlyAiLeads } from '../middleware/auth.js';
+
+const LEADS_PER_LAUNCH = 10;
 
 /**
  * Fully automated campaign pipeline.
@@ -29,17 +32,28 @@ export async function launchCampaignPipeline(userId, campaignId) {
     // Update campaign to active
     db.prepare("UPDATE campaigns SET status = 'active' WHERE id = ?").run(campaignId);
 
+    // Plan rules apply to Launch exactly as to the individual buttons. Launch
+    // used to check only the AI-action allowance, so Starter accounts got lead
+    // search and auto-outreach, and no run respected the monthly lead cap.
+    const owner = loadPlanUser(campaign.user_id);
+    const planBlock = (resource) => {
+      try { checkPlanLimitForUser(owner, resource); return null; } catch (e) { return e.message; }
+    };
+
     // Step 1: Generate leads if needed
     const existingLeadCount = db.prepare('SELECT COUNT(*) as c FROM campaign_leads WHERE campaign_id = ?').get(campaignId).c;
+    const leadBlock = planBlock('auto_leads') || planBlock('ai_leads_per_month');
 
-    if (campaign.target_audience && existingLeadCount === 0) {
+    if (campaign.target_audience && existingLeadCount === 0 && leadBlock) {
+      updateStatus('running', `Step 1: Skipped — ${leadBlock}`);
+    } else if (campaign.target_audience && existingLeadCount === 0) {
       updateStatus('running', 'Step 1: Generating leads...');
       try {
-        const leadResult = await runAgent(userId, 'generate_leads', {
+        const leadResult = await runAgent(campaign.user_id, 'generate_leads', {
           campaignId,
           campaignName: campaign.name,
           targetAudience: campaign.target_audience,
-          count: 10,
+          count: Math.min(LEADS_PER_LAUNCH, remainingMonthlyAiLeads(owner)),
         });
         const newCount = db.prepare('SELECT COUNT(*) as c FROM campaign_leads WHERE campaign_id = ?').get(campaignId).c;
         const provider = leadResult?.sourceProvider === 'apollo' ? 'Apollo' : 'AI Web Search';
@@ -65,7 +79,7 @@ export async function launchCampaignPipeline(userId, campaignId) {
       let scored = 0;
       for (const lead of unscoredLeads.slice(0, 15)) { // Cap at 15 to control costs
         try {
-          await runAgent(userId, 'score_lead', { leadId: lead.id });
+          await runAgent(campaign.user_id, 'score_lead', { leadId: lead.id });
           scored++;
         } catch (e) {
           // Continue scoring others if one fails
@@ -80,7 +94,7 @@ export async function launchCampaignPipeline(userId, campaignId) {
     if (!campaign.body && campaign.type === 'email') {
       updateStatus('running', 'Step 3: Generating email content...');
       try {
-        const content = await runAgent(userId, 'generate_email', {
+        const content = await runAgent(campaign.user_id, 'generate_email', {
           audience: campaign.target_audience || 'general',
           subject: campaign.subject || campaign.name,
           purpose: 'promotional',
@@ -100,10 +114,14 @@ export async function launchCampaignPipeline(userId, campaignId) {
     // Step 4 + 5: Generate outreach sequences and send Step 1
     const leadsForOutreach = db.prepare('SELECT COUNT(*) as c FROM campaign_leads WHERE campaign_id = ?').get(campaignId).c;
 
-    if (leadsForOutreach > 0) {
+    const outreachBlock = planBlock('auto_outreach');
+
+    if (leadsForOutreach > 0 && outreachBlock) {
+      updateStatus('running', `Step 4: Skipped — ${outreachBlock}`);
+    } else if (leadsForOutreach > 0) {
       updateStatus('running', `Step 4: Generating outreach sequences for ${leadsForOutreach} leads...`);
       try {
-        const outreachResult = await runAgent(userId, 'auto_outreach', { campaignId });
+        const outreachResult = await runAgent(campaign.user_id, 'auto_outreach', { campaignId });
         const sent = outreachResult?.immediatelySent || outreachResult?.leadsProcessed || 0;
         updateStatus('running', `Step 4: Outreach created — ${sent} first emails sent`);
       } catch (e) {

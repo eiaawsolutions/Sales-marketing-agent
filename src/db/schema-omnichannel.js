@@ -139,7 +139,7 @@ function rebuildLeadsForOmnichannel(db) {
 // ---------------------------------------------------------------------------
 // 2. Additive columns on leads.
 //
-// `source` (free text) stays — checkPlanLimit() counts `source = 'ai_generated'`
+// `source` (free text) stays — checkPlanLimit() counts `source IN ('ai_generated','apollo')`
 // and campaigns/UI read it. `source_id` is the new first-class FK. We keep both
 // deliberately rather than break the plan-limit query.
 //

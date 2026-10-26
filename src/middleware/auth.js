@@ -123,6 +123,19 @@ export function getPlanLimits(plan) {
   return PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
 }
 
+function monthlyAiLeadsUsed(userId) {
+  return db.prepare(
+    "SELECT COUNT(*) as c FROM leads WHERE user_id = ? AND source IN ('ai_generated', 'apollo') AND created_at >= datetime('now', 'start of month')"
+  ).get(userId).c;
+}
+
+// How many verified leads this account may still source this month. Callers
+// cap a run's request to it so one run cannot overshoot the allowance.
+export function remainingMonthlyAiLeads(user) {
+  if (user.role === 'superadmin') return Infinity;
+  return Math.max(0, getPlanLimits(user.plan).ai_leads_per_month - monthlyAiLeadsUsed(user.id));
+}
+
 // Check if user is within plan limits for a resource.
 //
 // `req`-bound wrapper kept for every existing caller. The user-object form below
@@ -200,13 +213,12 @@ export function checkPlanLimitForUser(user, resource) {
       return true;
     }
     case 'ai_leads_per_month': {
-      // Counts verified AI-generated leads this calendar month. Starter gets 30,
-      // Pro 70, Business 140, Enterprise effectively unlimited. Driven by the
-      // real web-search cost of ~RM 0.95 per verified lead.
-      const count = db.prepare(
-        "SELECT COUNT(*) as c FROM leads WHERE user_id = ? AND source = 'ai_generated' AND created_at >= datetime('now', 'start of month')"
-      ).get(userId);
-      if (count.c >= limits.ai_leads_per_month) {
+      // Verified leads sourced this calendar month: Starter 30, Pro 70,
+      // Business 140, Enterprise effectively unlimited. Both sources count —
+      // web search ('ai_generated') and the contact database ('apollo').
+      // Apollo leads used to be left out, so the allowance never bit on the
+      // primary path.
+      if (monthlyAiLeadsUsed(userId) >= limits.ai_leads_per_month) {
         throw new Error(`AI lead generation limit reached (${limits.ai_leads_per_month}/month on ${user.plan} plan). Upgrade for a higher cap.`);
       }
       return true;

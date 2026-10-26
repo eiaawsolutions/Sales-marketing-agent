@@ -103,6 +103,27 @@ export function isFreemailDomain(domain) {
   return typeof domain === 'string' && FREEMAIL.has(domain);
 }
 
+// Shared team inboxes. A lead must be a person: if all we can find for a
+// company is hr@ or info@, the personal address would have to be guessed, and
+// the lead contract forbids guessing. Matched on the whole local part, so
+// "hrishikesh@" or "info.sales.lead@" are not caught.
+const ROLE_LOCAL_PARTS = new Set([
+  'admin', 'administrator', 'office', 'info', 'information', 'contact', 'contactus', 'hello', 'hi', 'team', 'mail',
+  'enquiry', 'enquiries', 'inquiry', 'inquiries', 'general', 'reception', 'frontdesk',
+  'sales', 'marketing', 'support', 'help', 'helpdesk', 'service', 'services', 'customerservice', 'cs', 'care',
+  'hr', 'humanresources', 'people', 'talent', 'careers', 'career', 'jobs', 'recruitment', 'recruiting', 'hiring', 'training', 'learning',
+  'finance', 'accounts', 'account', 'billing', 'invoice', 'invoices', 'payments', 'procurement', 'purchasing',
+  'media', 'press', 'pr', 'news', 'events', 'partnerships', 'legal', 'compliance', 'privacy', 'dpo',
+  'noreply', 'no-reply', 'donotreply', 'do-not-reply', 'postmaster', 'webmaster', 'abuse', 'test',
+]);
+
+export function isRoleMailbox(email) {
+  if (typeof email !== 'string') return false;
+  const at = email.lastIndexOf('@');
+  if (at <= 0) return false;
+  return ROLE_LOCAL_PARTS.has(email.slice(0, at).trim().toLowerCase());
+}
+
 // Bound every free-text field before it reaches the DB or a prompt.
 export function clampText(value, max) {
   if (value === null || value === undefined) return null;

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import db from '../db/index.js';
 import { campaignsService } from '../services/campaigns.js';
 import { runAgent, getAICostStats, getAICostByCampaign, getAICostLog, getOutreachQueue } from '../services/ai-agent.js';
-import { checkPlanLimit } from '../middleware/auth.js';
+import { checkPlanLimit, remainingMonthlyAiLeads } from '../middleware/auth.js';
 import { maskLeads, maskLead } from '../services/leads.js';
 
 const router = Router();
@@ -282,9 +282,10 @@ router.post('/:id/generate-leads', async (req, res) => {
     const campaign = campaignsService.getById(userId, req.params.id);
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
 
-    const result = await runAgent(req.user.id, 'generate_leads', {
+    const result = await runAgent(campaign.user_id, 'generate_leads', {
       campaignId: campaign.id, campaignName: campaign.name,
-      targetAudience: campaign.target_audience, count: req.body.count || 5,
+      targetAudience: campaign.target_audience,
+      count: Math.min(parseInt(req.body.count, 10) || 5, remainingMonthlyAiLeads(req.user)),
     });
     res.json(result);
   } catch (err) {

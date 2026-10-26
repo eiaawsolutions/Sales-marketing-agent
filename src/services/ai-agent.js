@@ -4,7 +4,7 @@ import db from '../db/index.js';
 import { decrypt } from '../utils/crypto.js';
 import { isApolloConfigured, searchPeople, enrichPerson, describeApolloSource, detectHotSignal } from './apollo.js';
 import { leadSourcesService } from './lead-sources.js';
-import { normalizePhone } from '../utils/normalize.js';
+import { normalizePhone, isRoleMailbox } from '../utils/normalize.js';
 import { DEFAULT_MODEL, resolveModel } from '../config/models.js';
 
 function getSettings() {
@@ -812,6 +812,18 @@ ${input.ctaUrl || landingUrl ? `IMPORTANT: Include the URL "${input.ctaUrl || la
   return result;
 }
 
+// email → lead id for one account's leads that have an email. Leads may have
+// no email at all (phone-only form fills, LinkedIn-only imports); mapping
+// those with r.email.toLowerCase() threw and took lead search down for the
+// whole account.
+function ownEmailIndex(userId) {
+  const rows = db.prepare(`
+    SELECT id, COALESCE(email_normalized, lower(trim(email))) AS e
+      FROM leads WHERE user_id = ? AND COALESCE(email_normalized, email) IS NOT NULL
+  `).all(userId);
+  return new Map(rows.filter(r => r.e).map(r => [r.e, r.id]));
+}
+
 async function generateLeadsTask(input) {
   // Apollo is the primary source when configured. Two distinct outcomes:
   //  - Apollo errors (auth/network/quota) → propagate the error so the user
@@ -847,8 +859,7 @@ async function generateLeadsViaAI(input) {
 
   // Only dedup within THIS user's leads — each user owns their own lead database.
   // A lead existing under user A must not block user B from getting the same email.
-  const userLeads = db.prepare('SELECT id, email FROM leads WHERE user_id = ?').all(leadUserId);
-  const userEmailToId = new Map(userLeads.map(r => [r.email.toLowerCase(), r.id]));
+  const userEmailToId = ownEmailIndex(leadUserId);
   const existingEmails = Array.from(userEmailToId.keys());
 
   // Capture the search count so we can enforce "the model actually browsed" after the call.
@@ -1004,7 +1015,7 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
     if (!email) return { ok: false, reason: 'no public email found' };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: 'malformed email' };
     if (email.endsWith('@noemail.leads.local')) return { ok: false, reason: 'pseudo-email (no real public email)' };
-    if (/^(test|admin|info|contact|hello|sales|support|noreply|no-reply)@/.test(email)) {
+    if (isRoleMailbox(email)) {
       return { ok: false, reason: `generic mailbox (${email}) — need a person's email, not a role address` };
     }
     return { ok: true };
@@ -1211,8 +1222,7 @@ async function generateLeadsViaApollo(input) {
     throw new Error('Target audience is required for Apollo lead generation. Set the target_audience on the campaign.');
   }
 
-  const userLeads = db.prepare('SELECT id, email FROM leads WHERE user_id = ?').all(leadUserId);
-  const userEmailToId = new Map(userLeads.map(r => [r.email.toLowerCase(), r.id]));
+  const userEmailToId = ownEmailIndex(leadUserId);
 
   // Step A — translate the free-text audience into Apollo filters.
   const filters = await translateAudienceToApolloFilters(targetAudience, campaignName, numLeads);
@@ -1291,6 +1301,10 @@ async function generateLeadsViaApollo(input) {
     // Server-side verification gate — same contract as the AI path.
     if (!realEmail || emailStatus !== 'verified') {
       rejected.push({ name: enriched?.name || person.name, reason: `email not verified (status: ${emailStatus || 'none'})` });
+      continue;
+    }
+    if (isRoleMailbox(realEmail)) {
+      rejected.push({ name: enriched?.name || person.name, reason: `generic mailbox (${realEmail}) — need a person's email, not a role address` });
       continue;
     }
     if (!/^https?:\/\//i.test(linkedinUrl) && !/^https?:\/\//i.test(websiteUrl)) {
