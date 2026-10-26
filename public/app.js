@@ -1476,6 +1476,7 @@ async function toggleCampaignLeads(id) {
       // Count outreach stats
       const outreachSent = outreachQueue.filter(q => q.status === 'sent').length;
       const outreachPending = outreachQueue.filter(q => q.status === 'pending').length;
+      const outreachDrafts = outreachQueue.filter(q => q.status === 'draft').length;
       const leadsWithOutreach = new Set(outreachQueue.map(q => q.lead_id)).size;
 
       panel.innerHTML = `
@@ -1556,11 +1557,12 @@ async function toggleCampaignLeads(id) {
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
                 <span class="text-sm">
                   <strong>Outreach:</strong>
+                  ${outreachDrafts ? `<span class="badge badge-paused">${outreachDrafts} need approval</span>` : ''}
+                  <span class="badge badge-draft">${outreachPending} scheduled</span>
                   <span class="badge badge-active">${outreachSent} sent</span>
-                  <span class="badge badge-draft">${outreachPending} pending</span>
                   &nbsp;for ${leadsWithOutreach} leads
                 </span>
-                <button class="btn btn-sm btn-outline" onclick="showOutreachQueue(${id})">View Full Queue</button>
+                <button class="btn btn-sm ${outreachDrafts ? 'btn-success' : 'btn-outline'}" onclick="showOutreachQueue(${id})">${outreachDrafts ? 'Review &amp; approve' : 'View queue'}</button>
               </div>
             </div>
           ` : ''}
@@ -1613,14 +1615,16 @@ async function aiGenerateLeads(campaignId) {
 
 // AI Auto-Outreach
 async function aiAutoOutreach(campaignId) {
-  if (!confirm('AI will generate a personalized outreach sequence for every lead in this campaign and send Step 1 immediately.\n\nContinue?')) return;
+  if (!confirm('AI will write a personalised email sequence (Day 0, 3 and 7) for every lead in this campaign.\n\nIf approval is on (Brief → Sending), nothing is sent until you approve it.\n\nContinue?')) return;
 
-  showNotification('AI is generating outreach sequences for all leads...');
+  showNotification('AI is writing outreach sequences for all leads...');
 
   try {
     const result = await api.post(`/campaigns/${campaignId}/auto-outreach`);
     showNotification(
-      `Outreach started! ${result.leadsProcessed} leads, ${result.totalSteps} steps queued, ${result.immediatelySent} Step 1 messages sent.`,
+      result.approvalRequired
+        ? `${result.drafted} messages drafted for ${result.leadsProcessed} leads — review and approve them in the campaign's approval queue.`
+        : `${result.queued} messages queued for ${result.leadsProcessed} leads — Day-0 emails are sending now.`,
       'success'
     );
 
@@ -1635,51 +1639,123 @@ async function aiAutoOutreach(campaignId) {
   }
 }
 
-// View outreach queue for a campaign
+// ===== Outreach approval queue =====
+// The agent drafts; a person approves. Drafts never send. Approving a lead's
+// sequence schedules Day 0 now and the follow-ups from that moment.
+const outreachQueueCache = {};
+const OUTREACH_STATUS = {
+  draft: ['paused', 'needs approval'], pending: ['draft', 'scheduled'], sending: ['draft', 'sending'],
+  sent: ['active', 'sent'], skipped: ['paused', 'skipped'], failed: ['paused', 'failed'],
+};
+
+// Message bodies are HTML written by the AI; show them as text so nothing in
+// them can run in the app.
+function outreachPreview(html, max = 400) {
+  const text = String(html || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  return esc(text.length > max ? text.slice(0, max) + '…' : text).replace(/\n/g, '<br>');
+}
+
 async function showOutreachQueue(campaignId) {
-  showNotification('Loading outreach queue...');
   try {
     const queue = await api.get(`/campaigns/${campaignId}/outreach-queue`);
+    outreachQueueCache[campaignId] = queue;
 
     if (!queue.length) {
-      showNotification('No outreach queued yet. Click Auto-Outreach first.', 'error');
+      showNotification('No outreach yet. Use Auto-Outreach or Launch to draft it.', 'error');
       return;
     }
 
-    // Group by lead
     const byLead = {};
     for (const item of queue) {
-      if (!byLead[item.lead_id]) byLead[item.lead_id] = { name: item.lead_name, email: item.lead_email, company: item.lead_company, steps: [] };
+      if (!byLead[item.lead_id]) byLead[item.lead_id] = { id: item.lead_id, name: item.lead_name, email: item.lead_email, company: item.lead_company, steps: [] };
       byLead[item.lead_id].steps.push(item);
     }
+    const draftCount = queue.filter(q => q.status === 'draft').length;
 
-    const body = Object.values(byLead).map(lead => `
+    const body = Object.values(byLead).map(lead => {
+      const hasDraft = lead.steps.some(s => s.status === 'draft');
+      const open = lead.steps.some(s => s.status === 'draft' || s.status === 'pending');
+      return `
       <div class="content-card" style="margin-bottom:12px">
-        <div class="type" style="margin-bottom:8px">${esc(lead.name)} — ${esc(lead.company || lead.email)}</div>
-        ${lead.steps.map(s => `
-          <div class="outreach-step ${s.status}">
-            <div class="outreach-step-header">
-              <span class="outreach-step-num">${s.step}</span>
-              <span class="badge badge-${s.status === 'sent' ? 'active' : s.status === 'pending' ? 'draft' : 'paused'}">${s.status}</span>
-              <span class="text-sm">${s.channel}</span>
-              <span class="text-muted text-sm">${s.delay_days === 0 ? 'Immediate' : `Day ${s.delay_days}`}</span>
-            </div>
-            ${s.subject ? `<div class="text-sm" style="margin:4px 0"><strong>Subject:</strong> ${s.subject}</div>` : ''}
-            <div class="text-sm" style="color:var(--text-muted);line-height:1.5">${s.message.substring(0, 200)}${s.message.length > 200 ? '...' : ''}</div>
-            ${s.goal ? `<div class="text-sm" style="margin-top:4px;color:var(--primary)">Goal: ${s.goal}</div>` : ''}
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <div class="type">${esc(lead.name)} — ${esc(lead.company || lead.email)}</div>
+          <div class="flex gap-1">
+            ${hasDraft ? `<button class="btn btn-sm btn-success" onclick="approveOutreach(${campaignId}, [${lead.id}])">Approve sequence</button>` : ''}
+            ${open ? `<button class="btn btn-sm btn-outline" onclick="skipOutreachLead(${campaignId}, ${lead.id})">Skip lead</button>` : ''}
           </div>
-        `).join('')}
-      </div>
-    `).join('');
+        </div>
+        ${lead.steps.map(s => {
+          const [badge, label] = OUTREACH_STATUS[s.status] || ['paused', s.status];
+          return `
+          <div class="outreach-step ${esc(s.status)}">
+            <div class="outreach-step-header">
+              <span class="outreach-step-num">${Number(s.step) || ''}</span>
+              <span class="badge badge-${badge}">${esc(label)}</span>
+              <span class="text-sm">${esc(s.channel)}</span>
+              <span class="text-muted text-sm">${Number(s.delay_days) === 0 ? 'Day 0' : `Day ${Number(s.delay_days)}`}</span>
+              ${s.status === 'draft' ? `<button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="editOutreachDraft(${campaignId}, ${Number(s.id)})">Edit</button>` : ''}
+            </div>
+            ${s.subject ? `<div class="text-sm" style="margin:4px 0"><strong>Subject:</strong> ${esc(s.subject)}</div>` : ''}
+            <div class="text-sm" style="color:var(--text-muted);line-height:1.5">${outreachPreview(s.message)}</div>
+            ${s.goal ? `<div class="text-sm" style="margin-top:4px;color:var(--primary)">Goal: ${esc(s.goal)}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('');
 
     modal = {
-      title: `Outreach Queue (${queue.length} steps for ${Object.keys(byLead).length} leads)`,
-      body: `<div style="max-height:60vh;overflow-y:auto">${body}</div>`,
+      title: draftCount
+        ? `Approval queue — ${draftCount} draft${draftCount === 1 ? '' : 's'} waiting`
+        : `Outreach (${queue.length} steps for ${Object.keys(byLead).length} leads)`,
+      body: `
+        <p class="text-sm text-muted" style="margin:0 0 12px">Nothing is sent until you approve it. Approving a sequence sends Day 0 now and schedules the follow-ups from today.</p>
+        <div style="max-height:60vh;overflow-y:auto">${body}</div>`,
+      ...(draftCount ? { onSave: () => approveOutreach(campaignId, null), saveLabel: `Approve all ${draftCount}` } : {}),
     };
     render();
   } catch (e) {
     showNotification('Error: ' + e.message, 'error');
   }
+}
+
+async function approveOutreach(campaignId, leadIds) {
+  if (!leadIds && !confirm('Approve every draft in this campaign? Day-0 emails start sending straight away.')) return;
+  try {
+    const r = await api.post(`/campaigns/${campaignId}/outreach/approve`, leadIds ? { leadIds } : {});
+    showNotification(`${r.approved} message${r.approved === 1 ? '' : 's'} approved — Day 0 is sending now.`, 'success');
+    await showOutreachQueue(campaignId);
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+async function skipOutreachLead(campaignId, leadId) {
+  if (!confirm('Skip this lead? Its unsent messages are cancelled. The lead stays in your list.')) return;
+  try {
+    await api.post(`/campaigns/${campaignId}/outreach/skip`, { leadIds: [leadId] });
+    showNotification('Lead skipped — it will not be contacted by this campaign.', 'success');
+    await showOutreachQueue(campaignId);
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+function editOutreachDraft(campaignId, itemId) {
+  const item = (outreachQueueCache[campaignId] || []).find(q => q.id === itemId);
+  if (!item) return;
+  modal = {
+    title: `Edit draft — step ${Number(item.step)} to ${esc(item.lead_name)}`,
+    body: `
+      <div class="form-group"><label>Subject</label><input id="od-subject" value="${esc(item.subject || '')}" maxlength="200"></div>
+      <div class="form-group"><label>Message</label><textarea id="od-message" style="min-height:220px">${esc(item.message || '')}</textarea></div>
+      <p class="text-sm text-muted">Keep the voice-call link if you want the prospect to be able to talk to your assistant.</p>`,
+    saveLabel: 'Save draft',
+    onSave: async () => {
+      await api.put(`/campaigns/${campaignId}/outreach/${itemId}`, {
+        subject: document.getElementById('od-subject').value,
+        message: document.getElementById('od-message').value,
+      });
+      showNotification('Draft saved.', 'success');
+      await showOutreachQueue(campaignId);
+    },
+  };
+  render();
 }
 
 // ===== Campaign Wizard =====
@@ -2241,7 +2317,7 @@ async function wizardSave(action) {
       showNotification(`Campaign saved & sent to ${sendResult.sent}/${sendResult.total} leads!`, 'success');
     } else if (action === 'launch' && campaign.id) {
       await api.post(`/campaigns/${campaign.id}/launch`);
-      showNotification('AI Pipeline launched! Generating leads, scoring, creating content, sending outreach...', 'success');
+      showNotification('AI Pipeline launched! Finding leads, scoring them and writing outreach...', 'success');
       setWizardState(null);
       loadCampaigns();
       // Start polling for pipeline status
@@ -2262,7 +2338,7 @@ async function wizardSave(action) {
 }
 
 async function launchPipeline(campaignId) {
-  if (!confirm('Launch the AI pipeline? This will auto-generate leads, score them, create content, and send outreach emails.')) return;
+  if (!confirm('Launch the AI pipeline? It finds verified leads, scores them and writes their outreach. With approval on, nothing is sent until you approve it.')) return;
   showNotification('Launching AI pipeline...');
   try {
     await api.post(`/campaigns/${campaignId}/launch`);
@@ -2282,7 +2358,7 @@ function pollPipelineStatus(campaignId) {
       const data = await api.get(`/campaigns/${campaignId}/pipeline-status`);
       if (data.status === 'completed') {
         clearInterval(interval);
-        showNotification('Pipeline complete! Leads generated, scored, content created, outreach sent.', 'success');
+        showNotification(data.log?.length ? data.log[data.log.length - 1].msg : 'Pipeline complete.', 'success');
         loadCampaigns();
       } else if (data.status === 'failed') {
         clearInterval(interval);

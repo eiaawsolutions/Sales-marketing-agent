@@ -6,6 +6,8 @@ import { isApolloConfigured, searchPeople, enrichPerson, describeApolloSource, d
 import { leadSourcesService } from './lead-sources.js';
 import { normalizePhone, isRoleMailbox } from '../utils/normalize.js';
 import { DEFAULT_MODEL, resolveModel } from '../config/models.js';
+import { approvalRequired } from './account-profile.js';
+import { kickDispatch } from './outreach-dispatch.js';
 
 function getSettings() {
   const rows = db.prepare('SELECT key, value FROM settings').all();
@@ -1459,7 +1461,7 @@ async function autoOutreachTask(input) {
     "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)"
   );
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  const ownerUserId = input._userId || campaign.user_id || 1;
+  const ownerUserId = campaign.user_id;
 
   for (const lead of newLeads) {
     // CSPRNG token (lead.id is implicit via the linkData payload, not the
@@ -1472,12 +1474,19 @@ async function autoOutreachTask(input) {
   }
 
   const insertStep = db.prepare(`
-    INSERT INTO outreach_queue (campaign_id, lead_id, step, channel, subject, message, goal, delay_days, scheduled_at, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+' || ? || ' days'), ?)
+    INSERT INTO outreach_queue (campaign_id, lead_id, step, channel, subject, message, goal, delay_days, scheduled_at, status, user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+' || ? || ' days'), ?, ?)
   `);
 
+  // With approval on (the default), every step is a draft until a person
+  // approves it. With it off, steps go straight to the send queue and Day 0 is
+  // dispatched now. Either way nothing is marked sent here: only the
+  // dispatcher marks a message sent, after the provider has accepted it.
+  // (Step 1 used to be recorded as sent without ever being emailed.)
+  const needsApproval = approvalRequired(campaign.user_id);
+  const initialStatus = needsApproval ? 'draft' : 'pending';
+
   let totalSteps = 0;
-  let sentCount = 0;
   const summary = [];
 
   // Process in batches of 3 to avoid token limits
@@ -1518,7 +1527,7 @@ Rules:
         const callUrl = leadCallLinks.get(lead.id);
 
         for (const step of (seq.steps || [])) {
-          const isImmediate = step.delay_days === 0 && step.step === 1;
+          const delayDays = Math.max(0, Math.min(60, parseInt(step.delay_days, 10) || 0));
 
           // Inject the real call link.
           // 1. Replace {{CALL_LINK}} placeholder if AI followed instructions.
@@ -1537,22 +1546,10 @@ Rules:
           insertStep.run(
             campaignId, lead.id, step.step, step.channel,
             step.subject || null, msg, step.goal || '',
-            step.delay_days, step.delay_days,
-            isImmediate ? 'sent' : 'pending'
+            delayDays, delayDays,
+            initialStatus, campaign.user_id
           );
           totalSteps++;
-
-          if (isImmediate) {
-            db.prepare(
-              'INSERT INTO activities (lead_id, campaign_id, type, description) VALUES (?, ?, ?, ?)'
-            ).run(lead.id, campaignId, 'email',
-              `Auto-outreach Step 1: ${step.subject || step.channel} — ${msg.substring(0, 100)}`
-            );
-            db.prepare(
-              "UPDATE campaign_leads SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE campaign_id = ? AND lead_id = ? AND status = 'pending'"
-            ).run(campaignId, lead.id);
-            sentCount++;
-          }
         }
 
         summary.push({
@@ -1566,12 +1563,19 @@ Rules:
     queueBatch();
   }
 
-  if (sentCount > 0) {
-    db.prepare('UPDATE campaigns SET status = ?, sent_count = sent_count + ? WHERE id = ?')
-      .run('active', sentCount, campaignId);
+  if (totalSteps > 0) {
+    db.prepare("UPDATE campaigns SET status = 'active' WHERE id = ? AND status IN ('draft', 'scheduled')").run(campaignId);
+    if (!needsApproval) kickDispatch(campaignId);
   }
 
-  return { leadsProcessed: summary.length, totalSteps, immediatelySent: sentCount, summary };
+  return {
+    leadsProcessed: summary.length,
+    totalSteps,
+    approvalRequired: needsApproval,
+    drafted: needsApproval ? totalSteps : 0,
+    queued: needsApproval ? 0 : totalSteps,
+    summary,
+  };
 }
 
 // Get outreach queue for a campaign (exported for routes)

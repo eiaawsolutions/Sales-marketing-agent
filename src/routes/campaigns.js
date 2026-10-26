@@ -4,6 +4,7 @@ import { campaignsService } from '../services/campaigns.js';
 import { runAgent, getAICostStats, getAICostByCampaign, getAICostLog, getOutreachQueue } from '../services/ai-agent.js';
 import { checkPlanLimit, remainingMonthlyAiLeads } from '../middleware/auth.js';
 import { maskLeads, maskLead } from '../services/leads.js';
+import { approveDrafts, skipLeads, editDraft } from '../services/outreach-queue.js';
 
 const router = Router();
 
@@ -234,9 +235,9 @@ router.patch('/:id/status', (req, res) => {
 
     db.prepare('UPDATE campaigns SET status = ? WHERE id = ?').run(next, req.params.id);
 
-    // Stopped: drain pending outreach so nothing fires after the user hit Stop.
+    // Stopped: drain drafts and scheduled outreach so nothing fires after Stop.
     if (next === 'stopped') {
-      db.prepare("UPDATE outreach_queue SET status = 'skipped' WHERE campaign_id = ? AND status = 'pending'")
+      db.prepare("UPDATE outreach_queue SET status = 'skipped' WHERE campaign_id = ? AND status IN ('draft', 'pending')")
         .run(req.params.id);
     }
 
@@ -348,6 +349,28 @@ router.get('/:id/outreach-queue', (req, res) => {
     });
   }
   res.json(queue);
+});
+
+// Approval queue. Nothing the agent drafts is sent until approved here.
+router.post('/:id/outreach/approve', (req, res) => {
+  const approved = approveDrafts({
+    campaignId: req.campaign.id, leadIds: req.body?.leadIds, itemIds: req.body?.itemIds, approvedBy: req.user.id,
+  });
+  res.json({ approved });
+});
+
+router.post('/:id/outreach/skip', (req, res) => {
+  res.json({ skipped: skipLeads({ campaignId: req.campaign.id, leadIds: req.body?.leadIds }) });
+});
+
+router.put('/:id/outreach/:itemId', (req, res) => {
+  const result = editDraft({
+    campaignId: req.campaign.id, itemId: parseInt(req.params.itemId, 10),
+    subject: req.body?.subject, message: req.body?.message,
+  });
+  if (result === 'not_found') return res.status(404).json({ error: 'Message not found' });
+  if (result === 'not_draft') return res.status(409).json({ error: 'Only drafts can be edited — this message is already approved or sent.' });
+  res.json({ ok: true });
 });
 
 router.post('/:id/send', async (req, res) => {

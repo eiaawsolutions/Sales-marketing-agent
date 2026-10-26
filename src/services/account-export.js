@@ -53,6 +53,7 @@ export function exportAccountData(db, userId) {
     data.segment_members = all('SELECT * FROM segment_members WHERE segment_id IN (SELECT id FROM segments WHERE user_id = @uid)');
   }
   if (tableExists(db, 'lead_touchpoints')) data.lead_touchpoints = all('SELECT * FROM lead_touchpoints WHERE user_id = @uid ORDER BY id');
+  if (tableExists(db, 'account_profiles')) data.account_profile = all('SELECT * FROM account_profiles WHERE user_id = @uid');
   if (tableExists(db, 'lead_sources')) {
     data.lead_sources = all('SELECT * FROM lead_sources WHERE user_id = @uid ORDER BY id').map((row) => {
       const out = {};
@@ -75,7 +76,7 @@ export function exportAccountData(db, userId) {
     account: user,
     summary,
     notes: {
-      email_suppressions: 'Your do-not-email list: recipients who unsubscribed, marked your email as spam, or were added manually. '
+      email_suppressions: 'Your do-not-email list: recipients who unsubscribed, marked your email as spam, hard-bounced, or were added manually. '
         + 'Addresses are stored only as SHA-256 hex of the address trimmed and lower-cased; hash your own list the same way to match them.',
     },
     data,

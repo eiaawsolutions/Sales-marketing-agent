@@ -12,8 +12,8 @@ const LEADS_PER_LAUNCH = 10;
  * 1. Generate leads (if target_audience set and no leads assigned)
  * 2. Score all unscored leads
  * 3. Generate email content (if body is empty)
- * 4. Generate outreach sequences + send Step 1
- * 5. Follow-ups auto-queued for scheduler (days 3, 7)
+ * 4. Draft outreach sequences (or queue them, if the account turned approval off)
+ * 5. Approved steps send via outreach-dispatch.js: Day 0 at once, days 3 and 7 by the scheduler
  */
 export async function launchCampaignPipeline(userId, campaignId) {
   const log = [];
@@ -115,15 +115,18 @@ export async function launchCampaignPipeline(userId, campaignId) {
     const leadsForOutreach = db.prepare('SELECT COUNT(*) as c FROM campaign_leads WHERE campaign_id = ?').get(campaignId).c;
 
     const outreachBlock = planBlock('auto_outreach');
+    let awaitingApproval = false;
 
     if (leadsForOutreach > 0 && outreachBlock) {
       updateStatus('running', `Step 4: Skipped — ${outreachBlock}`);
     } else if (leadsForOutreach > 0) {
       updateStatus('running', `Step 4: Generating outreach sequences for ${leadsForOutreach} leads...`);
       try {
-        const outreachResult = await runAgent(campaign.user_id, 'auto_outreach', { campaignId });
-        const sent = outreachResult?.immediatelySent || outreachResult?.leadsProcessed || 0;
-        updateStatus('running', `Step 4: Outreach created — ${sent} first emails sent`);
+        const r = await runAgent(campaign.user_id, 'auto_outreach', { campaignId });
+        awaitingApproval = !!r?.approvalRequired && r.drafted > 0;
+        updateStatus('running', awaitingApproval
+          ? `Step 4: ${r.drafted} messages drafted for ${r.leadsProcessed} leads — waiting for your approval`
+          : `Step 4: ${r?.queued || 0} messages queued for ${r?.leadsProcessed || 0} leads — first emails are sending now`);
       } catch (e) {
         updateStatus('running', `Step 4: Outreach generation failed (${e.message})`);
       }
@@ -131,9 +134,11 @@ export async function launchCampaignPipeline(userId, campaignId) {
       updateStatus('running', 'Step 4: No leads to send outreach to');
     }
 
-    // Step 5 + 6: Follow-ups are already queued in outreach_queue by autoOutreachTask
-    // The scheduler (scheduler.js) will process them at the scheduled times
-    updateStatus('completed', 'Pipeline complete — follow-ups scheduled for days 3 and 7');
+    // Step 5: approved messages are sent by outreach-dispatch.js — Day 0 at
+    // once, follow-ups on days 3 and 7 via the scheduler.
+    updateStatus('completed', awaitingApproval
+      ? 'Pipeline complete — review and approve the drafts to start sending'
+      : 'Pipeline complete — follow-ups scheduled for days 3 and 7');
 
   } catch (err) {
     updateStatus('failed', `Pipeline error: ${err.message}`);

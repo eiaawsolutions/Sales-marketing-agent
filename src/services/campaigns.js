@@ -2,6 +2,7 @@ import db from '../db/index.js';
 import { sendEmail } from '../utils/email.js';
 import { signTracking } from '../utils/tracking-token.js';
 import { isSuppressed, prepareOutreachEmail, UNSUBSCRIBE_PATH } from './unsubscribe.js';
+import { senderFor } from './account-profile.js';
 
 export const campaignsService = {
   getAll(userId, filters = {}) {
@@ -114,6 +115,7 @@ export const campaignsService = {
           subject: campaign.subject,
           html: trackedHtml,
           headers,
+          ...senderFor(campaign.user_id),
         });
 
         // Resend's id ties later webhook events (opened, bounced, complained) to this send.

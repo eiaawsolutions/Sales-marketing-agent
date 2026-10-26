@@ -9,7 +9,33 @@ import { decrypt } from './crypto.js';
  *
  * `headers` carries extra message headers, e.g. List-Unsubscribe on outreach.
  */
-export async function sendEmail({ to, subject, html, from, replyTo, attachments, icalEvent, headers }) {
+const DEFAULT_SENDER = { name: 'EIAAW SalesAgent', address: 'sales@eiaawsolutions.com' };
+
+// A display name goes inside a From header. Strip anything that could end the
+// header (CR/LF) or smuggle in a second address (quotes, angle brackets).
+export function safeDisplayName(name) {
+  return String(name || '').replace(/[\r\n"<>\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+}
+
+function addressOf(value) {
+  const s = String(value || '').trim();
+  const m = s.match(/<([^<>\s]+@[^<>\s]+)>/);
+  return m ? m[1] : s;
+}
+
+function formatFrom(name, address) {
+  const n = safeDisplayName(name);
+  return n ? `"${n}" <${address}>` : address;
+}
+
+/**
+ * `fromName` is the person/business the email is sent for (account outreach).
+ * `from` is a bare address and is only passed for a customer domain already
+ * verified for sending (account-profile.js senderFor) — any other address
+ * would fail DMARC, so without it mail goes from EIAAW's verified domain under
+ * the customer's name, with replies routed by `replyTo`.
+ */
+export async function sendEmail({ to, subject, html, from, fromName, replyTo, attachments, icalEvent, headers }) {
   // Try Resend first — DB row wins over env so the in-app Settings UI keeps working,
   // but env var (RESEND_API_KEY) acts as a fresh-install / Railway-only fallback.
   const resendRow = db.prepare("SELECT value FROM settings WHERE key = 'resend_api_key'").get();
@@ -21,25 +47,27 @@ export async function sendEmail({ to, subject, html, from, replyTo, attachments,
 
   if (resendKey && resendKey.length > 5 && !resendKey.includes('•')) {
     console.log('Sending email via Resend to:', to, '(source:', dbResendKey ? 'db' : 'env', ')');
-    return sendViaResend(resendKey, { to, subject, html, from, replyTo, attachments, icalEvent, headers });
+    return sendViaResend(resendKey, { to, subject, html, from, fromName, replyTo, attachments, icalEvent, headers });
   }
 
   // Fall back to SMTP
   console.log('Sending email via SMTP to:', to, '(Resend key:', resendKey ? 'present but invalid' : 'not configured', ')');
-  return sendViaSMTP({ to, subject, html, from, replyTo, attachments, icalEvent, headers });
+  return sendViaSMTP({ to, subject, html, from, fromName, replyTo, attachments, icalEvent, headers });
 }
 
-async function sendViaResend(apiKey, { to, subject, html, from, replyTo, attachments, icalEvent, headers }) {
-  const configuredFrom = from || db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value || '';
+async function sendViaResend(apiKey, { to, subject, html, from, fromName, replyTo, attachments, icalEvent, headers }) {
+  const configuredFrom = db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value || '';
 
   // Resend requires a verified domain. Free email providers (gmail, yahoo, etc.) can't be used.
-  // Use the verified eiaawsolutions.com domain, or fallback to Resend default.
+  // A per-account `from` is pre-checked against verified domains; otherwise the
+  // verified eiaawsolutions.com address (Settings, or the default).
   let fromEmail;
-  if (configuredFrom && configuredFrom.includes('@eiaawsolutions.com')) {
-    fromEmail = configuredFrom;
+  if (from) {
+    fromEmail = formatFrom(fromName, from);
+  } else if (configuredFrom.includes('@eiaawsolutions.com')) {
+    fromEmail = fromName ? formatFrom(fromName, addressOf(configuredFrom)) : configuredFrom;
   } else {
-    // Default to verified domain — this works since eiaawsolutions.com is verified in Resend
-    fromEmail = 'EIAAW SalesAgent <sales@eiaawsolutions.com>';
+    fromEmail = formatFrom(fromName || DEFAULT_SENDER.name, DEFAULT_SENDER.address);
   }
 
   const payload = { from: fromEmail, to: [to], subject, html };
@@ -79,7 +107,7 @@ async function sendViaResend(apiKey, { to, subject, html, from, replyTo, attachm
   return { method: 'resend', id: data.id };
 }
 
-async function sendViaSMTP({ to, subject, html, from, replyTo, attachments, icalEvent, headers }) {
+async function sendViaSMTP({ to, subject, html, from, fromName, replyTo, attachments, icalEvent, headers }) {
   // smtp_pass is in SENSITIVE_KEYS and stored AES-encrypted. Decrypt before
   // handing to nodemailer or every send dies with "535 BadCredentials".
   // Fall back to env vars (SMTP_USER / SMTP_PASS / etc.) when settings are
@@ -88,7 +116,8 @@ async function sendViaSMTP({ to, subject, html, from, replyTo, attachments, ical
   const smtpPort = parseInt(db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get()?.value || process.env.SMTP_PORT || '587');
   const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value || process.env.SMTP_USER;
   const smtpPass = decrypt(db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value) || process.env.SMTP_PASS;
-  const fromEmail = from || db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value || process.env.FROM_EMAIL || smtpUser;
+  const baseFrom = from || db.prepare("SELECT value FROM settings WHERE key = 'from_email'").get()?.value || process.env.FROM_EMAIL || smtpUser;
+  const fromEmail = fromName ? formatFrom(fromName, addressOf(baseFrom)) : baseFrom;
 
   if (!smtpUser || !smtpHost) throw new Error('Email not configured. Add SMTP or Resend API key in Settings.');
 

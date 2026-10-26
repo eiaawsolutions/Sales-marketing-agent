@@ -43,7 +43,7 @@ export function suppress({ userId, email, reason = 'unsubscribe', campaignId = n
               VALUES (?, ?, ?, ?, ?)`).run(userId, emailHash(email), reason, campaignId, leadId);
   if (leadId) {
     db.prepare(`UPDATE outreach_queue SET status = 'skipped'
-                WHERE lead_id = ? AND status = 'pending'
+                WHERE lead_id = ? AND status IN ('draft', 'pending')
                   AND campaign_id IN (SELECT id FROM campaigns WHERE user_id = ?)`).run(leadId, userId);
   }
   return changes > 0;

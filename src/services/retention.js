@@ -185,6 +185,7 @@ export function deleteAccountData(db, userId) {
     if (tableExists(db, 'lead_sources')) run('lead_sources', 'DELETE FROM lead_sources WHERE user_id = @uid');
     if (tableExists(db, 'lead_scoring_rules')) run('lead_scoring_rules', 'DELETE FROM lead_scoring_rules WHERE user_id = @uid');
     if (tableExists(db, 'lead_settings')) run('lead_settings', 'DELETE FROM lead_settings WHERE user_id = @uid');
+    if (tableExists(db, 'account_profiles')) run('account_profiles', 'DELETE FROM account_profiles WHERE user_id = @uid');
     run('agent_tasks', 'DELETE FROM agent_tasks WHERE user_id = @uid');
     run('sessions', 'DELETE FROM sessions WHERE user_id = @uid');
     const delSetting = db.prepare('DELETE FROM settings WHERE key = ?');
