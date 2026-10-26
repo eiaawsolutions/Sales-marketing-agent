@@ -208,6 +208,60 @@ test('a meeting cannot be created against another account\'s lead', async () => 
   assert.equal(mails.length, 0);
 });
 
+test("a call link cannot be made for another account's lead", async () => {
+  db.prepare("INSERT OR REPLACE INTO sessions (token, user_id, expires_at) VALUES ('sess3', 3, datetime('now', '+1 day'))").run();
+  db.prepare("INSERT INTO account_profiles (user_id, business_name, sender_name, offer) VALUES (3, 'Other Co', 'Olly', 'Audits')").run();
+  await server(async ({ base }) => {
+    const post = (leadId) => realFetch(base + '/api/voice/generate-link', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer sess3' }, body: JSON.stringify({ leadId }) });
+    assert.equal((await post(20)).status, 404);
+    assert.equal((await post(30)).status, 200);
+  });
+  const links = db.prepare("SELECT value FROM settings WHERE key LIKE 'call_link_%'").all().map(r => JSON.parse(r.value));
+  assert.deepEqual(links.map(l => l.leadId), [30]);
+});
+
+test("a link carrying another account's lead never starts a call", async () => {
+  await server(async ({ get }) => {
+    const res = await get(`/api/voice/call-link-token?t=${link(20, 3)}`);
+    assert.equal(res.status, 404);
+    assert.doesNotMatch(JSON.stringify(res.body), /Leadership Lab|Grace/);
+  });
+  assert.equal(retellCalls.length, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM activities WHERE type = 'voice_call'").get().c, 0);
+});
+
+test("one call link starts only a few calls a day, so a leaked link cannot drain the customer's allowance", async () => {
+  const t = link(20, 2);
+  await server(async ({ get }) => {
+    for (let i = 0; i < 5; i++) assert.equal((await get(`/api/voice/call-link-token?t=${t}`)).status, 200);
+    assert.equal((await get(`/api/voice/call-link-token?t=${t}`)).status, 429);
+  });
+  assert.equal(retellCalls.length, 5);
+});
+
+test('the same booking repeated within one call is booked once', async () => {
+  await server(async ({ tool }) => {
+    const book = { name: 'schedule_meeting', args: { date_time: 'Thursday at 3pm' }, call: { call_id: 'c7', metadata: { lead_id: '20' } } };
+    await tool(book);
+    const again = await tool(book);
+    assert.equal(again.status, 200);
+  });
+  await new Promise(r => setTimeout(r, 50));
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM appointments').get().c, 1);
+  assert.equal(mails.filter(m => m.to[0] === 'grace@lumina.example').length, 1);
+});
+
+test('with nothing to send, the assistant does not say it sent an overview', async () => {
+  reset({ brief: false });
+  await server(async ({ tool }) => {
+    const r = await tool({ name: 'send_overview', args: {}, call: { call_id: 'c8', metadata: { lead_id: '20' } } });
+    assert.doesNotMatch(r.body.result, /sent/i);
+  });
+  await new Promise(r => setTimeout(r, 50));
+  assert.equal(mails.length, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM activities WHERE type = 'email'").get().c, 0);
+});
+
 test('the voice prompt has a customer mode and never tells the agent to hide that it is an AI', () => {
   assert.match(SALES_AGENT_PROMPT, /CUSTOMER LEAD MODE — when \{\{site_scope\}\} = "customer_lead"/);
   assert.match(SALES_AGENT_PROMPT, /\{\{business_name\}\}/);

@@ -39,10 +39,10 @@ function reset() {
 }
 beforeEach(reset);
 
-async function as(userId, fn) {
+async function as(userId, fn, extra = {}) {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => { req.user = { id: userId, role: 'user', plan: 'business', email: 'aaron@tll.example' }; next(); });
+  app.use((req, _res, next) => { req.user = { id: userId, role: 'user', plan: 'business', email: 'aaron@tll.example', ...extra }; next(); });
   app.use('/api/profile', profileRouter);
   const server = app.listen(0);
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -69,6 +69,15 @@ test('the brief starts with approval on, saves valid input and rejects bad links
     assert.equal(ok.body.ready, true);
     assert.equal(ok.body.sender.fromName, 'Aaron Joseph (The Leadership Lab)');
   });
+});
+
+test('a teammate can read the brief but only the account owner can change it', async () => {
+  await as(2, async (call) => {
+    assert.equal((await call('GET')).status, 200);
+    const put = await call('PUT', { reply_to_email: 'teammate@elsewhere.example', outreach_approval: false });
+    assert.equal(put.status, 403);
+  }, { isMember: true, memberId: 9 });
+  await as(2, async (call) => { assert.equal((await call('GET')).body.profile.outreach_approval, 1); });
 });
 
 test("outreach is written about the account's offer, its true claims and the lead's signals", async () => {

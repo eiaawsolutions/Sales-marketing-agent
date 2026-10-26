@@ -4,7 +4,7 @@ import { campaignsService } from '../services/campaigns.js';
 import { runAgent, getAICostStats, getAICostByCampaign, getAICostLog, getOutreachQueue } from '../services/ai-agent.js';
 import { checkPlanLimit, remainingMonthlyAiLeads } from '../middleware/auth.js';
 import { maskLeads, maskLead } from '../services/leads.js';
-import { approveDrafts, skipLeads, editDraft } from '../services/outreach-queue.js';
+import { approveDrafts, skipLeads, editDraft, validIdFilter } from '../services/outreach-queue.js';
 
 const router = Router();
 
@@ -353,6 +353,9 @@ router.get('/:id/outreach-queue', (req, res) => {
 
 // Approval queue. Nothing the agent drafts is sent until approved here.
 router.post('/:id/outreach/approve', (req, res) => {
+  if (!validIdFilter(req.body?.leadIds) || !validIdFilter(req.body?.itemIds)) {
+    return res.status(400).json({ error: 'leadIds and itemIds, when given, must be non-empty arrays of ids' });
+  }
   const approved = approveDrafts({
     campaignId: req.campaign.id, leadIds: req.body?.leadIds, itemIds: req.body?.itemIds, approvedBy: req.user.memberId ?? req.user.id,
   });

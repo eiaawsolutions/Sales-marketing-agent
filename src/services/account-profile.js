@@ -100,12 +100,19 @@ export function saveProfile(userId, input = {}) {
   return { profile: getProfile(userId) };
 }
 
-// Domains whose DNS (SPF/DKIM) has been verified in Resend for sending on a
-// customer's behalf. Managed by EIAAW after the customer adds the records; a
-// from_email on any other domain is ignored so mail never fails DMARC.
-export function verifiedSenderDomains() {
-  const raw = db.prepare("SELECT value FROM settings WHERE key = 'verified_sender_domains'").get()?.value || '';
-  return new Set(raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
+// The platform's own sending domain. Only EIAAW's account may put its own
+// address in From; every customer sends from here under their own name.
+const PLATFORM_DOMAIN = 'eiaawsolutions.com';
+
+// Domains whose DNS (SPF/DKIM) EIAAW has verified in Resend for one account,
+// held per account (setting verified_sender_domains_<userId>) after that
+// customer adds the records. A from_email on any other domain is ignored, so
+// mail never fails DMARC and no account can send as another's domain.
+export function verifiedSenderDomains(userId) {
+  const raw = db.prepare('SELECT value FROM settings WHERE key = ?').get(`verified_sender_domains_${userId}`)?.value || '';
+  const domains = new Set(raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
+  if (!isHqAccount(userId)) domains.delete(PLATFORM_DOMAIN);
+  return domains;
 }
 
 /**
@@ -121,7 +128,7 @@ export function senderFor(userId) {
   const accountEmail = db.prepare('SELECT email FROM users WHERE id = ?').get(userId)?.email || null;
   return {
     fromName: name || undefined,
-    from: fromDomain && verifiedSenderDomains().has(fromDomain) ? p.from_email : undefined,
+    from: fromDomain && verifiedSenderDomains(userId).has(fromDomain) ? p.from_email : undefined,
     replyTo: p.reply_to_email || (hq ? undefined : accountEmail || undefined),
   };
 }

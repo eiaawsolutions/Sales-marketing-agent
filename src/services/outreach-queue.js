@@ -15,11 +15,23 @@ function idList(values) {
 }
 
 /**
+ * A lead or item filter, when one is given, must be a non-empty array of ids.
+ * Anything else is rejected rather than read as "no filter", which would
+ * approve every draft in the campaign.
+ */
+export function validIdFilter(values) {
+  if (values === undefined || values === null) return true;
+  return Array.isArray(values) && values.length > 0
+    && values.every(v => (typeof v === 'number' || typeof v === 'string') && /^\d+$/.test(String(v)));
+}
+
+/**
  * Approve a campaign's drafts — all of them, or only some leads / items.
  * Each step is re-scheduled from the moment of approval (Day 0 now, Day 3 in
  * three days), so a draft that waited a week does not fire every step at once.
  */
 export function approveDrafts({ campaignId, leadIds, itemIds, approvedBy }) {
+  if (!validIdFilter(leadIds) || !validIdFilter(itemIds)) return 0;
   const leads = idList(leadIds);
   const items = idList(itemIds);
   const where = ['campaign_id = ?', "status = 'draft'"];

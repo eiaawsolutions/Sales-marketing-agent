@@ -7,6 +7,12 @@
  *
  * Drafts ('draft') are never touched here: nothing reaches a prospect until a
  * person approves it (see outreach-queue.js).
+ *
+ * One prospect never gets a sequence in a burst: a step is not claimed while
+ * an earlier step to the same prospect is still waiting, and each send pushes
+ * that prospect's later steps out to their own spacing from now. A paused
+ * campaign that resumes, or a scheduler that was down, sends the next step
+ * only — not Day 0, 3 and 7 within seconds.
  */
 import db from '../db/index.js';
 import { sendEmail } from '../utils/email.js';
@@ -51,6 +57,9 @@ export async function processOutreachQueue({ campaignId = null } = {}) {
         AND oq.channel IN ('email', 'ai_action')
         AND oq.scheduled_at <= datetime('now')
         AND c.status = 'active'
+        AND NOT EXISTS (SELECT 1 FROM outreach_queue e
+                         WHERE e.campaign_id = oq.campaign_id AND e.lead_id = oq.lead_id
+                           AND e.step < oq.step AND e.status IN ('draft', 'pending', 'sending'))
         ${campaignId ? 'AND oq.campaign_id = ?' : ''}
       ORDER BY oq.scheduled_at ASC, oq.step ASC
       LIMIT ${BATCH}
@@ -60,11 +69,21 @@ export async function processOutreachQueue({ campaignId = null } = {}) {
     console.log(`[Scheduler] Processing ${due.length} pending outreach items`);
 
     const baseUrl = db.prepare("SELECT value FROM settings WHERE key = 'base_url'").get()?.value || 'https://sa.eiaawsolutions.com';
-    const claim = db.prepare("UPDATE outreach_queue SET status = 'sending', claimed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'");
+    const claim = db.prepare(`
+      UPDATE outreach_queue SET status = 'sending', claimed_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND status = 'pending' AND scheduled_at <= datetime('now')
+         AND NOT EXISTS (SELECT 1 FROM outreach_queue e
+                          WHERE e.campaign_id = outreach_queue.campaign_id AND e.lead_id = outreach_queue.lead_id
+                            AND e.step < outreach_queue.step AND e.status IN ('draft', 'pending', 'sending'))`);
+    const spaceLaterSteps = db.prepare(`
+      UPDATE outreach_queue
+         SET scheduled_at = datetime('now', '+' || MAX(COALESCE(delay_days, 0) - @delay, 1) || ' days')
+       WHERE campaign_id = @campaignId AND lead_id = @leadId AND step > @step AND status = 'pending'
+         AND scheduled_at < datetime('now', '+' || MAX(COALESCE(delay_days, 0) - @delay, 1) || ' days')`);
     let sentCount = 0;
 
     for (const item of due) {
-      if (claim.run(item.id).changes === 0) continue; // another dispatcher has it
+      if (claim.run(item.id).changes === 0) continue; // another dispatcher has it, or it is not this prospect's turn
 
       try {
         if (!item.lead_email) {
@@ -76,6 +95,16 @@ export async function processOutreachQueue({ campaignId = null } = {}) {
         if (isSuppressed(item.user_id, item.lead_email)) {
           db.prepare("UPDATE outreach_queue SET status = 'skipped' WHERE id = ?").run(item.id);
           continue;
+        }
+
+        // The campaign email already reached this prospect: the Day-0 outreach
+        // would be a second first-touch the same day. Follow-ups still go.
+        if (item.step === 1) {
+          const reached = db.prepare('SELECT status FROM campaign_leads WHERE campaign_id = ? AND lead_id = ?').get(item.campaign_id, item.lead_id);
+          if (reached && ['sent', 'opened', 'clicked'].includes(reached.status)) {
+            db.prepare("UPDATE outreach_queue SET status = 'skipped' WHERE id = ?").run(item.id);
+            continue;
+          }
         }
 
         // Unsubscribe link + one-click headers, then tracking
@@ -94,6 +123,7 @@ export async function processOutreachQueue({ campaignId = null } = {}) {
 
         db.prepare("UPDATE outreach_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP, provider_message_id = ? WHERE id = ?")
           .run(sent?.id || null, item.id);
+        spaceLaterSteps.run({ campaignId: item.campaign_id, leadId: item.lead_id, step: item.step, delay: item.delay_days || 0 });
         db.prepare("UPDATE campaign_leads SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE campaign_id = ? AND lead_id = ? AND status = 'pending'")
           .run(item.campaign_id, item.lead_id);
         db.prepare('UPDATE campaigns SET sent_count = sent_count + 1 WHERE id = ?')

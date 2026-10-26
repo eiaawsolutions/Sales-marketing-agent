@@ -46,6 +46,7 @@ async function retellAPI(apiKey, endpoint, method = 'GET', body = null) {
 // Calls with no lead (website visitors) belong to EIAAW's own account, the same
 // convention as FOUNDER_ID in routes/forms.js.
 const EIAAW_ACCOUNT_ID = 1;
+const MAX_CALLS_PER_LINK_PER_DAY = 5;
 
 // Retell signs both routes below with X-Retell-Signature over the raw body, so
 // server.js mounts express.raw() on them and req.body arrives as a Buffer.
@@ -208,6 +209,15 @@ async function handleScheduleMeeting(args, callId, leadId, userId, res) {
 
   const lead = leadId ? db.prepare('SELECT name, company, email, user_id FROM leads WHERE id = ?').get(leadId) : null;
   const host = hostFor(userId);
+  const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Kuala_Lumpur' });
+  const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' });
+
+  // A retried or replayed tool call for the same time on the same call is the
+  // same booking: no second appointment, no second invite.
+  if (callId && db.prepare('SELECT 1 FROM appointments WHERE call_id = ? AND scheduled_at = ?').get(callId, scheduled.toISOString())) {
+    return res.json({ result: `That's already booked for ${dateStr} at ${timeStr}, Malaysia time, with ${host.name}.` });
+  }
+
   const type = ['demo', 'call', 'meeting', 'follow_up'].includes(meeting_type) ? meeting_type : 'meeting';
   const title = `${lead?.name || 'Prospect'}${lead?.company ? ` (${lead.company})` : ''} with ${host.name}`;
   // The account's own meeting room from its brief, or none (the host sends
@@ -232,8 +242,6 @@ async function handleScheduleMeeting(args, callId, leadId, userId, res) {
     }).catch(err => console.error('Calendar invite send error:', err.message));
   }
 
-  const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Kuala_Lumpur' });
-  const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' });
   res.json({ result: `Booked for ${dateStr} at ${timeStr}, Malaysia time, with ${host.name}. ${lead?.email ? 'A calendar invite is on its way to their email.' : ''}`.trim() });
 }
 
@@ -243,18 +251,22 @@ async function handleSendOverview(args, callId, leadId, userId, res) {
     return res.json({ result: "I don't have their email on file. Could you ask for their email address so I can send it?" });
   }
 
-  // Fire-and-forget. A customer's prospect gets the customer's overview (from
-  // their brief); only EIAAW's own leads get the EIAAW SalesAgent brochure.
+  // A customer's prospect gets the customer's overview (from their brief);
+  // only EIAAW's own leads get the EIAAW SalesAgent brochure. An account with
+  // no brief has nothing to send, and the assistant must not say otherwise.
   const persona = personaFor(lead);
+  if (persona.kind === 'unconfigured') {
+    return res.json({ result: "I can't send that from here. Let them know the team will follow up by email." });
+  }
+
+  // Fire-and-forget; the activity is logged once the provider accepts it.
   const send = persona.kind === 'customer'
     ? sendCustomerOverviewEmail(lead, persona.profile, userId)
-    : persona.kind === 'eiaaw' ? sendProductOverviewEmail(lead) : Promise.resolve();
-  send.catch(err => console.error('Overview email error:', err.message));
-
-  if (leadId) {
+    : sendProductOverviewEmail(lead);
+  send.then(() => {
     db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
       .run(userId, leadId, 'email', `Sent product overview email to ${lead.email}`);
-  }
+  }).catch(err => console.error('Overview email error:', err.message));
 
   // The caller is a voice session, not the account owner: confirm without
   // reading the address back.
@@ -498,6 +510,22 @@ router.get('/call-link-token', async (req, res) => {
 
     // Determine dynamic variables from lead data
     const lead = data.leadId ? db.prepare('SELECT * FROM leads WHERE id = ?').get(data.leadId) : null;
+    // A link speaks for the account that minted it, and only about that
+    // account's own lead.
+    if (data.leadId && (!lead || lead.user_id !== data.userId)) {
+      return res.status(404).json({ error: 'This call link has expired or is invalid. Please request a new one.' });
+    }
+
+    // Each call costs money and spends the owner's monthly allowance, and a
+    // link is a bearer token that can be forwarded: cap the calls one link can
+    // start per day.
+    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const starts = (Array.isArray(data.starts) ? data.starts : []).filter(ts => ts > dayAgo);
+    if (starts.length >= MAX_CALLS_PER_LINK_PER_DAY) {
+      return res.status(429).json({ error: 'This link has been used several times today. Please reply to the email instead, or try again tomorrow.' });
+    }
+    db.prepare('UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?')
+      .run(JSON.stringify({ ...data, starts: [...starts, Date.now()] }), `call_link_${t}`);
     const isLandingVisitor = !data.leadId || data.source === 'landing';
     const stage = lead?.status || 'new';
     const callObjective = isLandingVisitor ? 'landing_conversion' : (stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify');
@@ -1024,40 +1052,43 @@ router.post('/generate-link', async (req, res) => {
     const { agentId } = getVoiceConfig();
     if (!agentId) return res.status(400).json({ error: 'Voice agent not set up. Run Auto-Setup in Settings first.' });
 
+    // Ownership first: a link for a lead acts as the lead's account (its
+    // brief, its voice allowance, its sender), so it is never minted for a
+    // lead the caller does not own.
+    let lead = null;
+    if (leadId) {
+      lead = req.user.role === 'superadmin'
+        ? db.prepare('SELECT id, name, company, email, phone, user_id FROM leads WHERE id = ?').get(leadId)
+        : db.prepare('SELECT id, name, company, email, phone, user_id FROM leads WHERE id = ? AND user_id = ?').get(leadId, req.user.id);
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    }
+    const persona = personaFor(lead);
+    if (lead && persona.kind === 'unconfigured') return res.status(409).json({ error: BRIEF_NEEDED });
+
     // CSPRNG-backed token; the previous Math.random()+Date.now() seed was
     // predictable enough for a determined attacker to guess adjacent tokens.
     const token = crypto.randomBytes(24).toString('hex');
 
     // Store with 24h expiry
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    const linkData = { leadId: leadId || null, userId: req.user.id, expiresAt };
+    const linkData = { leadId: lead?.id || null, userId: lead ? lead.user_id : req.user.id, expiresAt };
     db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)")
       .run(`call_link_${token}`, JSON.stringify(linkData));
 
     const baseUrl = req.headers.origin || `https://${req.headers.host}`;
     const callUrl = `${baseUrl}/call.html?t=${token}`;
 
-    // Get lead info
     let leadName = '';
     let leadEmail = '';
     let leadPhone = '';
     let shareMessage = `Hi! I'd like to have a quick chat about how we can help your business. Click here to talk to our AI assistant: ${callUrl}`;
-    let persona = personaFor(null);
-    if (leadId) {
-      // Cross-tenant guard before reading the lead PII into the share message.
-      const lead = req.user.role === 'superadmin'
-        ? db.prepare('SELECT name, company, email, phone, user_id FROM leads WHERE id = ?').get(leadId)
-        : db.prepare('SELECT name, company, email, phone, user_id FROM leads WHERE id = ? AND user_id = ?').get(leadId, req.user.id);
-      if (lead) {
-        persona = personaFor(lead);
-        if (persona.kind === 'unconfigured') return res.status(409).json({ error: BRIEF_NEEDED });
-        leadName = lead.name;
-        leadEmail = lead.email || '';
-        leadPhone = lead.phone || '';
-        shareMessage = persona.kind === 'customer'
-          ? `Hi ${lead.name}, ${persona.vars.sender_name} from ${persona.vars.business_name} here. If it's easier than email, you can talk to our AI assistant any time — it can answer questions and find a time for us to speak: ${callUrl}`
-          : `Hi ${lead.name}! I'd love to show you how EIAAW Solutions can help ${lead.company || 'your business'}. Click here for a quick voice chat with our AI assistant: ${callUrl}`;
-      }
+    if (lead) {
+      leadName = lead.name;
+      leadEmail = lead.email || '';
+      leadPhone = lead.phone || '';
+      shareMessage = persona.kind === 'customer'
+        ? `Hi ${lead.name}, ${persona.vars.sender_name} from ${persona.vars.business_name} here. If it's easier than email, you can talk to our AI assistant any time — it can answer questions and find a time for us to speak: ${callUrl}`
+        : `Hi ${lead.name}! I'd love to show you how EIAAW Solutions can help ${lead.company || 'your business'}. Click here for a quick voice chat with our AI assistant: ${callUrl}`;
     }
 
     // Log activity

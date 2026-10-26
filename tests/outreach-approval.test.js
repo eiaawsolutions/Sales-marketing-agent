@@ -153,11 +153,58 @@ test("the account's own address is used only once its domain is verified for sen
 
   reset({ approval: 0 });
   db.prepare("UPDATE account_profiles SET sender_name = 'Aaron Joseph', from_email = 'aaron@tll.example' WHERE user_id = 2").run();
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('verified_sender_domains', 'tll.example')").run();
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('verified_sender_domains_2', 'tll.example')").run();
   await runAgent(2, 'auto_outreach', { campaignId: 50 });
   await processOutreachQueue();
-  db.prepare("DELETE FROM settings WHERE key = 'verified_sender_domains'").run();
+  db.prepare("DELETE FROM settings WHERE key = 'verified_sender_domains_2'").run();
   assert.equal(sent[0].from, '"Aaron Joseph (The Leadership Lab)" <aaron@tll.example>');
+});
+
+test("a domain verified for one account cannot be sent from by another, and EIAAW's domain by none", async () => {
+  const { senderFor } = await import('../src/services/account-profile.js');
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('verified_sender_domains_2', 'tll.example')").run();
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('verified_sender_domains_3', 'eiaawsolutions.com')").run();
+  db.prepare("INSERT INTO account_profiles (user_id, business_name, offer, from_email) VALUES (3, 'Other', 'x', 'ceo@tll.example')").run();
+  try {
+    assert.equal(senderFor(3).from, undefined, "account 3 cannot send as account 2's domain");
+    db.prepare("UPDATE account_profiles SET from_email = 'sales@eiaawsolutions.com' WHERE user_id = 3").run();
+    assert.equal(senderFor(3).from, undefined, "a customer account never sends as EIAAW's own domain");
+  } finally {
+    db.prepare("DELETE FROM settings WHERE key LIKE 'verified_sender_domains%'").run();
+  }
+});
+
+test('an approval with a malformed lead list approves nothing', async () => {
+  await runAgent(2, 'auto_outreach', { campaignId: 50 });
+  await withRoutes(2, async (call) => {
+    assert.equal((await call('POST', '/api/campaigns/50/outreach/approve', { leadIds: 20 })).status, 400);
+    assert.equal((await call('POST', '/api/campaigns/50/outreach/approve', { leadIds: ['x'] })).status, 400);
+    assert.equal((await call('POST', '/api/campaigns/50/outreach/approve', { itemIds: [] })).status, 400);
+  });
+  assert.deepEqual(statuses(), { draft: 6 });
+});
+
+test('after a pause, each prospect gets one email per run and the follow-ups keep their spacing', async () => {
+  await runAgent(2, 'auto_outreach', { campaignId: 50 });
+  // Approved, then every step left overdue, as after a long pause or scheduler downtime.
+  db.prepare("UPDATE outreach_queue SET status = 'pending', approved_at = datetime('now', '-9 days'), scheduled_at = datetime('now', '-8 days')").run();
+  await Promise.all([processOutreachQueue(), processOutreachQueue()]);
+  await new Promise(r => setTimeout(r, 50));
+  assert.deepEqual(sent.map(m => m.subject).sort(), ['First note for Lee Shu Fen', 'First note for Nurul Huda']);
+  const gap = (step) => db.prepare(`SELECT MIN(julianday(scheduled_at) - julianday('now')) d FROM outreach_queue WHERE step = ?`).get(step).d;
+  assert.ok(gap(2) > 2.9, `step 2 waits three days after step 1 went out (was ${gap(2)})`);
+  assert.ok(gap(3) > 6.9, `step 3 waits seven days after step 1 went out (was ${gap(3)})`);
+});
+
+test('a prospect the campaign email already reached does not also get the Day-0 outreach email', async () => {
+  await runAgent(2, 'auto_outreach', { campaignId: 50 });
+  db.prepare("UPDATE campaign_leads SET status = 'sent' WHERE lead_id = 20").run();
+  await withRoutes(2, async (call) => { await call('POST', '/api/campaigns/50/outreach/approve', {}); });
+  await processOutreachQueue();
+  await new Promise(r => setTimeout(r, 50));
+  assert.deepEqual(sent.map(m => m.subject), ['First note for Nurul Huda']);
+  assert.equal(db.prepare('SELECT status FROM outreach_queue WHERE lead_id = 20 AND step = 1').get().status, 'skipped');
+  assert.equal(db.prepare('SELECT status FROM outreach_queue WHERE lead_id = 20 AND step = 2').get().status, 'pending');
 });
 
 test('plain-text drafts keep their line breaks and clickable links; HTML is escaped', async () => {

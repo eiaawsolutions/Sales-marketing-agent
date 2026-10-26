@@ -199,7 +199,7 @@ app.use('/api/campaigns/*/send', rateLimit({ windowMs: 60000, max: 3, message: {
 // Paid-action endpoints: every Retell voice call costs ~$0.50, every Stripe
 // checkout-session creation hits a paid API. Tight per-IP caps add a brake
 // on top of the per-plan voice/checkout limits already enforced in-route.
-app.use(['/api/voice/web-call', '/api/voice/call', '/api/voice/auto-call', '/api/voice/generate-link'],
+app.use(['/api/voice/web-call', '/api/voice/call', '/api/voice/auto-call', '/api/voice/generate-link', '/api/voice/call-link-token'],
   rateLimit({ windowMs: 60000, max: 5, message: { error: 'Voice call rate limit — max 5 per minute per IP.' }, validate: false }));
 app.use('/api/voice/public-session',
   rateLimit({ windowMs: 60000, max: 3, message: { error: 'Too many call sessions. Wait a moment.' }, validate: false }));
