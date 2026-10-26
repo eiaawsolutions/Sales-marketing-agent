@@ -7,6 +7,20 @@ import { maskLeads, maskLead } from '../services/leads.js';
 
 const router = Router();
 
+// Every /:id route belongs to the campaign's owner. Checked once, here, so a
+// new route cannot forget it (launch, auto-outreach, send, add-leads, status
+// and queue reads all used to load the campaign by id alone). Fails closed: a
+// campaign you do not own is a 404, indistinguishable from one that does not
+// exist. Superadmin reaches every campaign.
+router.param('id', (req, res, next, id) => {
+  const campaign = req.user.role === 'superadmin'
+    ? db.prepare('SELECT id, user_id FROM campaigns WHERE id = ?').get(id)
+    : db.prepare('SELECT id, user_id FROM campaigns WHERE id = ? AND user_id = ?').get(id, req.user.id);
+  if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+  req.campaign = campaign;
+  next();
+});
+
 router.get('/', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;
   res.json(campaignsService.getAll(userId, req.query));
@@ -240,7 +254,16 @@ router.delete('/:id', (req, res) => {
 
 router.post('/:id/leads', (req, res) => {
   try {
-    const campaign = campaignsService.addLeads(req.params.id, req.body.leadIds);
+    // Only the campaign owner's own leads may be attached. A foreign lead id
+    // here would let one account email — and read back — another's contacts.
+    const ids = Array.isArray(req.body.leadIds) ? req.body.leadIds.map(Number).filter(Number.isInteger) : [];
+    if (!ids.length) return res.status(400).json({ error: 'leadIds must be a non-empty array of lead ids' });
+    const owned = db.prepare(
+      `SELECT COUNT(*) AS c FROM leads WHERE user_id = ? AND id IN (${ids.map(() => '?').join(',')})`
+    ).get(req.campaign.user_id, ...ids).c;
+    if (owned !== new Set(ids).size) return res.status(400).json({ error: 'One or more leads were not found in this account.' });
+
+    const campaign = campaignsService.addLeads(req.params.id, ids);
     if (req.user.role !== 'superadmin' && campaign.leads) {
       campaign.leads = maskLeads(campaign.leads);
     }
@@ -273,7 +296,7 @@ router.post('/:id/auto-outreach', async (req, res) => {
   try {
     checkPlanLimit(req, 'auto_outreach');
     checkPlanLimit(req, 'ai_action');
-    const result = await runAgent(req.user.id, 'auto_outreach', {
+    const result = await runAgent(req.campaign.user_id, 'auto_outreach', {
       campaignId: parseInt(req.params.id),
     });
     res.json(result);
@@ -292,9 +315,11 @@ router.post('/:id/launch', async (req, res) => {
     db.prepare("UPDATE campaigns SET pipeline_status = 'running' WHERE id = ?").run(campaignId);
     res.json({ status: 'launching', campaignId });
 
-    // Run pipeline in background (don't await — already responded)
+    // Run pipeline in background (don't await — already responded). Runs as the
+    // campaign owner, so leads, costs and quotas land in that account even when
+    // a superadmin presses Launch.
     import('../services/pipeline-automation.js').then(({ launchCampaignPipeline }) => {
-      launchCampaignPipeline(req.user.id, campaignId).catch(err => {
+      launchCampaignPipeline(req.campaign.user_id, campaignId).catch(err => {
         console.error('Pipeline failed:', err.message);
         db.prepare("UPDATE campaigns SET pipeline_status = 'failed' WHERE id = ?").run(campaignId);
       });
@@ -326,7 +351,7 @@ router.get('/:id/outreach-queue', (req, res) => {
 
 router.post('/:id/send', async (req, res) => {
   try {
-    const result = await campaignsService.sendCampaign(req.user.id, req.params.id);
+    const result = await campaignsService.sendCampaign(req.campaign.user_id, req.params.id);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

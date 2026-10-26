@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { pipelineService } from '../services/pipeline.js';
 import { runAgent } from '../services/ai-agent.js';
-import { maskLead } from '../services/leads.js';
+import { maskLead, leadsService } from '../services/leads.js';
+import { checkPlanLimit } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -36,6 +37,8 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
+    const userId = req.user.role === 'superadmin' ? null : req.user.id;
+    if (!leadsService.getById(userId, req.body.lead_id)) return res.status(404).json({ error: 'Lead not found' });
     const deal = pipelineService.create(req.user.id, req.body);
     res.status(201).json(deal);
   } catch (err) {
@@ -58,6 +61,7 @@ router.delete('/:id', (req, res) => {
 
 router.post('/analyze', async (req, res) => {
   try {
+    checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'analyze_pipeline', {});
     res.json(result);
   } catch (err) {

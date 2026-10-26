@@ -625,12 +625,17 @@ IMPORTANT: Reference this landing page URL in the ad descriptions and targeting 
   return { contentId: content.lastInsertRowid, ...result };
 }
 
-async function analyzePipelineTask() {
+// Both tasks below build their prompt straight from the database and return
+// the model's answer to the caller, so every query is scoped to the caller's
+// account. Unscoped, they put every customer's deals and activity log in front
+// of whoever pressed the button.
+async function analyzePipelineTask(input) {
   const deals = db.prepare(`
-    SELECT p.*, l.name, l.company, l.email
-    FROM pipeline p JOIN leads l ON p.lead_id = l.id
+    SELECT p.*, l.name, l.company
+    FROM pipeline p JOIN leads l ON p.lead_id = l.id AND l.user_id = p.user_id
+    WHERE p.user_id = ?
     ORDER BY p.stage, p.deal_value DESC
-  `).all();
+  `).all(input._userId);
 
   const summary = {
     total_deals: deals.length,
@@ -653,27 +658,30 @@ Pipeline data:
 ${JSON.stringify(summary, null, 2)}
 
 Individual deals:
-${deals.map(d => `- ${d.name} (${d.company}): ${d.stage} | $${d.deal_value} | ${d.probability}% | Close: ${d.expected_close_date || 'TBD'}`).join('\n') || 'No deals in pipeline'}`
+${deals.map(d => `- ${d.name} (${d.company}): ${d.stage} | RM ${d.deal_value} | ${d.probability}% | Close: ${d.expected_close_date || 'TBD'}`).join('\n') || 'No deals in pipeline'}
+
+Deal values are in Malaysian ringgit (RM). Report money in RM.`
   );
 
   return { pipeline_summary: summary, analysis: result };
 }
 
 async function suggestActionsTask(input) {
+  const userId = input._userId;
   const lead = input.leadId
-    ? db.prepare('SELECT * FROM leads WHERE id = ?').get(input.leadId)
+    ? db.prepare('SELECT * FROM leads WHERE id = ? AND user_id = ?').get(input.leadId, userId)
     : null;
 
   const recentActivities = db.prepare(
-    'SELECT * FROM activities ORDER BY created_at DESC LIMIT 30'
-  ).all();
+    'SELECT * FROM activities WHERE user_id = ? ORDER BY created_at DESC LIMIT 30'
+  ).all(userId);
 
   const openDeals = db.prepare(
     `SELECT p.*, l.name, l.company FROM pipeline p
-     JOIN leads l ON p.lead_id = l.id
-     WHERE p.stage NOT IN ('closed_won','closed_lost')
+     JOIN leads l ON p.lead_id = l.id AND l.user_id = p.user_id
+     WHERE p.user_id = ? AND p.stage NOT IN ('closed_won','closed_lost')
      ORDER BY p.deal_value DESC LIMIT 10`
-  ).all();
+  ).all(userId);
 
   const result = await chatJSON(
     `Suggest the top 5 most impactful sales/marketing actions to take right now. Return JSON with "actions" array, each having "priority" (1-5), "type", "description", "expected_impact", and "target" fields.

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { runAgent, freeformChat } from '../services/ai-agent.js';
 import { checkPlanLimit } from '../middleware/auth.js';
 import db from '../db/index.js';
+import { leadsService } from '../services/leads.js';
 
 const router = Router();
 
@@ -58,6 +59,11 @@ router.post('/generate/seo', async (req, res) => {
 
 router.post('/suggest-actions', async (req, res) => {
   try {
+    if (req.body.leadId !== undefined && req.body.leadId !== null) {
+      const scope = req.user.role === 'superadmin' ? null : req.user.id;
+      if (!leadsService.getById(scope, req.body.leadId)) return res.status(404).json({ error: 'Lead not found' });
+    }
+    checkPlanLimit(req, 'ai_action');
     const result = await runAgent(req.user.id, 'suggest_actions', { leadId: req.body.leadId });
     res.json(result);
   } catch (err) {
