@@ -1,21 +1,18 @@
 import { Router } from 'express';
-import crypto from 'crypto';
 import db from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { sendEmail } from '../utils/email.js';
+import { getProfile, senderFor, isHqAccount } from '../services/account-profile.js';
 
 const router = Router();
 router.use(requireAuth);
 
-/**
- * Generate a unique Google Meet-style link for each appointment.
- * Format: https://meet.google.com/xxx-xxxx-xxx (3-4-3 lowercase letters)
- * This creates a "new meeting" link that works when the host opens it.
- */
-function generateMeetLink() {
-  const chars = 'abcdefghijklmnopqrstuvwxyz';
-  const pick = (n) => Array.from(crypto.randomBytes(n), b => chars[b % 26]).join('');
-  return `https://meet.google.com/${pick(3)}-${pick(4)}-${pick(3)}`;
+// Meeting location: what the user typed, else the account's own meeting room
+// from its brief, else none — the host sends the link. (This used to invent a
+// random meet.google.com/xxx-xxxx-xxx code, which is not a real meeting.)
+function defaultLocation(userId, typed) {
+  const t = typeof typed === 'string' ? typed.trim() : '';
+  return t || getProfile(userId).meeting_link || null;
 }
 
 // GET /api/appointments — list appointments for current user
@@ -55,8 +52,12 @@ router.post('/', async (req, res) => {
   const { lead_id, title, scheduled_at, duration_minutes, type, notes, location } = req.body;
   if (!title || !scheduled_at) return res.status(400).json({ error: 'Title and scheduled_at required' });
 
-  // Auto-generate Google Meet link if no location provided
-  const meetLink = location || generateMeetLink();
+  // The invite below is emailed to the lead: it must be this account's lead.
+  if (lead_id && !db.prepare('SELECT 1 FROM leads WHERE id = ? AND user_id = ?').get(lead_id, req.user.id)) {
+    return res.status(404).json({ error: 'Lead not found' });
+  }
+
+  const meetLink = defaultLocation(req.user.id, location);
 
   const result = db.prepare(
     `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, location)
@@ -75,8 +76,10 @@ router.post('/', async (req, res) => {
   if (lead_id) {
     const lead = db.prepare('SELECT name, email, company FROM leads WHERE id = ?').get(lead_id);
     if (lead?.email) {
-      sendCalendarInviteEmail(apptId, lead, new Date(scheduled_at), title, duration_minutes || 15, meetLink, notes, type, req.user.id, lead_id)
-        .catch(err => console.error('Auto calendar invite error:', err.message));
+      sendCalendarInviteEmail({
+        apptId, lead, scheduled: new Date(scheduled_at), title, duration: duration_minutes || 15,
+        location: meetLink, notes, type, userId: req.user.id, leadId: lead_id,
+      }).catch(err => console.error('Auto calendar invite error:', err.message));
     }
   }
 
@@ -126,7 +129,7 @@ router.get('/:id/ics', (req, res) => {
   const ics = generateICS({
     id: appt.id, scheduled: start, end, title: appt.title,
     notes: appt.notes, location: appt.location,
-    leadName: appt.lead_name, leadEmail: appt.lead_email,
+    leadName: appt.lead_name, leadEmail: appt.lead_email, host: hostFor(req.user.id),
   });
   res.set({
     'Content-Type': 'text/calendar; charset=utf-8',
@@ -146,18 +149,17 @@ router.post('/:id/send-invite', async (req, res) => {
   if (!appt.lead_email) return res.status(400).json({ error: 'Lead has no email address' });
 
   try {
-    // Generate Meet link if appointment doesn't have one
-    const meetLink = appt.location || generateMeetLink();
-    if (!appt.location) {
+    const meetLink = appt.location || defaultLocation(req.user.id, null);
+    if (!appt.location && meetLink) {
       db.prepare('UPDATE appointments SET location = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(meetLink, appt.id);
     }
 
-    await sendCalendarInviteEmail(
-      appt.id,
-      { name: appt.lead_name, email: appt.lead_email, company: appt.lead_company },
-      new Date(appt.scheduled_at), appt.title, appt.duration_minutes,
-      meetLink, appt.notes, appt.type, req.user.id, appt.lead_id
-    );
+    await sendCalendarInviteEmail({
+      apptId: appt.id,
+      lead: { name: appt.lead_name, email: appt.lead_email, company: appt.lead_company },
+      scheduled: new Date(appt.scheduled_at), title: appt.title, duration: appt.duration_minutes,
+      location: meetLink, notes: appt.notes, type: appt.type, userId: req.user.id, leadId: appt.lead_id,
+    });
 
     res.json({ success: true, message: 'Calendar invite sent' });
   } catch (err) {
@@ -166,16 +168,10 @@ router.post('/:id/send-invite', async (req, res) => {
 });
 
 // --- Shared ICS Generator ---
-function generateICS({ id, scheduled, end, title, notes, location, leadName, leadEmail }) {
+function generateICS({ id, scheduled, end, title, notes, location, leadName, leadEmail, host }) {
   const now = new Date();
   const fmt = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-
-  // Include Google Meet link in description if it's a meet.google.com link
-  const isMeetLink = location?.includes('meet.google.com');
-  const description = [
-    isMeetLink ? `Join Google Meet: ${location}` : '',
-    notes || '',
-  ].filter(Boolean).join('\\n\\n');
+  const description = [location ? `Join: ${location}` : '', notes || ''].filter(Boolean).join('\n\n');
 
   return [
     'BEGIN:VCALENDAR',
@@ -184,15 +180,16 @@ function generateICS({ id, scheduled, end, title, notes, location, leadName, lea
     'CALSCALE:GREGORIAN',
     'METHOD:REQUEST',
     'BEGIN:VEVENT',
-    `UID:appt-${id}@eiaaw.com`,
+    `UID:appt-${id}@eiaawsolutions.com`,
     `DTSTAMP:${fmt(now)}`,
     `DTSTART:${fmt(scheduled)}`,
     `DTEND:${fmt(end)}`,
-    `SUMMARY:${title}`,
-    `DESCRIPTION:${description}`,
-    location ? `LOCATION:${location}` : '',
-    leadEmail ? `ATTENDEE;CN=${leadName || ''}:mailto:${leadEmail}` : '',
-    'ORGANIZER;CN=EIAAW Solutions:mailto:noreply@eiaaw.com',
+    `SUMMARY:${icsText(title)}`,
+    description ? `DESCRIPTION:${icsText(description)}` : '',
+    location ? `LOCATION:${icsText(location)}` : '',
+    host?.email ? `ORGANIZER;CN=${icsParam(host.name)}:mailto:${host.email}` : '',
+    host?.email ? `ATTENDEE;CN=${icsParam(host.name)};ROLE=CHAIR:mailto:${host.email}` : '',
+    leadEmail ? `ATTENDEE;CN=${icsParam(leadName)};RSVP=TRUE:mailto:${leadEmail}` : '',
     'STATUS:CONFIRMED',
     'BEGIN:VALARM',
     'TRIGGER:-PT15M',
@@ -204,54 +201,87 @@ function generateICS({ id, scheduled, end, title, notes, location, leadName, lea
   ].filter(Boolean).join('\r\n');
 }
 
-// --- Shared calendar invite email sender (used by auto-send + manual send-invite) ---
-async function sendCalendarInviteEmail(apptId, lead, scheduled, title, duration, meetLink, notes, type, userId, leadId) {
-  const end = new Date(scheduled.getTime() + (duration || 15) * 60000);
+// RFC 5545 §3.3.11: escape TEXT values. Unescaped, a comma, semicolon or
+// newline in an AI-written title or note breaks the event in the recipient's
+// calendar.
+function icsText(value) {
+  return String(value || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+}
 
+// Parameter values (CN=…) cannot carry quotes, colons or semicolons unquoted.
+function icsParam(value) {
+  return String(value || '').replace(/["\r\n]/g, '').replace(/[;:,]/g, ' ').trim();
+}
+
+function htmlText(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// The person a meeting is with: the account's sender and the inbox where they
+// want replies (falling back to the login email).
+function hostFor(userId) {
+  const p = getProfile(userId);
+  const email = p.reply_to_email || db.prepare('SELECT email FROM users WHERE id = ?').get(userId)?.email || null;
+  if (isHqAccount(userId) && !p.business_name) return { name: 'EIAAW Solutions', business: 'EIAAW Solutions', email };
+  return { name: p.sender_name || p.business_name || 'Your host', business: p.business_name || p.sender_name || '', email };
+}
+
+// --- Shared calendar invite email sender (used by auto-send, manual send-invite and the voice agent) ---
+// The prospect gets the meeting details only. `notes` (e.g. the voice
+// assistant's Need/Budget/Authority/Timeline summary) are internal: they go in
+// the host's copy, never to the prospect.
+async function sendCalendarInviteEmail({ apptId, lead, scheduled, title, duration, location, notes, type, userId, leadId }) {
+  const end = new Date(scheduled.getTime() + (duration || 15) * 60000);
+  const host = hostFor(userId);
   const icsContent = generateICS({
-    id: apptId, scheduled, end, title, notes,
-    location: meetLink, leadName: lead.name, leadEmail: lead.email,
+    id: apptId, scheduled, end, title, location, leadName: lead.name, leadEmail: lead.email, host,
   });
 
   const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kuala_Lumpur' });
   const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' });
-  const isMeetLink = meetLink?.includes('meet.google.com');
+  const withWhom = host.business && host.business !== host.name ? `${host.name} from ${host.business}` : host.name;
+  const where = location
+    ? `<p style="margin:12px 0 4px;font-size:14px"><strong>Join:</strong> <a href="${htmlText(location)}">${htmlText(location)}</a></p>`
+    : `<p style="margin:12px 0 4px;font-size:14px">${htmlText(host.name)} will send the joining link before the meeting.</p>`;
+  const details = `
+    <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin:16px 0">
+      <p style="margin:4px 0;font-size:14px"><strong>Date:</strong> ${dateStr}</p>
+      <p style="margin:4px 0;font-size:14px"><strong>Time:</strong> ${timeStr} (Malaysia time)</p>
+      <p style="margin:4px 0;font-size:14px"><strong>Duration:</strong> ${Number(duration) || 15} minutes</p>
+      ${where}
+    </div>`;
+  const ical = { filename: 'invite.ics', method: 'REQUEST', content: icsContent };
 
   await sendEmail({
     to: lead.email,
-    subject: `Meeting Confirmed: ${title} — ${dateStr}`,
+    subject: `Confirmed: ${title} — ${dateStr}`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px">
-        <h2 style="color:#2ec4b6;margin-bottom:16px">You're Booked!</h2>
-        <p style="font-size:15px;line-height:1.6;color:#333">Hi ${lead.name || 'there'},</p>
-        <p style="font-size:15px;line-height:1.6;color:#333">Your ${type === 'demo' ? 'demo' : 'meeting'} with EIAAW Solutions is confirmed.</p>
-        <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin:16px 0">
-          <p style="margin:4px 0;font-size:14px"><strong>Date:</strong> ${dateStr}</p>
-          <p style="margin:4px 0;font-size:14px"><strong>Time:</strong> ${timeStr}</p>
-          <p style="margin:4px 0;font-size:14px"><strong>Duration:</strong> ${duration} minutes</p>
-          ${isMeetLink ? `
-            <p style="margin:12px 0 4px;font-size:14px"><strong>Join via Google Meet:</strong></p>
-            <a href="${meetLink}" style="display:inline-block;background:#1a73e8;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:bold">Join Meeting</a>
-            <p style="margin:6px 0 0;font-size:12px;color:#888">${meetLink}</p>
-          ` : meetLink ? `<p style="margin:4px 0;font-size:14px"><strong>Where:</strong> ${meetLink}</p>` : ''}
-        </div>
-        <p style="font-size:14px;color:#666">A calendar invite is attached. Add it to your calendar so you don't miss it.</p>
-        ${notes ? `<p style="font-size:14px;color:#666"><strong>Notes:</strong> ${notes}</p>` : ''}
-        <hr style="margin:24px 0;border:none;border-top:1px solid #eee">
-        <p style="font-size:12px;color:#999;text-align:center">EIAAW Solutions — AI-Human Sales Partnerships</p>
-      </div>
-    `,
-    icalEvent: {
-      filename: 'invite.ics',
-      method: 'REQUEST',
-      content: icsContent,
-    },
+        <p style="font-size:15px;line-height:1.6;color:#333">Hi ${htmlText(lead.name || 'there')},</p>
+        <p style="font-size:15px;line-height:1.6;color:#333">Your ${type === 'demo' ? 'demo' : 'meeting'} with ${htmlText(withWhom)} is confirmed.</p>
+        ${details}
+        <p style="font-size:14px;color:#666">A calendar invite is attached. Reply to this email if you need to change the time.</p>
+      </div>`,
+    icalEvent: ical,
+    ...senderFor(userId),
   });
 
-  // Mark appointment as confirmed
-  db.prepare('UPDATE appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('confirmed', apptId);
+  if (host.email && host.email !== lead.email) {
+    await sendEmail({
+      to: host.email,
+      subject: `New meeting: ${lead.name || 'a prospect'}${lead.company ? ` (${lead.company})` : ''} — ${dateStr}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px">
+          <p style="font-size:15px;color:#333">A meeting is booked with <strong>${htmlText(lead.name || '')}</strong>${lead.company ? ` from ${htmlText(lead.company)}` : ''} (${htmlText(lead.email)}).</p>
+          ${details}
+          ${notes ? `<p style="font-size:14px;color:#333"><strong>Notes from the call:</strong><br>${htmlText(notes).replace(/\n/g, '<br>')}</p>` : ''}
+          <p style="font-size:13px;color:#888">The prospect has the invite. Add the attached event to your calendar.</p>
+        </div>`,
+      icalEvent: ical,
+    }).catch(err => console.error('Host meeting copy failed:', err.message));
+  }
 
-  // Log activity
+  db.prepare('UPDATE appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('confirmed', apptId);
   if (leadId) {
     db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
       .run(userId, leadId, 'email', `Sent calendar invite for: ${title}`);
@@ -259,6 +289,6 @@ async function sendCalendarInviteEmail(apptId, lead, scheduled, title, duration,
 }
 
 // Export for use in voice.js
-export { generateMeetLink, generateICS, sendCalendarInviteEmail };
+export { generateICS, sendCalendarInviteEmail, hostFor };
 
 export default router;

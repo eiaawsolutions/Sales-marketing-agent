@@ -2,10 +2,12 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import db from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
-import { checkPlanLimit, VOICE_ADDONS } from '../middleware/auth.js';
+import { checkPlanLimit, checkPlanLimitForUser, loadPlanUser, VOICE_ADDONS } from '../middleware/auth.js';
 import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
-import { generateMeetLink, sendCalendarInviteEmail } from './appointments.js';
+import { sendCalendarInviteEmail, hostFor } from './appointments.js';
+import { getProfile, senderFor } from '../services/account-profile.js';
+import { personaFor, EMPTY_CUSTOMER_VARS } from '../services/voice-persona.js';
 import { GIT_SHA } from '../version.js';
 import { verifyRetell } from '../services/ingest-auth.js';
 
@@ -111,18 +113,14 @@ router.post('/webhook', requireRetellSignature, async (req, res) => {
           db.prepare('UPDATE leads SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status IN (?, ?)').run('qualified', leadId, 'new', 'contacted');
         }
 
-        // Check if a meeting was booked during the call (from call summary)
-        if (callSummary && (callSummary.toLowerCase().includes('meeting booked') || callSummary.toLowerCase().includes('demo scheduled') || callSummary.toLowerCase().includes('agreed to meet'))) {
-          const existingAppt = db.prepare('SELECT id FROM appointments WHERE call_id = ?').get(callId);
-          if (!existingAppt) {
-            // Create a placeholder appointment — the tool-callback may have already created one
-            db.prepare(
-              `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, call_id, status)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-            ).run(leadId, ownerId, `Follow-up with ${callLead.name || 'Lead'}`,
-              new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // Default 3 days out
-              15, 'demo', `Auto-created from voice call. Summary: ${callSummary}`, callId, 'scheduled');
-          }
+        // The summary says a meeting was agreed but the assistant never booked
+        // one (schedule_meeting creates the appointment). Flag it for a person
+        // rather than inventing a time — this used to create a "scheduled"
+        // appointment three days out that nobody had agreed to.
+        const mentionsMeeting = /meeting booked|demo scheduled|agreed to meet/i.test(callSummary);
+        if (mentionsMeeting && !db.prepare('SELECT 1 FROM appointments WHERE call_id = ?').get(callId)) {
+          db.prepare("INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, 'task', ?)")
+            .run(ownerId, leadId, `Voice call suggests a meeting was agreed, but no time was booked — follow up to confirm. Summary: ${callSummary.slice(0, 300)}`);
         }
       }
     }
@@ -166,7 +164,8 @@ router.post('/tool-callback', requireRetellSignature, async (req, res) => {
     }
     // Default: log_call_outcome
     let apptMsg = '';
-    if (args.meeting_requested && leadId) {
+    const alreadyBooked = callId && db.prepare('SELECT 1 FROM appointments WHERE call_id = ?').get(callId);
+    if (args.meeting_requested && leadId && !alreadyBooked) {
       const meetingTime = args.meeting_time || args.next_step || '';
       const scheduled = parseMeetingTime(meetingTime);
       if (scheduled) {
@@ -207,40 +206,50 @@ async function handleScheduleMeeting(args, callId, leadId, userId, res) {
     return res.json({ result: "I wasn't able to parse that time. Could you confirm the date and time again?" });
   }
 
-  const lead = leadId ? db.prepare('SELECT name, company, email FROM leads WHERE id = ?').get(leadId) : null;
-  const title = `${meeting_type === 'demo' ? 'Demo' : 'Meeting'} with ${lead?.name || 'Lead'}`;
-  const meetLink = generateMeetLink();
-  const dur = parseInt(duration) || 15;
+  const lead = leadId ? db.prepare('SELECT name, company, email, user_id FROM leads WHERE id = ?').get(leadId) : null;
+  const host = hostFor(userId);
+  const type = ['demo', 'call', 'meeting', 'follow_up'].includes(meeting_type) ? meeting_type : 'meeting';
+  const title = `${lead?.name || 'Prospect'}${lead?.company ? ` (${lead.company})` : ''} with ${host.name}`;
+  // The account's own meeting room from its brief, or none (the host sends
+  // the link). Never a made-up meet.google.com code.
+  const location = getProfile(userId).meeting_link || null;
+  const dur = parseInt(duration, 10) || 30;
 
   const result = db.prepare(
     `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, call_id, location)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(leadId, userId, title, scheduled.toISOString(), dur, meeting_type || 'demo', notes || '', callId, meetLink);
+  ).run(leadId, userId, title, scheduled.toISOString(), dur, type, notes || '', callId, location);
 
   if (leadId) {
     db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
-      .run(userId, leadId, 'meeting', `Meeting booked via voice call: ${title}`);
+      .run(userId, leadId, 'meeting', `Meeting booked by the voice assistant: ${title}`);
   }
 
-  // Fire-and-forget: send calendar invite with Google Meet link
+  // Fire-and-forget: invite to the prospect, copy (with the call notes) to the host
   if (lead?.email) {
-    sendCalendarInviteEmail(result.lastInsertRowid, lead, scheduled, title, dur, meetLink, notes, meeting_type, userId, leadId)
-      .catch(err => console.error('Calendar invite send error:', err.message));
+    sendCalendarInviteEmail({
+      apptId: result.lastInsertRowid, lead, scheduled, title, duration: dur, location, notes, type, userId, leadId,
+    }).catch(err => console.error('Calendar invite send error:', err.message));
   }
 
   const dateStr = scheduled.toLocaleDateString('en-MY', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Kuala_Lumpur' });
   const timeStr = scheduled.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' });
-  res.json({ result: `Perfect, I've booked that for ${dateStr} at ${timeStr}. ${lead?.email ? "I'm sending a calendar invite with a Google Meet link to their email now." : 'All set!'}` });
+  res.json({ result: `Booked for ${dateStr} at ${timeStr}, Malaysia time, with ${host.name}. ${lead?.email ? 'A calendar invite is on its way to their email.' : ''}`.trim() });
 }
 
 async function handleSendOverview(args, callId, leadId, userId, res) {
-  const lead = leadId ? db.prepare('SELECT name, email, company FROM leads WHERE id = ?').get(leadId) : null;
+  const lead = leadId ? db.prepare('SELECT name, email, company, user_id FROM leads WHERE id = ?').get(leadId) : null;
   if (!lead?.email) {
     return res.json({ result: "I don't have their email on file. Could you ask for their email address so I can send it?" });
   }
 
-  // Fire-and-forget
-  sendProductOverviewEmail(lead).catch(err => console.error('Overview email error:', err.message));
+  // Fire-and-forget. A customer's prospect gets the customer's overview (from
+  // their brief); only EIAAW's own leads get the EIAAW SalesAgent brochure.
+  const persona = personaFor(lead);
+  const send = persona.kind === 'customer'
+    ? sendCustomerOverviewEmail(lead, persona.profile, userId)
+    : persona.kind === 'eiaaw' ? sendProductOverviewEmail(lead) : Promise.resolve();
+  send.catch(err => console.error('Overview email error:', err.message));
 
   if (leadId) {
     db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
@@ -253,7 +262,11 @@ async function handleSendOverview(args, callId, leadId, userId, res) {
 }
 
 async function handleSendDemoLink(args, callId, leadId, userId, res) {
-  const lead = leadId ? db.prepare('SELECT name, email, company FROM leads WHERE id = ?').get(leadId) : null;
+  const lead = leadId ? db.prepare('SELECT name, email, company, user_id FROM leads WHERE id = ?').get(leadId) : null;
+  // The demo is of EIAAW SalesAgent: never for a customer's prospect.
+  if (lead && personaFor(lead).kind !== 'eiaaw') {
+    return res.json({ result: "That isn't available on this call. Offer to book a time with the team instead." });
+  }
   if (!lead?.email) {
     return res.json({ result: "I don't have their email. Ask for their email so I can send the demo link." });
   }
@@ -330,6 +343,31 @@ async function sendProductOverviewEmail(lead) {
         <hr style="margin:24px 0;border:none;border-top:1px solid #eee">
         <p style="font-size:12px;color:#999;text-align:center">EIAAW Solutions — AI-Human Sales Partnerships<br><a href="https://eiaawsolutions.com" style="color:#2ec4b6">eiaawsolutions.com</a></p>
       </div>`,
+  });
+}
+
+function htmlText(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// "Send me something" on a customer's call: a short note from the customer's
+// sender, built only from their brief (offer, true claims, call to action).
+async function sendCustomerOverviewEmail(lead, profile, userId) {
+  const sender = profile.sender_name || profile.business_name;
+  const link = profile.meeting_link || profile.website;
+  await sendEmail({
+    to: lead.email,
+    subject: `${profile.business_name} — the overview you asked for`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;font-size:15px;line-height:1.6;color:#1a1a1a">
+        <p>Hi ${htmlText(lead.name || 'there')},</p>
+        <p>Thanks for speaking with our assistant. As promised, here is a short overview of ${htmlText(profile.business_name)}:</p>
+        <p>${htmlText(profile.offer)}</p>
+        ${profile.proof_points ? `<p>${htmlText(profile.proof_points).replace(/\n/g, '<br>')}</p>` : ''}
+        ${profile.call_to_action ? `<p>If it is useful, I'd suggest ${htmlText(profile.call_to_action)}${link ? `: <a href="${htmlText(link)}">${htmlText(link)}</a>` : '.'}</p>` : (link ? `<p><a href="${htmlText(link)}">${htmlText(link)}</a></p>` : '')}
+        <p>${htmlText(sender)}${profile.sender_title ? `<br>${htmlText(profile.sender_title)}, ${htmlText(profile.business_name)}` : ''}</p>
+      </div>`,
+    ...senderFor(userId),
   });
 }
 
@@ -423,6 +461,20 @@ function parseMeetingTime(text) {
   return utcDate > new Date() ? utcDate : null;
 }
 
+// GET /api/voice/call-link-info — public, read-only: which business a call link
+// speaks for, so call.html can say so before a call (and its cost) is created.
+// Returns the business name only — nothing about the lead.
+router.get('/call-link-info', (req, res) => {
+  const row = typeof req.query.t === 'string' ? db.prepare('SELECT value FROM settings WHERE key = ?').get(`call_link_${req.query.t}`) : null;
+  if (!row?.value) return res.status(404).json({ error: 'This call link has expired or is invalid.' });
+  let data;
+  try { data = JSON.parse(row.value); } catch { return res.status(404).json({ error: 'This call link has expired or is invalid.' }); }
+  if (data.expiresAt && new Date(data.expiresAt) < new Date()) return res.status(410).json({ error: 'This call link has expired.' });
+  const lead = data.leadId ? db.prepare('SELECT id, user_id, name FROM leads WHERE id = ?').get(data.leadId) : null;
+  const persona = personaFor(lead);
+  res.json({ businessName: persona.kind === 'customer' ? persona.vars.business_name : null });
+});
+
 // GET /api/voice/call-link-token — public endpoint: exchange a call link token for a Retell access token
 router.get('/call-link-token', async (req, res) => {
   try {
@@ -477,19 +529,35 @@ router.get('/call-link-token', async (req, res) => {
       : isLandingVisitor ? 'sales_agent'
       : 'lead';
 
+    let vars = {
+      ...EMPTY_CUSTOMER_VARS,
+      lead_name: lead?.name || 'there',
+      lead_company: lead?.company || '',
+      lead_title: lead?.title || '',
+      lead_stage: stage,
+      call_objective: callObjective,
+      begin_message: beginMessage,
+      landing_mode: isLandingVisitor ? 'true' : 'false',
+      site_scope: siteScope,
+    };
+
+    // A link from a customer's outreach: the prospect talks to the customer's
+    // assistant, counted against the customer's monthly voice allowance.
+    if (lead && !isLandingVisitor) {
+      const persona = personaFor(lead);
+      if (persona.kind === 'unconfigured') {
+        return res.status(503).json({ error: "This line isn't set up yet. Please reply to the email instead." });
+      }
+      try { checkPlanLimitForUser(loadPlanUser(lead.user_id), 'voice_call'); } catch {
+        return res.status(429).json({ error: 'This line is busy right now. Please reply to the email and we will find a time.' });
+      }
+      if (persona.kind === 'customer') vars = { ...vars, ...persona.vars };
+    }
+
     // Create web call with Retell
     const webCall = await retellAPI(apiKey, '/v2/create-web-call', 'POST', {
       agent_id: agentId,
-      retell_llm_dynamic_variables: {
-        lead_name: lead?.name || 'there',
-        lead_company: lead?.company || '',
-        lead_title: lead?.title || '',
-        lead_stage: stage,
-        call_objective: callObjective,
-        begin_message: beginMessage,
-        landing_mode: isLandingVisitor ? 'true' : 'false',
-        site_scope: siteScope,
-      },
+      retell_llm_dynamic_variables: vars,
       metadata: {
         lead_id: data.leadId ? String(data.leadId) : '',
         source: data.source || 'call_link',
@@ -497,10 +565,10 @@ router.get('/call-link-token', async (req, res) => {
       },
     });
 
-    // Log the call activity
-    if (data.leadId) {
+    // Log the call activity (in the lead owner's account — it is their allowance)
+    if (lead) {
       db.prepare('INSERT INTO activities (user_id, lead_id, type, description, outcome) VALUES (?, ?, ?, ?, ?)')
-        .run(data.userId || 1, data.leadId, 'voice_call',
+        .run(lead.user_id, lead.id, 'voice_call',
           `Lead opened call link and started web call`,
           JSON.stringify(webCall));
     }
@@ -509,7 +577,8 @@ router.get('/call-link-token', async (req, res) => {
       accessToken: webCall.access_token,
       callId: webCall.call_id,
       leadName: lead?.name || null,
-      greeting: beginMessage,
+      greeting: vars.begin_message,
+      businessName: vars.business_name || null,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -584,6 +653,8 @@ router.post('/refresh-prompt-with-token', async (req, res) => {
 
 // --- Authenticated routes ---
 router.use(requireAuth);
+
+const BRIEF_NEEDED = 'Fill in your Brief (business name and what you offer) first — the voice assistant speaks for your business and needs to know what it sells.';
 
 // GET /api/voice/plans — available voice add-ons
 router.get('/plans', (req, res) => {
@@ -862,6 +933,8 @@ router.post('/call', async (req, res) => {
       : db.prepare('SELECT * FROM leads WHERE id = ? AND user_id = ?').get(leadId, req.user.id);
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
     if (!lead.phone) return res.status(400).json({ error: 'Lead has no phone number. Add a phone number first.' });
+    const persona = personaFor(lead, { outbound: true });
+    if (persona.kind === 'unconfigured') return res.status(409).json({ error: BRIEF_NEEDED });
 
     const { provider, apiKey, agentId, phoneNumber } = getVoiceConfig();
     if (!apiKey) return res.status(400).json({ error: 'Voice AI not configured. Admin needs to add Voice AI API key in Settings.' });
@@ -891,6 +964,7 @@ router.post('/call', async (req, res) => {
         agent_id: agentId,
         to_number: lead.phone,
         retell_llm_dynamic_variables: {
+          ...EMPTY_CUSTOMER_VARS,
           lead_name: lead.name,
           lead_company: lead.company || 'their company',
           lead_title: lead.title || '',
@@ -900,10 +974,11 @@ router.post('/call', async (req, res) => {
           call_objective: callObjective,
           begin_message: beginMessage,
           custom_script: script || '',
+          ...(persona.kind === 'customer' ? persona.vars : {}),
         },
         metadata: {
           lead_id: String(lead.id),
-          user_id: String(req.user.id),
+          user_id: String(lead.user_id),
           campaign_id: campaignId ? String(campaignId) : '',
         },
       };
@@ -967,16 +1042,21 @@ router.post('/generate-link', async (req, res) => {
     let leadEmail = '';
     let leadPhone = '';
     let shareMessage = `Hi! I'd like to have a quick chat about how we can help your business. Click here to talk to our AI assistant: ${callUrl}`;
+    let persona = personaFor(null);
     if (leadId) {
       // Cross-tenant guard before reading the lead PII into the share message.
       const lead = req.user.role === 'superadmin'
-        ? db.prepare('SELECT name, company, email, phone FROM leads WHERE id = ?').get(leadId)
-        : db.prepare('SELECT name, company, email, phone FROM leads WHERE id = ? AND user_id = ?').get(leadId, req.user.id);
+        ? db.prepare('SELECT name, company, email, phone, user_id FROM leads WHERE id = ?').get(leadId)
+        : db.prepare('SELECT name, company, email, phone, user_id FROM leads WHERE id = ? AND user_id = ?').get(leadId, req.user.id);
       if (lead) {
+        persona = personaFor(lead);
+        if (persona.kind === 'unconfigured') return res.status(409).json({ error: BRIEF_NEEDED });
         leadName = lead.name;
         leadEmail = lead.email || '';
         leadPhone = lead.phone || '';
-        shareMessage = `Hi ${lead.name}! I'd love to show you how EIAAW Solutions can help ${lead.company || 'your business'}. Click here for a quick voice chat with our AI assistant: ${callUrl}`;
+        shareMessage = persona.kind === 'customer'
+          ? `Hi ${lead.name}, ${persona.vars.sender_name} from ${persona.vars.business_name} here. If it's easier than email, you can talk to our AI assistant any time — it can answer questions and find a time for us to speak: ${callUrl}`
+          : `Hi ${lead.name}! I'd love to show you how EIAAW Solutions can help ${lead.company || 'your business'}. Click here for a quick voice chat with our AI assistant: ${callUrl}`;
       }
     }
 
@@ -990,7 +1070,25 @@ router.post('/generate-link', async (req, res) => {
     res.json({ callUrl, token, expiresAt, shareMessage, leadName, leadEmail, leadPhone, emailSent: false });
 
     // Fire-and-forget: send email in background (don't block response)
-    if (sendEmailFlag && leadEmail) {
+    if (sendEmailFlag && leadEmail && persona.kind === 'customer') {
+      const userId = req.user.id;
+      const p = persona.vars;
+      sendEmail({
+        to: leadEmail,
+        subject: `${leadName ? leadName + ', ' : ''}a quicker way to reach ${p.business_name}`,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;font-size:15px;line-height:1.6;color:#1a1a1a">
+            <p>Hi ${htmlText(leadName || 'there')},</p>
+            <p>If it's easier than email, you can talk to ${htmlText(p.business_name)}'s AI assistant right from your browser. It can answer questions about what we do and find a time for you to speak with ${htmlText(p.sender_name)}.</p>
+            <p><a href="${callUrl}">Start a voice chat</a> (your browser will ask for microphone access; the link works for 24 hours).</p>
+            <p>${htmlText(p.sender_name)}</p>
+          </div>`,
+        ...senderFor(persona.profile.user_id),
+      }).then(() => {
+        db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
+          .run(userId, leadId, 'email', 'Sent call link email');
+      }).catch(err => console.error('Call link email failed:', err.message));
+    } else if (sendEmailFlag && leadEmail) {
       const userId = req.user.id;
       sendEmail({
         to: leadEmail,
@@ -1046,6 +1144,8 @@ router.post('/web-call', async (req, res) => {
         ? db.prepare('SELECT * FROM leads WHERE id = ?').get(leadId)
         : db.prepare('SELECT * FROM leads WHERE id = ? AND user_id = ?').get(leadId, req.user.id);
       if (!lead) return res.status(404).json({ error: 'Lead not found' });
+      const persona = personaFor(lead);
+      if (persona.kind === 'unconfigured') return res.status(409).json({ error: BRIEF_NEEDED });
 
       const stage = lead.status || 'new';
       const callObjective = stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify';
@@ -1060,16 +1160,20 @@ router.post('/web-call', async (req, res) => {
       }
 
       dynamicVars = {
+        ...EMPTY_CUSTOMER_VARS,
         lead_name: lead.name,
         lead_company: lead.company || 'their company',
         lead_title: lead.title || '',
         lead_stage: stage,
         call_objective: callObjective,
         begin_message: beginMessage,
+        site_scope: 'lead',
+        ...(persona.kind === 'customer' ? persona.vars : {}),
       };
-      description = `Web call with ${lead.name} (${callObjective})`;
+      description = `Web call with ${lead.name} (${dynamicVars.call_objective})`;
     } else {
       dynamicVars = {
+        ...EMPTY_CUSTOMER_VARS,
         lead_name: 'there',
         lead_company: '',
         lead_stage: 'new',
@@ -1145,17 +1249,22 @@ router.post('/auto-call', async (req, res) => {
     for (const lead of batch) {
       try {
         const stage = lead.status || 'new';
+        const persona = personaFor(lead, { outbound: true });
+        if (persona.kind === 'unconfigured') throw new Error(BRIEF_NEEDED);
         const callBody = {
           agent_id: agentId,
           to_number: lead.phone,
           retell_llm_dynamic_variables: {
+            ...EMPTY_CUSTOMER_VARS,
             lead_name: lead.name,
             lead_company: lead.company || 'their company',
             lead_stage: stage,
             call_objective: stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify',
             begin_message: `Hey, is this ${lead.name}? I'm Sarah, an AI assistant from E-I-A-A-W A.I. Sales Agent — I'll be super quick, do you have one minute?`,
+            site_scope: 'lead',
+            ...(persona.kind === 'customer' ? persona.vars : {}),
           },
-          metadata: { lead_id: String(lead.id), user_id: String(req.user.id), campaign_id: String(campaignId) },
+          metadata: { lead_id: String(lead.id), user_id: String(lead.user_id), campaign_id: String(campaignId) },
         };
         if (phoneNumber) callBody.from_number = phoneNumber;
 
@@ -1208,11 +1317,29 @@ const SALES_AGENT_PROMPT = `You are Sarah — a sharp, warm AI assistant for EIA
 - Score: {{lead_score}}
 - Stage: {{lead_stage}}
 - Call objective: {{call_objective}}
-- Site scope: {{site_scope}}   (values: "parent" = eiaawsolutions.com — talk about all 5 products; "sales_agent" = sa.eiaawsolutions.com — Sales Agent only; "ads_agency" = ads.eiaawsolutions.com — Ai Ads Agency only; "social_media_team" = smt.eiaawsolutions.com — Social Media Team only; "workforce" = ep.eiaawsolutions.com — Workforce only; "lead" = an outbound lead)
+- Site scope: {{site_scope}}   (values: "parent" = eiaawsolutions.com — talk about all 5 products; "sales_agent" = sa.eiaawsolutions.com — Sales Agent only; "ads_agency" = ads.eiaawsolutions.com — Ai Ads Agency only; "social_media_team" = smt.eiaawsolutions.com — Social Media Team only; "workforce" = ep.eiaawsolutions.com — Workforce only; "lead" = an outbound lead of EIAAW's; "customer_lead" = a prospect of {{business_name}}, a business that uses this assistant)
 - Custom script: {{custom_script}}
+- Business you speak for (customer_lead calls only): {{business_name}}
+- Person the prospect would meet: {{sender_name}}
+- What the business offers: {{offer}}
+- Facts the business stands behind: {{proof_points}}
+- What the business wants the prospect to agree to: {{call_to_action}}
+- Notes from the business for these calls: {{voice_notes}}
+- Meeting link on file: {{meeting_link_present}}
 
 ## Opening
 Use {{begin_message}} as your opening. Then WAIT for their response.
+
+## CUSTOMER LEAD MODE — when {{site_scope}} = "customer_lead" (read this first)
+On these calls you are the AI assistant of {{business_name}}, speaking to one of their prospects for them. EIAAW is only the software you run on. This section replaces guardrails 1, 3, 6 and 7 and every playbook below for these calls; guardrails 4 and 5 still apply.
+- SCOPE: you may ONLY discuss {{business_name}}'s offer, the facts in the variables above, the prospect's situation, and booking a meeting with {{sender_name}}. Never mention EIAAW, its products, prices, websites or the Talk-to-us form. If asked who made you: "I'm an AI assistant that {{business_name}} uses." Anything else: "That's outside what I can help with on this call — {{sender_name}} can pick it up when you meet."
+- FACTS: everything you know about {{business_name}} is in {{offer}}, {{proof_points}} and {{voice_notes}}. For anything not there — prices, dates, trainers, outcomes, client names, numbers — say "I don't have that detail — {{sender_name}} will cover it when you meet." Never invent results, figures or guarantees.
+- QUALIFY gently, one short question at a time, at most four, skipping any already answered: what is prompting this now (Need); who else is involved in choosing (Authority); when they would want to start (Timeline); whether budget is planned for it (Budget).
+- BOOK: offer a meeting with {{sender_name}} ({{call_to_action}} if given). Ask which weekday and time suit them, Malaysia time, between 9am and 6pm. When they confirm, call schedule_meeting with date_time, duration "30", meeting_type "meeting", and notes summarising Need, Budget, Authority and Timeline. Then read back the day and time and say a calendar invite is on its way to their email.
+- If they don't want a meeting, thank them and say {{sender_name}} can follow up by email.
+- Never use send_demo_link on these calls. Use send_overview only if they ask for something in writing.
+- Before ending, call log_call_outcome. Its summary must start "Need: …; Budget: …; Authority: …; Timeline: …" (write "unknown" for anything not discussed).
+- Their name and email are already on file with {{business_name}} — do not ask for them.
 
 ## ABSOLUTE GUARDRAILS — NEVER BREAK THESE
 
@@ -1478,7 +1605,7 @@ The caller is on smt.eiaawsolutions.com (the Social Media Team product page). On
 - Pricing (all in ringgit; paid at checkout with no free trial, except Chief of Staff, whose first plan has 14 days free): Sales Agent Starter RM 99, Pro RM 199, Business RM 399 per month. Ai Ads Agency Starter RM 2,088, Growth RM 6,288 per month, Enterprise custom. Workforce Starter RM 25, Growth RM 59, Scale RM 119 per active employee per month, Enterprise custom. Social Media Team Solo RM 688, Studio RM 1,688, Agency RM 6,888 per month, plus a bespoke Enterprise tier. Chief of Staff Personal RM 69, Pro RM 149 per month, Team RM 119 per seat per month from 3 seats. Custom AI systems are quoted per project. Don't go beyond this.
 - DEFAULT REDIRECT FOR DEPTH. Any question that asks for more than the FACTS block holds — specific feature timelines, platform-specific integrations, custom workflows, an Enterprise quote, demo scheduling, technical proofs, security packs, references, customer lists — route to the Talk-to-us form on whichever site they're on. Phrasing: "That's exactly the kind of thing our team is set up to walk you through. Click 'Talk to us' on the page — they reply within one working day."
 - If {{custom_script}} is provided AND {{site_scope}} = "lead", integrate it naturally. For "parent" or "sales_agent" landing visitors, ignore custom_script unless it's clearly aligned with the FACTS block.
-- Never volunteer that you're AI. If asked directly, be honest and pivot to value.
+- You are an AI assistant and every opening line says so. If asked, confirm it plainly. Never claim or imply that you are a person.
 - Real talk. No corporate speak. No brochure language. No emojis.`;
 
 // Exported so /api/health (in server.js) can report the exact prompt length

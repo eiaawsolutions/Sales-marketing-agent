@@ -260,7 +260,7 @@
   <main class="call-shell">
     <div class="call-card rvl">
 
-      <div class="call-lockup">
+      <div class="call-lockup" id="lockup">
         <img src="/brand/shield.png?v=3" alt="EIAAW Solutions">
         <div class="words">
           <strong>EIAAW SOLUTIONS</strong>
@@ -322,6 +322,28 @@
       document.getElementById('status').textContent = 'Invalid link';
       document.getElementById('status').className = 'status error';
       document.getElementById('permissions-note').style.display = 'none';
+    } else {
+      // A link from a business that uses EIAAW: name that business, not EIAAW,
+      // before the call starts. "Powered by EIAAW Solutions" stays — it is.
+      fetch(`/api/voice/call-link-info?t=${encodeURIComponent(token)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(info => {
+          if (!info || !info.businessName) return;
+          const name = info.businessName;
+          document.title = `Talk to ${name}'s AI assistant`;
+          const lockup = document.getElementById('lockup');
+          const strong = document.createElement('strong');
+          strong.textContent = name;
+          const words = document.createElement('div');
+          words.className = 'words';
+          words.append(strong);
+          lockup.replaceChildren(words);
+          const em = document.createElement('em');
+          em.textContent = name;
+          document.getElementById('heading').replaceChildren('Talk to ', em, "'s AI assistant.");
+          document.getElementById('subtitle').textContent = `Ask your questions and find a time to speak with the ${name} team. You'll be talking to an AI assistant.`;
+        })
+        .catch(() => {});
     }
 
     async function startCall() {
