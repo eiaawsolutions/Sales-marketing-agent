@@ -1,6 +1,7 @@
 import db from '../db/index.js';
 import { runAgent } from './ai-agent.js';
 import { loadPlanUser, checkPlanLimitForUser, remainingMonthlyAiLeads } from '../middleware/auth.js';
+import { getProfile, hasOffer, isHqAccount, TONES } from './account-profile.js';
 
 const LEADS_PER_LAUNCH = 10;
 
@@ -90,16 +91,25 @@ export async function launchCampaignPipeline(userId, campaignId) {
       updateStatus('running', 'Step 2: All leads already scored');
     }
 
-    // Step 3: Generate email content if empty
-    if (!campaign.body && campaign.type === 'email') {
+    // Step 3: Generate email content if empty — about the account's own offer
+    // (Brief page). It used to describe EIAAW's product for every account.
+    const profile = getProfile(campaign.user_id);
+    const briefReady = hasOffer(profile);
+    if (!campaign.body && campaign.type === 'email' && !briefReady && !isHqAccount(campaign.user_id)) {
+      updateStatus('running', 'Step 3: Skipped — add your business name and offer on the Brief page so the agent can write about it');
+    } else if (!campaign.body && campaign.type === 'email') {
       updateStatus('running', 'Step 3: Generating email content...');
       try {
         const content = await runAgent(campaign.user_id, 'generate_email', {
           audience: campaign.target_audience || 'general',
           subject: campaign.subject || campaign.name,
           purpose: 'promotional',
-          tone: 'professional',
-          productInfo: 'EIAAW AI Sales Agent — AI-powered sales and marketing automation platform',
+          tone: briefReady ? (TONES[profile.tone] || TONES.warm) : 'professional',
+          productInfo: briefReady
+            ? `${profile.business_name} — ${profile.offer}${profile.call_to_action ? `. Call to action: ${profile.call_to_action}` : ''}`
+            : 'EIAAW AI Sales Agent — AI-powered sales and marketing automation platform',
+          proofPoints: briefReady ? (profile.proof_points || '') : undefined,
+          ctaUrl: briefReady ? (profile.meeting_link || profile.website || undefined) : undefined,
         });
         db.prepare('UPDATE campaigns SET subject = COALESCE(NULLIF(subject, ""), ?), body = ? WHERE id = ?')
           .run(content.subject || campaign.subject || campaign.name, content.body_html || content.body_text, campaignId);

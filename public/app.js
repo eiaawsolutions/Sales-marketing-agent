@@ -470,6 +470,7 @@ function renderSidebar() {
   // The links EVERY user sees.
   const items = [
     { id: 'dashboard', icon: '&#9632;', label: 'Dashboard' },
+    { id: 'brief', icon: '&#9873;', label: 'Brief' },
     { id: 'leads', icon: '&#9679;', label: 'Leads' },
     { id: 'sources', icon: '&#9741;', label: 'Sources' },
     { id: 'pipeline', icon: '&#9654;', label: 'Pipeline' },
@@ -555,6 +556,7 @@ function toggleAdminMenu() {
 function renderPage() {
   switch (currentPage) {
     case 'dashboard': return '<div id="page" class="loading">Loading dashboard...</div>';
+    case 'brief': return '<div id="page" class="loading">Loading brief...</div>';
     case 'leads': return '<div id="page" class="loading">Loading leads...</div>';
     case 'sources': return '<div id="page" class="loading">Loading sources...</div>';
     case 'pipeline': return '<div id="page" class="loading">Loading pipeline...</div>';
@@ -591,6 +593,7 @@ async function afterRender() {
   }
   switch (currentPage) {
     case 'dashboard': return loadDashboard();
+    case 'brief': return loadBrief();
     case 'leads': return loadLeads();
     case 'sources': return loadSources();
     case 'pipeline': return loadPipeline();
@@ -605,6 +608,107 @@ async function afterRender() {
     case 'system-overview': return loadSystemOverview();
     case 'system-logic': return loadSystemLogic();
   }
+}
+
+// ========== Brief ==========
+// What this account sells, the claims it may make and who its email comes
+// from. Every message, score and voice call is written from it.
+const BRIEF_FIELDS = ['business_name', 'website', 'offer', 'proof_points', 'call_to_action', 'tone',
+  'sender_name', 'sender_title', 'reply_to_email', 'from_email', 'meeting_link', 'voice_notes'];
+
+async function loadBrief() {
+  try {
+    const { profile: p, ready, tones, sender, from_domain_verified } = await api.get('/profile');
+    const field = (id, label, hint, opts = {}) => `
+      <div class="form-group">
+        <label for="br-${id}">${label}</label>
+        ${opts.textarea
+          ? `<textarea id="br-${id}" maxlength="${opts.max || 1500}" style="min-height:${opts.rows || 90}px" placeholder="${esc(opts.placeholder || '')}">${esc(p[id] || '')}</textarea>`
+          : `<input id="br-${id}" type="${opts.type || 'text'}" maxlength="${opts.max || 200}" value="${esc(p[id] || '')}" placeholder="${esc(opts.placeholder || '')}">`}
+        ${hint ? `<small class="text-muted">${hint}</small>` : ''}
+        <small class="text-sm" id="br-err-${id}" style="color:var(--danger);display:none"></small>
+      </div>`;
+
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar"><h2>Brief</h2><button class="btn btn-primary" onclick="saveBrief()">Save brief</button></div>
+      ${ready ? '' : `
+        <div class="card" style="border:2px solid var(--warning)">
+          <h3 style="text-transform:none;letter-spacing:0">Start here</h3>
+          <p class="text-muted text-sm" style="margin:0">Add your business name and what you offer. Until then the agent will not write outreach for you — it never invents an offer.</p>
+        </div>`}
+
+      <div class="card">
+        <h3>What you sell</h3>
+        <div class="grid-2">
+          ${field('business_name', 'Business name *', '', { max: 120, placeholder: 'e.g. The Leadership Lab' })}
+          ${field('website', 'Website', 'https only.', { type: 'url', max: 500, placeholder: 'https://' })}
+        </div>
+        ${field('offer', 'What you offer *', 'One or two sentences in your words. This is what every message is about.', { textarea: true, placeholder: 'e.g. Leadership programmes for first-time managers and mid-level leaders' })}
+        ${field('proof_points', 'Claims you can stand behind', 'Only things that are true and you are happy to see in writing. The agent will never claim results, clients, figures or accreditations that are not listed here.', { textarea: true, placeholder: 'e.g. HRD Corp claimable for levy-paying employers' })}
+        <div class="grid-2">
+          ${field('call_to_action', 'Call to action', 'What you want the prospect to agree to.', { max: 300, placeholder: 'e.g. a 20-minute call to compare notes on your 2027 plans' })}
+          <div class="form-group">
+            <label for="br-tone">Tone</label>
+            <select id="br-tone">${Object.entries(tones).map(([k, v]) => `<option value="${k}" ${p.tone === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Who it comes from</h3>
+        <div class="grid-2">
+          ${field('sender_name', 'Sender name', '', { max: 80, placeholder: 'e.g. Aaron Joseph' })}
+          ${field('sender_title', 'Sender title', '', { max: 80, placeholder: 'e.g. Founder' })}
+        </div>
+        <div class="grid-2">
+          ${field('reply_to_email', 'Replies go to', 'Prospects who reply reach this inbox. Leave empty to use your login email.', { type: 'email', max: 254 })}
+          ${field('from_email', 'Send from (your domain)', from_domain_verified === true
+            ? 'Domain verified — mail goes from this address.'
+            : 'Used once EIAAW has verified your domain (SPF/DKIM). Until then mail goes from sales@eiaawsolutions.com under your name.', { type: 'email', max: 254 })}
+        </div>
+        <p class="text-sm text-muted" style="margin:0">Prospects will see: <strong>${esc(sender.fromName || 'EIAAW SalesAgent')}</strong>${sender.replyTo ? ` · replies to <strong>${esc(sender.replyTo)}</strong>` : ''}</p>
+      </div>
+
+      <div class="card">
+        <h3>Meetings &amp; voice assistant</h3>
+        ${field('meeting_link', 'Meeting link', 'Your Google Meet room, Zoom link or booking page (https). Sent in every meeting invite the voice assistant books.', { type: 'url', max: 500, placeholder: 'https://' })}
+        ${field('voice_notes', 'Notes for the voice assistant', 'Anything it should know when prospects call: formats, typical cohort sizes, what you need before quoting. It will only say what is here or in your offer.', { textarea: true })}
+      </div>
+
+      <div class="card">
+        <h3>Sending</h3>
+        <label class="flex gap-2" style="align-items:center;cursor:pointer">
+          <input type="checkbox" id="br-approval" ${p.outreach_approval ? 'checked' : ''} style="width:auto">
+          <span>Review every message before it is sent <span class="text-muted">(recommended)</span></span>
+        </label>
+        <p class="text-sm text-muted" style="margin:8px 0 0">When on, the agent drafts and you approve from each campaign's approval queue. When off, Day-0 emails go out as soon as they are written.</p>
+      </div>
+    `;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+async function saveBrief() {
+  const body = {};
+  for (const f of BRIEF_FIELDS) body[f] = document.getElementById(`br-${f}`)?.value ?? '';
+  body.outreach_approval = document.getElementById('br-approval').checked ? 1 : 0;
+  BRIEF_FIELDS.forEach(f => { const el = document.getElementById(`br-err-${f}`); if (el) el.style.display = 'none'; });
+  try {
+    const r = await fetch('/api/profile', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` }, body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      for (const [f, msg] of Object.entries(data.errors || {})) {
+        const el = document.getElementById(`br-err-${f}`);
+        if (el) { el.textContent = `This ${msg}.`; el.style.display = 'block'; }
+      }
+      return showNotification(data.error || 'Could not save', 'error');
+    }
+    showNotification('Brief saved.', 'success');
+    loadBrief();
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
 
 // ========== Dashboard ==========

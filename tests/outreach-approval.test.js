@@ -33,7 +33,7 @@ function reset({ approval = 1 } = {}) {
     db.prepare(`INSERT INTO users (id, username, email, password_hash, role, status, plan) VALUES (?, ?, ?, 'x', 'user', 'active', 'business')`)
       .run(id, `u${id}`, `owner${id}@example.com`);
   }
-  db.prepare('INSERT INTO account_profiles (user_id, outreach_approval) VALUES (2, ?)').run(approval);
+  db.prepare("INSERT INTO account_profiles (user_id, business_name, offer, outreach_approval) VALUES (2, 'The Leadership Lab', 'Leadership programmes', ?)").run(approval);
   db.prepare("INSERT INTO leads (id, user_id, name, email, company) VALUES (20, 2, 'Lee Shu Fen', 'shufen@velora.example', 'Velora')").run();
   db.prepare("INSERT INTO leads (id, user_id, name, email, company) VALUES (21, 2, 'Nurul Huda', 'nurul@seri.example', 'Seri Andalas')").run();
   db.prepare("INSERT INTO campaigns (id, user_id, name, type, status, subject, body) VALUES (50, 2, 'TLL Q4', 'email', 'active', 'Hi', '<p>x</p>')").run();
@@ -157,7 +157,20 @@ test("the account's own address is used only once its domain is verified for sen
   await runAgent(2, 'auto_outreach', { campaignId: 50 });
   await processOutreachQueue();
   db.prepare("DELETE FROM settings WHERE key = 'verified_sender_domains'").run();
-  assert.equal(sent[0].from, '"Aaron Joseph" <aaron@tll.example>');
+  assert.equal(sent[0].from, '"Aaron Joseph (The Leadership Lab)" <aaron@tll.example>');
+});
+
+test('plain-text drafts keep their line breaks and clickable links; HTML is escaped', async () => {
+  reset({ approval: 0 });
+  agent.setChat(async () => JSON.stringify({ sequences: [{ lead_name: 'Lee Shu Fen', steps: [
+    { step: 1, channel: 'email', delay_days: 0, subject: 's', message: 'Hi Shu Fen,\n\nSee <b>this</b>: {{CALL_LINK}}\n\nAaron', goal: 'g' },
+  ] }] }));
+  await runAgent(2, 'auto_outreach', { campaignId: 50 });
+  await processOutreachQueue();
+  const html = sent[0].html;
+  assert.match(html, /Hi Shu Fen,<br>/);
+  assert.match(html, /&lt;b&gt;this&lt;\/b&gt;/, 'model-written markup is shown, not rendered');
+  assert.match(html, /<a href="https:\/\/sa\.eiaawsolutions\.com\/api\/tracking\/click\/50\/20\?t=[0-9a-f]+&url=https%3A%2F%2Fsa\.eiaawsolutions\.com%2Fcall\.html/);
 });
 
 test('a sender name cannot inject headers or a second address', async () => {

@@ -20,6 +20,18 @@ const BATCH = 20;
 // retried into a possible duplicate.
 const STALE_SENDING_MINUTES = 15;
 
+// Queue messages are plain text — written by the agent from web-sourced lead
+// data, or typed into the approval editor. Email is HTML, where newlines
+// collapse and a bare URL is not a link. So: escape everything (nothing the
+// model wrote can render as markup or a disguised link in a prospect's inbox),
+// keep line breaks, and turn https URLs into links, which also lets click
+// tracking see the voice-call link.
+export function toEmailHtml(message) {
+  const escaped = String(message || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const linked = escaped.replace(/https:\/\/[^\s<>"']+[^\s<>"'.,;:!?)]/g, (url) => `<a href="${url}">${url}</a>`);
+  return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#1a1a1a">${linked.replace(/\r?\n/g, '<br>')}</div>`;
+}
+
 function sendGapMs() {
   const n = Number(process.env.OUTREACH_SEND_GAP_MS);
   return Number.isFinite(n) && n >= 0 ? n : 1000;
@@ -67,7 +79,7 @@ export async function processOutreachQueue({ campaignId = null } = {}) {
         }
 
         // Unsubscribe link + one-click headers, then tracking
-        const emailBody = item.message || `<p>Hi ${item.lead_name},</p><p>${item.goal || 'Just following up on our previous conversation.'}</p>`;
+        const emailBody = toEmailHtml(item.message);
         const withForm = appendFormCta(emailBody, item.form_id, item.campaign_id, item.lead_id, baseUrl);
         const { html: withUnsub, headers } = prepareOutreachEmail({ html: withForm, baseUrl, campaignId: item.campaign_id, leadId: item.lead_id });
         const trackedHtml = injectTracking(withUnsub, item.campaign_id, item.lead_id, baseUrl);
