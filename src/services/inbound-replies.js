@@ -8,6 +8,9 @@
  * never times out and retries are harmless (provider_email_id is unique).
  *
  * For each reply:
+ *   0. on arrival (in the webhook itself), stop every sequence to that
+ *      person — before anything that can fail. Only an away message, known
+ *      by its subject, is let through;
  *   1. fetch the text from Resend (the webhook carries metadata only), and
  *      keep the reply itself, not the quoted thread below it;
  *   2. an automatic away message (by its headers) changes nothing;
@@ -16,7 +19,9 @@
  *      stopped anyway: a person who replied never gets another automated
  *      follow-up. Labelling is retried, then left for a person;
  *   4. forward it, once, to the account's own inbox with Reply-To set to the
- *      prospect, so answering from the inbox reaches them directly.
+ *      prospect, so answering from the inbox reaches them directly. A forward
+ *      that fails is retried; a reply whose text can never be fetched is
+ *      still announced to the inbox, so the person sees that someone replied.
  * Only replies to one of our signed reply addresses are stored at all.
  */
 import db from '../db/index.js';
@@ -56,7 +61,14 @@ export function acceptInbound(event) {
     INSERT OR IGNORE INTO replies (user_id, lead_id, source, provider_email_id, message_id, from_address, to_address, subject, status)
     VALUES (?, ?, 'inbound', ?, ?, ?, ?, ?, 'received')
   `).run(lead.user_id, lead.id, id, str(data.message_id, 500), str(data.from, 320), str(toAddress, 320), str(data.subject, 300));
-  return changes ? 'queued' : 'duplicate';
+  if (!changes) return 'duplicate';
+  // Whoever replied gets no further automated follow-up, whatever happens
+  // next (a fetch or the AI may fail). An away message keeps the sequence.
+  if (!isAutoReply({}, data.subject)) {
+    const stopped = stopSequences(lead.user_id, lead.id);
+    db.prepare('UPDATE replies SET stopped_count = ? WHERE provider_email_id = ?').run(stopped, id);
+  }
+  return 'queued';
 }
 
 export function htmlToText(html) {
@@ -149,7 +161,9 @@ async function processOne(row) {
   if (isAutoReply(headers, row.subject)) {
     db.prepare(`UPDATE replies SET intent = 'out_of_office', confidence = 1, summary = 'Automatic reply',
                 actions = ?, status = 'dismissed', handled_at = CURRENT_TIMESTAMP WHERE id = ?`)
-      .run(JSON.stringify(['Auto-reply: the sequence carries on']), row.id);
+      .run(JSON.stringify([row.stopped_count > 0
+        ? 'Automatic reply. The sequence was stopped when it arrived — restart it from the campaign if it should carry on'
+        : 'Auto-reply: the sequence carries on']), row.id);
     db.prepare("INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, 'email', 'Automatic reply received — the sequence carries on')").run(row.user_id, lead.id);
     return;
   }
@@ -158,10 +172,10 @@ async function processOne(row) {
   let failure = null;
   try {
     checkPlanLimitForUser(loadPlanUser(row.user_id), 'ai_action');
-    result = await handleReply({ userId: row.user_id, lead, text: body, replyId: row.id });
+    result = await handleReply({ userId: row.user_id, lead, text: body, replyId: row.id, stopped: row.stopped_count || 0 });
   } catch (e) {
     failure = e;
-    const n = stopSequences(row.user_id, lead.id);
+    const n = (row.stopped_count || 0) + stopSequences(row.user_id, lead.id);
     db.prepare('UPDATE replies SET actions = ? WHERE id = ?').run(JSON.stringify([
       n > 0 ? `Stopped the sequence for ${lead.name} (${n} message${n === 1 ? '' : 's'} cancelled)` : `Nothing more was scheduled to ${lead.name}`,
       `Could not label it yet: ${e.message}`,
@@ -172,6 +186,36 @@ async function processOne(row) {
     try { await forwardToInbox(row, lead, body, result); } catch (e) { console.error('[replies] forward failed:', e.message); }
   }
   if (failure) throw failure;
+}
+
+// A reply whose text never came back from Resend: tell the inbox someone
+// replied, so a person can look (the original is kept by Resend).
+async function announceUnread(id) {
+  const row = db.prepare('SELECT * FROM replies WHERE id = ?').get(id);
+  if (!row || row.forwarded_at || row.body) return;
+  const lead = db.prepare('SELECT * FROM leads WHERE id = ? AND user_id = ?').get(row.lead_id, row.user_id);
+  if (!lead) return;
+  await forwardToInbox(row, lead, '(The text of this reply could not be read from the mail provider. Open it in SalesAgent or ask EIAAW to retrieve it.)', null);
+}
+
+// Forwards that failed after a reply was read are retried for a day, without
+// reading or labelling the reply again. Away messages are never forwarded.
+async function retryForwards() {
+  const rows = db.prepare(`
+    SELECT * FROM replies WHERE source = 'inbound' AND forwarded_at IS NULL AND body IS NOT NULL
+       AND status IN ('new', 'answered', 'dismissed') AND COALESCE(intent, '') <> 'out_of_office'
+       AND received_at >= datetime('now', '-1 day') AND handled_at <= datetime('now', '-10 minutes')
+     ORDER BY id LIMIT 10
+  `).all();
+  for (const row of rows) {
+    const lead = db.prepare('SELECT * FROM leads WHERE id = ? AND user_id = ?').get(row.lead_id, row.user_id);
+    if (!lead) continue;
+    const result = row.intent ? { intent: row.intent, confidence: row.confidence, suggested_reply: row.suggested_body ? { body: row.suggested_body } : null } : null;
+    try { await forwardToInbox(row, lead, row.body, result); } catch (e) {
+      db.prepare('UPDATE replies SET handled_at = CURRENT_TIMESTAMP WHERE id = ?').run(row.id);
+      console.error(`[replies] forward of reply ${row.id} failed again: ${e.message}`);
+    }
+  }
 }
 
 let running = false;
@@ -203,10 +247,12 @@ export async function processInboundReplies({ limit = 20 } = {}) {
           const final = row.attempts + 1 >= MAX_ATTEMPTS;
           db.prepare('UPDATE replies SET status = ?, error = ? WHERE id = ?').run(final ? 'new' : 'failed', String(e.message || e).slice(0, 300), row.id);
           console.error(`[replies] reply ${row.id} ${final ? 'left for a person' : 'will be retried'}: ${e.message}`);
+          if (final) await announceUnread(row.id).catch(err => console.error('[replies] notice failed:', err.message));
         }
       }
-      if (!progressed || rows.length < limit) break;
+      if (!progressed) break;
     }
+    await retryForwards();
   } finally {
     running = false;
   }

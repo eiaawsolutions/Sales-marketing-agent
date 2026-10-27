@@ -205,3 +205,20 @@ test('only the account owner can redraft', async () => {
     assert.equal(r.status, 403);
   } finally { s.close(); }
 });
+
+test('a sequence approved while it was being redrafted is left alone — never doubled', async () => {
+  seedDrafts();
+  agent.setChat(async () => {
+    // A teammate approves Lee's sequence while the AI is writing the new one.
+    db.prepare("UPDATE outreach_queue SET status = 'pending' WHERE lead_id = 20").run();
+    return JSON.stringify({ sequences: [{ lead_name: 'Lee Shu Fen', steps: [
+      { step: 1, channel: 'email', delay_days: 0, subject: 'New', message: 'New {{CALL_LINK}}', goal: 'g' },
+      { step: 2, channel: 'email', delay_days: 3, subject: 'New 2', message: 'New 2 {{CALL_LINK}}', goal: 'g' },
+    ] }] });
+  });
+  const { call, close } = server(2);
+  try { await call('POST', '/api/profile/redraft'); } finally { close(); }
+  const lee = db.prepare('SELECT message, status FROM outreach_queue WHERE lead_id = 20').all();
+  assert.equal(lee.length, 3, 'no second sequence');
+  assert.ok(lee.every(r => r.message === 'old offer' && r.status === 'pending'));
+});

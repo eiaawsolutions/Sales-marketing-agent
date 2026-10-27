@@ -262,3 +262,81 @@ test('quoted history is cut in the usual formats', () => {
   assert.equal(stripQuoted('Boleh.\nPada Isn, 2 Nov 2026 Aaron menulis:\n> hi'), 'Boleh.');
   assert.equal(stripQuoted('Sure\n\nFrom: Aaron Joseph <aaron@tll.example>\nSent: Monday'), 'Sure');
 });
+
+async function acceptOnly(body) {
+  const app = express();
+  app.use('/api/tracking/webhook', express.raw({ type: 'application/json' }));
+  app.use('/api/tracking', trackingRouter);
+  const s = app.listen(0);
+  try {
+    const r = await realFetch(`http://127.0.0.1:${s.address().port}/api/tracking/webhook`, { method: 'POST', body, headers: signed(body) });
+    assert.equal(r.status, 200);
+  } finally { s.close(); }
+}
+
+test('a reply stops the sequence the moment it arrives, before it is read', async () => {
+  classifyAs({ intent: 'question', confidence: 0.9, summary: 'x' });
+  // Hold Resend's reply to the content fetch, so nothing after the webhook can run.
+  let release;
+  const held = new Promise(r => { release = r; });
+  const base = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).startsWith('https://api.resend.com/emails/receiving/')) { await held; }
+    return base(url, init);
+  };
+  await acceptOnly(inbound('rcv_early'));
+  assert.equal(open(), 0, 'stopped at the webhook, before the reply is fetched or labelled');
+  assert.equal(aiCalls, 0);
+  release();
+  await new Promise(r => setTimeout(r, 50));
+  globalThis.fetch = base;
+});
+
+test('a reply whose text cannot be fetched still stops the sequence and, in the end, reaches the inbox as a notice', async () => {
+  classifyAs({ intent: 'interested', confidence: 1, summary: 'x' });
+  const body = inbound('rcv_lost');
+  delete received.rcv_lost; // Resend cannot return it
+  await deliver(body);
+  assert.equal(open(), 0);
+  assert.equal(reply().status, 'failed');
+  db.prepare("UPDATE replies SET attempts = 2, handled_at = datetime('now', '-11 minutes')").run();
+  await processInboundReplies();
+  const r = reply();
+  assert.equal(r.status, 'new', 'left for a person after the last attempt');
+  const notice = mails.find(m => m.to[0] === 'aaron@tll.example');
+  assert.ok(notice, 'the account is told a reply came in');
+  assert.match(notice.html, /could not be read/);
+  assert.equal(notice.reply_to, 'daniel@permata.example');
+});
+
+test('a forward that failed is retried without labelling the reply again', async () => {
+  classifyAs({ intent: 'question', confidence: 0.9, summary: 'Asks about cost', suggested_reply: { subject: 'Re', body: 'Aaron will confirm.' } });
+  let failForward = true;
+  const base = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url) === 'https://api.resend.com/emails' && failForward) return new Response(JSON.stringify({ message: 'rate limited' }), { status: 429 });
+    return base(url, init);
+  };
+  await deliver(inbound('rcv_fwd'));
+  assert.equal(reply().forwarded_at, null);
+  assert.equal(reply().status, 'new');
+  failForward = false;
+  db.prepare("UPDATE replies SET handled_at = datetime('now', '-11 minutes')").run();
+  const callsBefore = aiCalls;
+  await processInboundReplies();
+  assert.ok(reply().forwarded_at, 'forwarded on the retry');
+  assert.equal(aiCalls, callsBefore, 'not labelled twice');
+  globalThis.fetch = base;
+});
+
+test('a referral is the named person at the same company — not a near match', () => {
+  const { sameName, sameCompany } = agent;
+  assert.equal(sameName({ name: 'Farhana Aziz' }, 'Farhana'), true);
+  assert.equal(sameName({ name: 'Alicia Wong' }, 'Ali'), false, 'a name inside another name is not the person');
+  assert.equal(sameName({ name: 'Ali Hassan' }, 'Ali Rahman'), false);
+  const referrer = { company: 'Malaysia Airlines Berhad', email: 'hr@malaysiaairlines.example' };
+  assert.equal(sameCompany({ company: 'Malaysia Airports Holdings Berhad', email: 'x@airports.example' }, referrer), false, 'sharing a word is not the same company');
+  assert.equal(sameCompany({ company: 'Malaysia Airlines', email: 'x@other.example' }, referrer), true, 'legal suffixes aside, the same name');
+  assert.equal(sameCompany({ company: 'MAB', email: 'farhana@malaysiaairlines.example' }, referrer), true, 'the same email domain');
+  assert.equal(sameCompany({ company: 'Permata Utara Logistics Sdn Bhd', email: 'f@p.example' }, { company: 'Permata Utara Logistics', email: 'd@q.example' }), true);
+});

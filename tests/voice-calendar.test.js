@@ -122,16 +122,18 @@ test('a time that is not free is not booked; the nearest free times are offered 
   assert.equal(bookings.length, 0);
 });
 
-test('if the calendar cannot be read, the meeting is booked here and the host is asked to confirm it', async () => {
+test('if the calendar cannot be read, nothing is booked or confirmed — the host is asked to confirm the time', async () => {
   calcomDown = true;
   await server(async ({ tool }) => {
     const r = await tool(book(FREE[0]));
-    assert.match(r.body.result, /^Booked for/);
+    assert.match(r.body.result, /can't confirm/i);
+    assert.doesNotMatch(r.body.result, /^Booked/);
   });
   await flush();
   assert.equal(bookings.length, 0);
-  assert.match(db.prepare('SELECT notes FROM appointments').get().notes, /could not be checked/);
-  assert.ok(mails.some(m => m.to[0] === 'grace@lumina.example'), 'our own invite goes to the prospect');
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM appointments').get().c, 0);
+  assert.ok(mails.every(m => m.to[0] !== 'grace@lumina.example'), 'no confirmation to the prospect');
+  assert.match(db.prepare("SELECT description FROM activities WHERE type = 'task'").get().description, /confirm/);
 });
 
 test('what the call captured — Need, Budget, Authority, Timeline — stays on the lead and the lead is re-scored', async () => {

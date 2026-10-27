@@ -98,5 +98,6 @@ test('only HQ manages sending domains; bad and platform domains are refused', as
   await as('superadmin', async (call) => {
     assert.equal((await call('POST', '/api/users/2/sending-domain', { domain: 'not a domain' })).status, 400);
     assert.equal((await call('POST', '/api/users/2/sending-domain', { domain: 'eiaawsolutions.com' })).status, 502);
+    assert.equal((await call('POST', '/api/users/2/sending-domain/check', { domain: 'eiaawsolutions.com' })).status, 409, 'never enabled for a customer');
   });
 });

@@ -79,8 +79,9 @@ async function followReferral(userId, referrer, referral, actions) {
   try {
     const owner = loadPlanUser(userId);
     checkPlanLimitForUser(owner, 'auto_leads');
+    checkPlanLimitForUser(owner, 'ai_leads_per_month');
     checkPlanLimitForUser(owner, 'ai_action');
-  } catch { return giveUp('lead search is not included on this plan or the AI allowance is used up'); }
+  } catch { return giveUp("lead search is not included on this plan, or this month's lead or AI allowance is used up"); }
 
   let found;
   try { found = await runAgent(userId, 'verify_referral', { leadId: referrer.id, name: referral.name, role: referral.role }); } catch (e) { return giveUp(e.message); }

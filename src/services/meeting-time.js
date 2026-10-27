@@ -12,11 +12,20 @@
 const MYT_OFFSET_MS = 8 * 60 * 60 * 1000;
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-const MONTH_RE = '(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*';
+const MONTH_RE = '(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)(?:\\.)?';
 
 function readTime(lower) {
+  // A range ("2 to 3pm", "10-11am") starts at its first time, in the range's am/pm.
+  let m = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(?:to|-|–|until)\s*\d{1,2}(?::\d{2})?\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/);
+  if (m) {
+    let h = parseInt(m[1], 10);
+    const pm = m[3].startsWith('p');
+    if (pm && h < 12) h += 12;
+    if (!pm && h === 12) h = 0;
+    return [h, parseInt(m[2] || '0', 10)];
+  }
   // "3pm", "3:30 pm", "10 a.m."
-  let m = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/);
+  m = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/);
   if (m) {
     let h = parseInt(m[1], 10);
     const pm = m[3].startsWith('p');
@@ -70,7 +79,11 @@ export function parseMeetingTime(text, now = new Date()) {
     const dayIdx = DAYS.findIndex(n => lower.includes(n));
     if (lower.includes('tomorrow')) { d += 1; found = true; }
     else if (lower.includes('today')) { found = true; }
-    else if (dayIdx >= 0) {
+    else if (dayIdx >= 0 && /\bnext\s+week\b|\bweek\s+after\b/.test(lower)) {
+      // "Friday next week": that weekday in the week starting next Monday.
+      const toNextMonday = 8 - (myt.getUTCDay() || 7);
+      d += toNextMonday + ((dayIdx + 6) % 7); found = true;
+    } else if (dayIdx >= 0) {
       let ahead = dayIdx - myt.getUTCDay();
       if (ahead <= 0) ahead += 7;
       d += ahead; found = true;

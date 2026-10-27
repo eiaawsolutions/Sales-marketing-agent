@@ -39,8 +39,23 @@ const INBOUND_NOTES_PREFIX = 'Lead type: Inbound (self-reported via website';
 const USER_SETTINGS_PREFIXES = [
   'stripe_customer_', 'stripe_subscription_', 'verify_code_', 'verify_resend_',
   'trial_end_', 'reveal_addon_', 'ai_addon_', 'voice_addon_', 'cancel_pending_',
-  'subscription_ended_', 'terms_acceptance_',
+  'subscription_ended_', 'terms_acceptance_', 'verified_sender_domains_', 'calendly_event_type_',
 ];
+
+// Monday briefs and pipeline reviews name prospects, so they are kept 90
+// days; monthly reports hold only counts and are kept 24 months.
+const BRIEF_RETENTION_DAYS = 90;
+const REPORT_RETENTION_MONTHS = 24;
+
+export function pruneBriefs(db, now = new Date()) {
+  if (!tableExists(db, 'briefs')) return 0;
+  const cutoff = (d) => d.toISOString().replace('T', ' ').slice(0, 19);
+  const briefs = db.prepare("DELETE FROM briefs WHERE kind IN ('weekly', 'review') AND created_at < ?")
+    .run(cutoff(new Date(now.getTime() - BRIEF_RETENTION_DAYS * 86400000))).changes;
+  const reports = db.prepare("DELETE FROM briefs WHERE kind = 'monthly' AND created_at < ?")
+    .run(cutoff(subtractMonths(now, REPORT_RETENTION_MONTHS))).changes;
+  return briefs + reports;
+}
 
 function tableExists(db, name) {
   return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
@@ -176,6 +191,7 @@ export function deleteAccountData(db, userId) {
     run('activities', `DELETE FROM activities WHERE user_id = @uid OR lead_id IN (${LEADS}) OR campaign_id IN (${CAMPAIGNS})`);
     run('pipeline', `DELETE FROM pipeline WHERE user_id = @uid OR lead_id IN (${LEADS})`);
     if (tableExists(db, 'replies')) run('replies', `DELETE FROM replies WHERE user_id = @uid OR lead_id IN (${LEADS})`);
+    if (tableExists(db, 'briefs')) run('briefs', 'DELETE FROM briefs WHERE user_id = @uid');
     run('generated_content', `DELETE FROM generated_content WHERE user_id = @uid OR campaign_id IN (${CAMPAIGNS})`);
     run('ai_cost_log', `DELETE FROM ai_cost_log WHERE user_id = @uid OR campaign_id IN (${CAMPAIGNS})`);
     if (tableExists(db, 'lead_touchpoints')) run('lead_touchpoints', `DELETE FROM lead_touchpoints WHERE user_id = @uid OR lead_id IN (${LEADS})`);
@@ -211,7 +227,7 @@ export function deleteAccountData(db, userId) {
 export function runRetention({ db = defaultDb, now = new Date(), dryRun = false, log = console } = {}) {
   const mode = dryRun ? 'DRY RUN' : 'live';
   const summary = { dryRun, enquiriesDeleted: 0, enquiryRelatedRows: 0, accountsDeleted: 0, accountRows: 0,
-    staleEnquiries: 0, expiredAccounts: 0, markersCleared: 0, suspendedWithoutMarker: 0 };
+    staleEnquiries: 0, expiredAccounts: 0, markersCleared: 0, suspendedWithoutMarker: 0, briefsDeleted: 0 };
 
   const stale = findStaleEnquiries(db, now);
   summary.staleEnquiries = stale.length;
@@ -234,6 +250,7 @@ export function runRetention({ db = defaultDb, now = new Date(), dryRun = false,
     const clear = db.prepare('DELETE FROM settings WHERE key = ?');
     for (const userId of acc.reinstated) summary.markersCleared += clear.run(`subscription_ended_${userId}`).changes;
     for (const key of acc.orphaned) summary.markersCleared += clear.run(key).changes;
+    summary.briefsDeleted = pruneBriefs(db, now);
   }
 
   log.log(`[Retention] ${mode}: enquiries past ${ENQUIRY_RETENTION_MONTHS} months = ${summary.staleEnquiries}`

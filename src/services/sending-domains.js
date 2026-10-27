@@ -75,6 +75,7 @@ export async function addDomain(userId, domain) {
  * allow it for this account (and only this one).
  */
 export async function checkDomain(userId, domain) {
+  if (domain === PLATFORM_DOMAIN) throw new Error("That is EIAAW's own domain.");
   let d = await findDomain(domain);
   if (!d) throw new Error('Add the domain first.');
   if (d.status !== 'verified') {

@@ -115,7 +115,7 @@ router.get('/usage', requireAuth, actAsAccount, (req, res) => {
   // The plan's monthly allowances as the proposal lists them: verified leads,
   // voice calls and seats.
   const verifiedLeads = db.prepare(
-    "SELECT COUNT(*) as c FROM leads WHERE user_id = ? AND source IN ('ai_generated', 'apollo') AND created_at >= datetime('now', 'start of month')"
+    "SELECT COUNT(*) as c FROM leads WHERE user_id = ? AND source IN ('ai_generated', 'apollo', 'referral') AND created_at >= datetime('now', 'start of month')"
   ).get(userId).c;
   const voiceCalls = db.prepare(
     "SELECT COUNT(*) as c FROM activities WHERE user_id = ? AND type = 'voice_call' AND created_at >= datetime('now', 'start of month')"

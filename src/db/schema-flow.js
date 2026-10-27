@@ -71,6 +71,8 @@ export function migrateFlow(db) {
     CREATE INDEX IF NOT EXISTS idx_replies_user ON replies(user_id, received_at);
     CREATE INDEX IF NOT EXISTS idx_replies_status ON replies(status);
   `);
+  // How many scheduled messages the reply cancelled when it arrived.
+  addColumn(db, 'replies', 'stopped_count', 'INTEGER NOT NULL DEFAULT 0');
 
   // The Monday brief, pipeline reviews asked for in the app, and the monthly
   // report (weekly-brief.js, monthly-report.js). facts are the numbers; the

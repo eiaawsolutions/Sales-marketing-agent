@@ -164,7 +164,7 @@ export function getPlanLimits(plan) {
 
 function monthlyAiLeadsUsed(userId) {
   return db.prepare(
-    "SELECT COUNT(*) as c FROM leads WHERE user_id = ? AND source IN ('ai_generated', 'apollo') AND created_at >= datetime('now', 'start of month')"
+    "SELECT COUNT(*) as c FROM leads WHERE user_id = ? AND source IN ('ai_generated', 'apollo', 'referral') AND created_at >= datetime('now', 'start of month')"
   ).get(userId).c;
 }
 

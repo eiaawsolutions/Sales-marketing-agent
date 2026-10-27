@@ -238,9 +238,8 @@ async function handleScheduleMeeting(args, callId, leadId, userId, res) {
 
   // With a booking calendar on the Brief, only a time it says is free is
   // booked, and it is booked there so it lands in the host's own calendar.
-  // If the calendar cannot be read, the meeting is booked here and the host
-  // is asked to confirm the time.
-  let calendarNote = '';
+  // If the calendar cannot be read, nothing is booked or confirmed: the host
+  // gets a task to confirm the time the prospect asked for.
   let booked = null;
   if (hasCalendar(userId)) {
     const free = await isFree(userId, scheduled.toISOString());
@@ -254,7 +253,13 @@ async function handleScheduleMeeting(args, callId, leadId, userId, res) {
       booked = await bookOnCalendar(userId, { start: scheduled.toISOString(), name: lead.name, email: lead.email, notes });
       if (!booked.ok) console.warn(`[voice] calendar booking failed for account ${userId}: ${booked.reason}`);
     }
-    if (free === null) calendarNote = 'The calendar could not be checked during the call — please confirm this time with the prospect.';
+    if (free === null) {
+      if (leadId) {
+        db.prepare("INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, 'task', ?)")
+          .run(userId, leadId, `Voice call: they asked to meet ${dateStr} at ${timeStr} (Malaysia time), but the calendar could not be checked — confirm the time with them${notes ? `. Notes: ${String(notes).slice(0, 300)}` : ''}`);
+      }
+      return res.json({ result: `I can't confirm that time on ${host.name}'s calendar right now. Tell them ${host.name} will email today to confirm ${dateStr} at ${timeStr}, or another time that suits. Do not say it is booked.` });
+    }
   }
 
   const type = ['demo', 'call', 'meeting', 'follow_up'].includes(meeting_type) ? meeting_type : 'meeting';
@@ -264,7 +269,7 @@ async function handleScheduleMeeting(args, callId, leadId, userId, res) {
   // made-up meet.google.com code.
   const location = (booked?.ok && booked.location) || getProfile(userId).meeting_link || null;
   const dur = parseInt(duration, 10) || 30;
-  const apptNotes = [notes || '', calendarNote].filter(Boolean).join('\n');
+  const apptNotes = notes || '';
 
   const result = db.prepare(
     `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, call_id, location)

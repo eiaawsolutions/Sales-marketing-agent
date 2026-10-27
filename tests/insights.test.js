@@ -167,3 +167,15 @@ test('board, review and report routes read only the signed-in account', async ()
 test('the monthly job emails last month\'s report only to accounts that did something', async () => {
   assert.equal(await runMonthlyReports(), 0, 'nothing happened last month in this fixture');
 });
+
+test('briefs that name prospects are kept 90 days; monthly reports 24 months', async () => {
+  const { pruneBriefs } = await import('../src/services/retention.js');
+  const ins = db.prepare("INSERT INTO briefs (user_id, kind, period, facts, created_at) VALUES (2, ?, ?, '{}', ?)");
+  const ago = (days) => new Date(Date.now() - days * 86400000).toISOString().replace('T', ' ').slice(0, 19);
+  ins.run('weekly', '2026-01-05', ago(120));
+  ins.run('review', 'x', ago(10));
+  ins.run('monthly', '2024-01', ago(800));
+  ins.run('monthly', '2026-01', ago(300));
+  assert.equal(pruneBriefs(db), 2);
+  assert.deepEqual(db.prepare('SELECT kind FROM briefs ORDER BY id').all().map(r => r.kind), ['review', 'monthly']);
+});

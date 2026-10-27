@@ -1015,18 +1015,30 @@ function futureDate(v) {
 // search (real personal email on a real page, a source, a profile or company
 // site) — and they are the person named, at the referrer's company. Nothing
 // is guessed: otherwise the agent reports it could not verify them.
-function sameCompany(cand, referrer) {
-  const words = (s) => String(s || '').toLowerCase().replace(/\b(sdn|bhd|berhad|group|holdings|the|ltd|limited|plc|inc|co)\b/g, ' ').split(/[^a-z0-9]+/).filter(w => w.length >= 3);
-  const a = new Set(words(cand.company));
-  if (words(referrer.company).some(w => a.has(w))) return true;
-  const domain = (e) => String(e || '').toLowerCase().split('@')[1] || '';
-  return !!domain(cand.email) && domain(cand.email) === domain(referrer.email);
+// The same company: the same email domain, or the same name once legal
+// suffixes are set aside ("Permata Utara Logistics Sdn Bhd" = "Permata Utara
+// Logistics"). Sharing a word is not enough: Malaysia Airlines is not
+// Malaysia Airports.
+const LEGAL_SUFFIX = /\b(sdn|bhd|berhad|plt|holdings|group|limited|ltd|plc|inc|llc|co|corp|corporation|company)\b\.?/g;
+function companyKey(name) {
+  return String(name || '').toLowerCase().replace(/&/g, ' and ').replace(LEGAL_SUFFIX, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+function sameCompany(cand, referrer) {
+  const domain = (e) => String(e || '').toLowerCase().split('@')[1] || '';
+  if (domain(cand.email) && domain(cand.email) === domain(referrer.email)) return true;
+  const a = companyKey(cand.company);
+  const b = companyKey(referrer.company);
+  return !!a && a === b;
+}
+
+// The person named: every word of the name they gave, as whole words of the
+// name found ("Farhana" = "Farhana Aziz"; "Ali" is not "Alicia").
 function sameName(cand, name) {
-  const want = String(name || '').toLowerCase().split(/\s+/).filter(w => w.length >= 2);
-  const have = String(cand.name || '').toLowerCase();
-  return want.length > 0 && want.every(w => have.includes(w));
+  const words = (s) => String(s || '').toLowerCase().split(/[^\p{L}\p{N}'-]+/u).filter(w => w.length >= 2);
+  const want = words(name);
+  const have = new Set(words(cand.name));
+  return want.length > 0 && want.every(w => have.has(w));
 }
 
 async function verifyReferralTask(input) {
@@ -1833,6 +1845,7 @@ Rules:
     const sequences = result.sequences || [];
 
     const dropDrafts = db.prepare("DELETE FROM outreach_queue WHERE campaign_id = ? AND lead_id = ? AND status = 'draft'");
+    const queueState = db.prepare("SELECT COUNT(*) AS total, COALESCE(SUM(status <> 'draft'), 0) AS touched FROM outreach_queue WHERE campaign_id = ? AND lead_id = ?");
     const queueBatch = db.transaction(() => {
       for (const seq of sequences) {
         const lead = batch.find(l => l.name === seq.lead_name);
@@ -1847,6 +1860,11 @@ Rules:
           .map(s => ({ ...s, delay: Math.max(0, Math.min(60, parseInt(s.delay_days, 10) || 0)) }))
           .sort((a, b) => a.delay - b.delay || (Number(a.step) || 0) - (Number(b.step) || 0));
         if (!steps.length) continue;
+        // Re-checked here, inside the transaction: the AI call took a while,
+        // and the lead may have been approved or drafted by someone else
+        // meanwhile. Never a second sequence.
+        const now = queueState.get(campaignId, lead.id);
+        if (input.replaceDrafts ? now.touched > 0 : now.total > 0) continue;
         if (input.replaceDrafts) dropDrafts.run(campaignId, lead.id);
 
         const callUrl = leadCallLinks.get(lead.id);
@@ -2090,6 +2108,8 @@ Total AI spend: $${totalCost.total.toFixed(4)}\n`;
 // the lead generator's "did the model actually browse" check looks for.
 export const __testing = {
   getModel,
+  sameName,
+  sameCompany,
   setChat(fn) {
     chatImpl = async (message, extraContext, options = {}) => {
       const out = await fn(message, extraContext, options);

@@ -38,6 +38,11 @@ function formatFrom(name, address) {
 // The Resend API key: the DB row wins over env so the in-app Settings UI keeps
 // working, but env (RESEND_API_KEY) acts as a fresh-install / Railway-only
 // fallback. Empty string when neither is usable.
+// For logs: "a***@domain" — enough to trace a delivery, not to read an address.
+function maskAddress(to) {
+  return String(Array.isArray(to) ? to[0] : to || '').replace(/^(.)[^@]*@/, '$1***@');
+}
+
 export function resendApiKey() {
   const resendRow = db.prepare("SELECT value FROM settings WHERE key = 'resend_api_key'").get();
   const dbResendKey = resendRow?.value ? decrypt(resendRow.value) : '';
@@ -48,12 +53,12 @@ export function resendApiKey() {
 export async function sendEmail({ to, subject, html, from, fromName, replyTo, attachments, icalEvent, headers }) {
   const resendKey = resendApiKey();
   if (resendKey) {
-    console.log('Sending email via Resend to:', to);
+    console.log('Sending email via Resend to:', maskAddress(to));
     return sendViaResend(resendKey, { to, subject, html, from, fromName, replyTo, attachments, icalEvent, headers });
   }
 
   // Fall back to SMTP
-  console.log('Sending email via SMTP to:', to, '(no Resend key configured)');
+  console.log('Sending email via SMTP to:', maskAddress(to), '(no Resend key configured)');
   return sendViaSMTP({ to, subject, html, from, fromName, replyTo, attachments, icalEvent, headers });
 }
 
@@ -102,10 +107,10 @@ async function sendViaResend(apiKey, { to, subject, html, from, fromName, replyT
     // Surface the full Resend error so deliverability problems (unverified
     // domain, sandbox-only address, rate limit, daily cap) are visible in
     // logs instead of bubbling up as a generic "Resend error 4xx".
-    console.error('[Resend] send failed:', res.status, JSON.stringify(data), 'from:', fromEmail, 'to:', to, 'subject:', subject);
+    console.error('[Resend] send failed:', res.status, JSON.stringify(data), 'to:', maskAddress(to));
     throw new Error(data.message || `Resend error ${res.status}`);
   }
-  console.log('[Resend] sent id=' + data.id, 'from:', fromEmail, 'to:', to, 'subject:', subject);
+  console.log('[Resend] sent id=' + data.id, 'to:', maskAddress(to));
   return { method: 'resend', id: data.id };
 }
 

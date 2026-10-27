@@ -31,3 +31,11 @@ test('an exact ISO time from the calendar is taken as is; past or unclear times 
   assert.equal(p('sometime soon'), null);
   assert.equal(p(''), null);
 });
+
+test('"next week", a "maybe" and a time range are read the way a person means them', () => {
+  assert.equal(p('Friday next week at 3pm'), myt('2026-11-06T15:00:00'), 'next week\'s Friday, not tomorrow');
+  assert.equal(p('Friday at 3, maybe 4'), myt('2026-10-30T15:00:00'), '"maybe" is not the month of May');
+  assert.equal(p('Friday 2 to 3pm'), myt('2026-10-30T14:00:00'), 'a range starts at its first time');
+  assert.equal(p('Friday 10-11am'), myt('2026-10-30T10:00:00'));
+  assert.equal(p('May 5 at 10am'), myt('2027-05-05T10:00:00'), 'the month of May still works');
+});
