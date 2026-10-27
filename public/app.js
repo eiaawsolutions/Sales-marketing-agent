@@ -1063,6 +1063,31 @@ const LEAD_TIERS = { all: ['All', () => true], hot: ['Hot 80+', s => s >= 80], w
 
 function setLeadsTier(tier) { leadsTierFilter = tier; loadLeads(); }
 
+// What a lead was verified with, read back from its notes (sector and size
+// only when a source stated them).
+function noteFacts(notes) {
+  const lines = String(notes || '').split('\n');
+  const get = (k) => { const line = lines.find(l => l.startsWith(k + ':')); return line ? line.slice(k.length + 1).trim() : ''; };
+  const isUrl = (u) => /^https?:\/\//i.test(u);
+  return {
+    sector: get('Sector'), size: get('Company size'), geography: get('Geography'),
+    linkedin: isUrl(get('Profile')), website: isUrl(get('Website')),
+    sources: get('Verification').split('|').map(x => x.trim()).filter(isUrl).length,
+  };
+}
+
+function companyCell(l) {
+  const f = noteFacts(l.notes);
+  const line = [f.sector, f.size && `${f.size} staff`, f.geography].filter(Boolean).join(' · ');
+  return `${esc(l.company || '-')}${line ? `<div class="text-sm text-muted">${esc(line)}</div>` : ''}`;
+}
+
+function verifiedCell(l) {
+  const f = noteFacts(l.notes);
+  const v = [f.linkedin && 'LinkedIn', f.website && 'Website', f.sources && `${f.sources} source${f.sources === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+  return `${renderSourceBadge(l.source)}${v ? `<div class="text-sm text-muted">${v}</div>` : ''}`;
+}
+
 async function loadLeads() {
   try {
     const all = await api.get('/leads');
@@ -1096,8 +1121,8 @@ async function loadLeads() {
             <col style="width:11%">
           </colgroup>
           <tr>
-            <th>Name</th><th>Email</th><th>Phone</th><th>Company</th>
-            <th>Source</th><th>Score</th><th>Status</th>
+            <th>Name</th><th>Email</th><th>Phone</th><th>Company · sector · size</th>
+            <th>Verified by</th><th>Score</th><th>Status</th>
             <th>Campaigns</th><th>Performance</th><th>Actions</th>
           </tr>
           ${leads.map(l => {
@@ -1115,8 +1140,8 @@ async function loadLeads() {
                 ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" id="reveal-btn-${l.id}" onclick="revealContact(${l.id})">Reveal</button>` : ''}
               </td>
               <td data-label="Phone"><span id="lead-phone-${l.id}">${l._masked ? `<span class="text-muted">${l.phone ? esc(l.phone) : '-'}</span>` : esc(l.phone || '-')}</span></td>
-              <td data-label="Company" title="${esc(l.company || '')}">${esc(l.company || '-')}</td>
-              <td data-label="Source">${renderSourceBadge(l.source)}</td>
+              <td data-label="Company" title="${esc(l.company || '')}">${companyCell(l)}</td>
+              <td data-label="Verified by">${verifiedCell(l)}</td>
               <td data-label="Score">${scoreCell(l)}</td>
               <td data-label="Status"><span class="badge badge-${l.status}">${l.status}</span></td>
               <td data-label="Campaigns" class="wrap">${campsHtml}</td>

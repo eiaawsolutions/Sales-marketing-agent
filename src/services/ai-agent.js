@@ -1088,6 +1088,8 @@ export function buildNotes(lead) {
   if (lead.lead_type) lines.push(`Lead type: ${lead.lead_type}${lead.confidence_score ? ` (confidence: ${lead.confidence_score})` : ''}`);
   if (lead.type) lines.push(`Segment: ${lead.type}`);
   if (lead.geography) lines.push(`Geography: ${lead.geography}`);
+  if (lead.sector) lines.push(`Sector: ${String(lead.sector).slice(0, 80)}`);
+  if (lead.company_size) lines.push(`Company size: ${String(lead.company_size).slice(0, 40)}`);
   if (lead.buying_signal) lines.push(`Buying signal: ${lead.buying_signal}`);
   if (lead.linkedin_url) lines.push(`Profile: ${lead.linkedin_url}`);
   if (lead.company_website) lines.push(`Website: ${lead.company_website}`);
@@ -1220,6 +1222,8 @@ Each lead object MUST have these fields (use empty string "" — never a guess �
 - "title": Job title / persona description
 - "company": Company / platform name (or "" if not applicable)
 - "geography": City / country
+- "sector": The company's industry, as shown on a page you visited (or "")
+- "company_size": Employee count or range, only if a page you visited states it, e.g. "1,200" or "500-1,000" (or "" — never estimate)
 - "lead_type": "Hot" | "Cold"
 - "email": REAL public email address verified on a real web page — REQUIRED. Do NOT return the lead at all if you cannot find a real public email. NEVER guess patterns like first.last@company.com.
 - "phone": Publicly listed phone only; otherwise ""
@@ -1576,6 +1580,8 @@ async function generateLeadsViaApollo(input) {
       `Fit: ${verdict.reason || 'matches campaign audience'}`,
       `Lead type: ${hotSignal ? 'Hot' : 'Cold'} (confidence: High — Apollo verified)`,
       `Apollo source: ${sourceDetail}`,
+      (enriched?.organization?.industry || person.organization?.industry) ? `Sector: ${enriched?.organization?.industry || person.organization?.industry}` : '',
+      (enriched?.organization?.estimated_num_employees || person.organization?.estimated_num_employees) ? `Company size: ${Number(enriched?.organization?.estimated_num_employees || person.organization?.estimated_num_employees).toLocaleString('en-MY')}` : '',
       linkedinUrl ? `Profile: ${linkedinUrl}` : '',
       websiteUrl ? `Website: ${websiteUrl}` : '',
       hotSignal ? `Buying signal: ${hotSignal}` : '',
