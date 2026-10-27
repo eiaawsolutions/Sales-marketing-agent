@@ -996,7 +996,7 @@ async function loadDashboard() {
           <div class="stat-label">Qualified Leads</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value yellow">$${(data.deals.openValue || 0).toLocaleString()}</div>
+          <div class="stat-value yellow">${rm(data.deals.openValue)}</div>
           <div class="stat-label">Open Pipeline Value</div>
         </div>
         <div class="stat-card">
