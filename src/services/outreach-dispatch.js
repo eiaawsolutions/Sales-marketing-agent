@@ -8,6 +8,9 @@
  * Drafts ('draft') are never touched here: nothing reaches a prospect until a
  * person approves it (see outreach-queue.js).
  *
+ * A LinkedIn note in a sequence is the team's to send from their own account:
+ * it is never sent here and never holds up the emails after it.
+ *
  * One prospect never gets a sequence in a burst: a step is not claimed while
  * an earlier step to the same prospect is still waiting, and each send pushes
  * that prospect's later steps out to their own spacing from now. A paused
@@ -59,7 +62,8 @@ export async function processOutreachQueue({ campaignId = null } = {}) {
         AND c.status = 'active'
         AND NOT EXISTS (SELECT 1 FROM outreach_queue e
                          WHERE e.campaign_id = oq.campaign_id AND e.lead_id = oq.lead_id
-                           AND e.step < oq.step AND e.status IN ('draft', 'pending', 'sending'))
+                           AND e.step < oq.step AND e.status IN ('draft', 'pending', 'sending')
+                           AND e.channel IN ('email', 'ai_action'))
         ${campaignId ? 'AND oq.campaign_id = ?' : ''}
       ORDER BY oq.scheduled_at ASC, oq.step ASC
       LIMIT ${BATCH}
@@ -74,7 +78,8 @@ export async function processOutreachQueue({ campaignId = null } = {}) {
        WHERE id = ? AND status = 'pending' AND scheduled_at <= datetime('now')
          AND NOT EXISTS (SELECT 1 FROM outreach_queue e
                           WHERE e.campaign_id = outreach_queue.campaign_id AND e.lead_id = outreach_queue.lead_id
-                            AND e.step < outreach_queue.step AND e.status IN ('draft', 'pending', 'sending'))`);
+                            AND e.step < outreach_queue.step AND e.status IN ('draft', 'pending', 'sending')
+                            AND e.channel IN ('email', 'ai_action'))`);
     const spaceLaterSteps = db.prepare(`
       UPDATE outreach_queue
          SET scheduled_at = datetime('now', '+' || MAX(COALESCE(delay_days, 0) - @delay, 1) || ' days')

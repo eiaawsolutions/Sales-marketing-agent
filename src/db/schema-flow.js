@@ -11,6 +11,10 @@
 //     company_size (a band). Searches, scores and campaign audiences are
 //     written from these.
 //
+//   outreach_queue.highlights — which phrases of a draft came from the lead's
+//     public signals and which from the brief: [{ text, from: 'lead'|'brief' }].
+//     Only phrases found verbatim in the message are kept.
+//
 // Plain ADD COLUMNs only: nothing here rebuilds a table.
 
 export function migrateFlow(db) {
@@ -19,6 +23,8 @@ export function migrateFlow(db) {
   for (const col of ['ideal_client', 'target_roles', 'target_sectors', 'target_regions', 'company_size']) {
     addColumn(db, 'account_profiles', col, 'TEXT');
   }
+
+  addColumn(db, 'outreach_queue', 'highlights', 'TEXT');
 }
 
 function addColumn(db, table, column, type) {

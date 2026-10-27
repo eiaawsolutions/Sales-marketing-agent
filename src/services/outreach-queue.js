@@ -94,6 +94,31 @@ export async function redraftFromBrief(userId) {
   return { leads_redrafted: leadsRedrafted, campaigns: byCampaign.size };
 }
 
+/** One queue item in one campaign, or null. */
+export function getQueueItem(campaignId, itemId) {
+  return db.prepare('SELECT * FROM outreach_queue WHERE id = ? AND campaign_id = ?').get(itemId, campaignId) || null;
+}
+
+/**
+ * The team sent a LinkedIn note from their own account. Marks it sent (and
+ * approved, if it was still a draft) and logs it on the lead. Returns 'ok',
+ * 'not_found', 'not_linkedin' or 'closed' (already sent or skipped).
+ */
+export function markLinkedinSent({ campaignId, itemId, by }) {
+  const item = getQueueItem(campaignId, itemId);
+  if (!item) return 'not_found';
+  if (item.channel !== 'linkedin') return 'not_linkedin';
+  const { changes } = db.prepare(`
+    UPDATE outreach_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP,
+           approved_at = COALESCE(approved_at, CURRENT_TIMESTAMP), approved_by = COALESCE(approved_by, ?)
+     WHERE id = ? AND status IN ('draft', 'pending')
+  `).run(by, itemId);
+  if (!changes) return 'closed';
+  db.prepare("INSERT INTO activities (user_id, lead_id, campaign_id, type, description) VALUES (?, ?, ?, 'note', ?)")
+    .run(item.user_id, item.lead_id, campaignId, 'LinkedIn connection note sent from your own account');
+  return 'ok';
+}
+
 /** Edit a draft's subject and/or body. Returns 'ok', 'not_found' or 'not_draft'. */
 export function editDraft({ campaignId, itemId, subject, message }) {
   const row = db.prepare('SELECT status FROM outreach_queue WHERE id = ? AND campaign_id = ?').get(itemId, campaignId);

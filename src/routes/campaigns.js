@@ -4,7 +4,7 @@ import { campaignsService } from '../services/campaigns.js';
 import { runAgent, getAICostStats, getAICostByCampaign, getAICostLog, getOutreachQueue } from '../services/ai-agent.js';
 import { checkPlanLimit, remainingMonthlyAiLeads } from '../middleware/auth.js';
 import { maskLeads, maskLead } from '../services/leads.js';
-import { approveDrafts, skipLeads, editDraft, validIdFilter } from '../services/outreach-queue.js';
+import { approveDrafts, skipLeads, editDraft, validIdFilter, getQueueItem, markLinkedinSent } from '../services/outreach-queue.js';
 import { audienceFromBrief } from '../services/account-profile.js';
 
 const router = Router();
@@ -374,6 +374,30 @@ router.put('/:id/outreach/:itemId', (req, res) => {
   });
   if (result === 'not_found') return res.status(404).json({ error: 'Message not found' });
   if (result === 'not_draft') return res.status(409).json({ error: 'Only drafts can be edited — this message is already approved or sent.' });
+  res.json({ ok: true });
+});
+
+// "Rewrite shorter" / "Rewrite longer" on one draft. Uses an AI action.
+router.post('/:id/outreach/:itemId/rewrite', async (req, res) => {
+  const length = req.body?.length;
+  if (!['shorter', 'longer'].includes(length)) return res.status(400).json({ error: "length must be 'shorter' or 'longer'" });
+  const item = getQueueItem(req.campaign.id, parseInt(req.params.itemId, 10));
+  if (!item) return res.status(404).json({ error: 'Message not found' });
+  if (item.status !== 'draft') return res.status(409).json({ error: 'Only drafts can be rewritten — this message is already approved or sent.' });
+  try { checkPlanLimit(req, 'ai_action'); } catch (e) { return res.status(403).json({ error: e.message }); }
+  try {
+    res.json(await runAgent(req.campaign.user_id, 'rewrite_outreach', { itemId: item.id, length, campaignId: req.campaign.id }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// The team sent the LinkedIn note from their own account.
+router.post('/:id/outreach/:itemId/linkedin-sent', (req, res) => {
+  const result = markLinkedinSent({ campaignId: req.campaign.id, itemId: parseInt(req.params.itemId, 10), by: req.user.memberId ?? req.user.id });
+  if (result === 'not_found') return res.status(404).json({ error: 'Message not found' });
+  if (result === 'not_linkedin') return res.status(409).json({ error: 'Only a LinkedIn note can be marked as sent by you.' });
+  if (result === 'closed') return res.status(409).json({ error: 'This note is already sent or skipped.' });
   res.json({ ok: true });
 });
 

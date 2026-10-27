@@ -2008,7 +2008,7 @@ async function aiGenerateLeads(campaignId) {
 
 // AI Auto-Outreach
 async function aiAutoOutreach(campaignId) {
-  if (!confirm('AI will write a personalised email sequence (Day 0, 3 and 7) for every lead in this campaign.\n\nIf approval is on (Brief → Sending), nothing is sent until you approve it.\n\nContinue?')) return;
+  if (!confirm('AI will write a personal sequence for every lead in this campaign: a first email (Day 0), a LinkedIn note for you to send (Day 1, when the lead has a public profile), and follow-up emails on Days 3 and 7.\n\nIf approval is on (Brief → Sending), nothing is sent until you approve it.\n\nContinue?')) return;
 
   showNotification('AI is writing outreach sequences for all leads...');
 
@@ -2095,14 +2095,8 @@ const outreachQueueCache = {};
 const OUTREACH_STATUS = {
   draft: ['paused', 'needs approval'], pending: ['draft', 'scheduled'], sending: ['draft', 'sending'],
   sent: ['active', 'sent'], skipped: ['paused', 'skipped'], failed: ['paused', 'failed'],
+  notedue: ['new', 'yours to send'],
 };
-
-// Message bodies are HTML written by the AI; show them as text so nothing in
-// them can run in the app.
-function outreachPreview(html, max = 400) {
-  const text = String(html || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ').trim();
-  return esc(text.length > max ? text.slice(0, max) + '…' : text).replace(/\n/g, '<br>');
-}
 
 async function showOutreachQueue(campaignId) {
   try {
@@ -2120,32 +2114,50 @@ async function showOutreachQueue(campaignId) {
       byLead[item.lead_id].steps.push(item);
     }
     const draftCount = queue.filter(q => q.status === 'draft').length;
+    const notesDue = queue.filter(q => q.channel === 'linkedin' && q.status === 'pending').length;
 
     const body = Object.values(byLead).map(lead => {
       const hasDraft = lead.steps.some(s => s.status === 'draft');
       const open = lead.steps.some(s => s.status === 'draft' || s.status === 'pending');
+      const profile = lead.steps.find(s => s.lead_linkedin)?.lead_linkedin;
       return `
       <div class="content-card" style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           <div class="type">${esc(lead.name)} — ${esc(lead.company || lead.email)}</div>
           <div class="flex gap-1">
-            ${hasDraft ? `<button class="btn btn-sm btn-success" onclick="approveOutreach(${campaignId}, [${lead.id}])">Approve sequence</button>` : ''}
-            ${open ? `<button class="btn btn-sm btn-outline" onclick="skipOutreachLead(${campaignId}, ${lead.id})">Skip lead</button>` : ''}
+            ${hasDraft ? `<button class="btn btn-sm btn-success" onclick="approveOutreach(${campaignId}, [${Number(lead.id)}])">Approve and schedule</button>` : ''}
+            ${open ? `<button class="btn btn-sm btn-outline" onclick="skipOutreachLead(${campaignId}, ${Number(lead.id)})">Skip this lead</button>` : ''}
           </div>
         </div>
         ${lead.steps.map(s => {
-          const [badge, label] = OUTREACH_STATUS[s.status] || ['paused', s.status];
+          const [badge, label] = OUTREACH_STATUS[s.channel === 'linkedin' && s.status === 'pending' ? 'notedue' : s.status] || ['paused', s.status];
+          const isNote = s.channel === 'linkedin';
+          const lastEmail = !isNote && s === lead.steps.filter(x => x.channel !== 'linkedin').slice(-1)[0];
+          const kind = isNote ? 'LinkedIn note · you send it' : (lastEmail && lead.steps.length > 1 ? 'Email + voice link' : 'Email');
+          const id = Number(s.id);
           return `
           <div class="outreach-step ${esc(s.status)}">
-            <div class="outreach-step-header">
+            <div class="outreach-step-header" style="flex-wrap:wrap">
               <span class="outreach-step-num">${Number(s.step) || ''}</span>
+              <span class="text-sm" style="font-weight:600">Day ${Number(s.delay_days) || 0}</span>
+              <span class="text-sm">${kind}</span>
               <span class="badge badge-${badge}">${esc(label)}</span>
-              <span class="text-sm">${esc(s.channel)}</span>
-              <span class="text-muted text-sm">${Number(s.delay_days) === 0 ? 'Day 0' : `Day ${Number(s.delay_days)}`}</span>
-              ${s.status === 'draft' ? `<button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="editOutreachDraft(${campaignId}, ${Number(s.id)})">Edit</button>` : ''}
+              ${s.status === 'draft' ? `
+                <span class="flex gap-1" style="margin-left:auto;flex-wrap:wrap">
+                  <button class="btn btn-sm btn-outline" onclick="rewriteOutreachDraft(${campaignId}, ${id}, 'shorter')">Rewrite shorter</button>
+                  <button class="btn btn-sm btn-outline" onclick="rewriteOutreachDraft(${campaignId}, ${id}, 'longer')">Rewrite longer</button>
+                  <button class="btn btn-sm btn-outline" onclick="editOutreachDraft(${campaignId}, ${id})">Edit</button>
+                </span>` : ''}
             </div>
             ${s.subject ? `<div class="text-sm" style="margin:4px 0"><strong>Subject:</strong> ${esc(s.subject)}</div>` : ''}
-            <div class="text-sm" style="color:var(--text-muted);line-height:1.5">${outreachPreview(s.message)}</div>
+            <div class="text-sm" style="line-height:1.55;margin-top:4px">${renderHighlighted(s.message, s.highlights)}</div>
+            ${isNote ? `
+              <div class="flex gap-1" style="margin-top:6px;align-items:center;flex-wrap:wrap">
+                <span class="text-sm text-muted">${String(s.message || '').length} / 300 characters · you paste and send this from your own LinkedIn account</span>
+                <button class="btn btn-sm btn-outline" onclick="copyOutreachText(${campaignId}, ${id})">Copy note</button>
+                ${profile ? `<a class="btn btn-sm btn-outline" href="${esc(profile)}" target="_blank" rel="noopener noreferrer">Open profile</a>` : ''}
+                ${s.status === 'draft' || s.status === 'pending' ? `<button class="btn btn-sm btn-outline" onclick="markLinkedinSent(${campaignId}, ${id})">Mark as sent</button>` : ''}
+              </div>` : ''}
             ${s.goal ? `<div class="text-sm" style="margin-top:4px;color:var(--primary)">Goal: ${esc(s.goal)}</div>` : ''}
           </div>`;
         }).join('')}
@@ -2157,7 +2169,8 @@ async function showOutreachQueue(campaignId) {
         ? `Approval queue — ${draftCount} draft${draftCount === 1 ? '' : 's'} waiting`
         : `Outreach (${queue.length} steps for ${Object.keys(byLead).length} leads)`,
       body: `
-        <p class="text-sm text-muted" style="margin:0 0 12px">Nothing is sent until you approve it. Approving a sequence sends Day 0 now and schedules the follow-ups from today.</p>
+        <p class="text-sm text-muted" style="margin:0 0 6px">Nothing is sent until you approve it. Review each sequence, or approve the batch once you have spot-checked a few. Approving sends Day 0 now and schedules the follow-ups from today. A reply stops that prospect's sequence.</p>
+        <p class="text-sm" style="margin:0 0 12px"><mark class="hl-lead">highlighted</mark> from the lead's public signals · <mark class="hl-brief">tinted</mark> from your brief${notesDue ? ` · <strong>${notesDue} LinkedIn note${notesDue === 1 ? '' : 's'} to send</strong>` : ''}</p>
         <div style="max-height:60vh;overflow-y:auto">${body}</div>`,
       ...(draftCount ? { onSave: () => approveOutreach(campaignId, null), saveLabel: `Approve all ${draftCount}` } : {}),
     };
@@ -2165,6 +2178,44 @@ async function showOutreachQueue(campaignId) {
   } catch (e) {
     showNotification('Error: ' + e.message, 'error');
   }
+}
+
+// The draft as text, with the phrases the agent personalised marked. Both the
+// message and each phrase are escaped before the marks go in.
+function renderHighlighted(message, highlights) {
+  let html = esc(String(message || ''));
+  for (const h of (Array.isArray(highlights) ? highlights : [])) {
+    const needle = esc(String(h.text || ''));
+    const at = needle ? html.indexOf(needle) : -1;
+    if (at === -1) continue;
+    html = `${html.slice(0, at)}<mark class="hl-${h.from === 'brief' ? 'brief' : 'lead'}">${needle}</mark>${html.slice(at + needle.length)}`;
+  }
+  return html.replace(/\n/g, '<br>');
+}
+
+async function rewriteOutreachDraft(campaignId, itemId, length) {
+  showNotification(length === 'shorter' ? 'Rewriting shorter…' : 'Rewriting longer…');
+  try {
+    await api.post(`/campaigns/${campaignId}/outreach/${itemId}/rewrite`, { length });
+    await showOutreachQueue(campaignId);
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+async function copyOutreachText(campaignId, itemId) {
+  const item = (outreachQueueCache[campaignId] || []).find(q => q.id === itemId);
+  if (!item) return;
+  try {
+    await navigator.clipboard.writeText(item.message || '');
+    showNotification('Copied. Paste it into the connection request on LinkedIn.', 'success');
+  } catch { showNotification('Could not copy — select the text and copy it instead.', 'error'); }
+}
+
+async function markLinkedinSent(campaignId, itemId) {
+  try {
+    await api.post(`/campaigns/${campaignId}/outreach/${itemId}/linkedin-sent`);
+    showNotification('Marked as sent. It is logged on the lead.', 'success');
+    await showOutreachQueue(campaignId);
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
 
 async function approveOutreach(campaignId, leadIds) {

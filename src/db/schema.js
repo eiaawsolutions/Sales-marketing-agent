@@ -477,9 +477,9 @@ function seedSystemLogic(db) {
       'src/services/ai-agent.js → qualifyLeadTask()',
       'Uses Budget/Authority/Need/Timeline framework. Claude returns a qualified boolean, bant_score (each 0-25), total_score, qualification_notes, and next_steps. Updates lead status to "qualified" or "contacted" accordingly.', 3],
 
-    ['AI Engine', 'Outreach Sequence (AI)', 'Generates multi-step personalized outreach plans',
-      'src/services/ai-agent.js → craftOutreachTask()',
-      'Generates a 4-5 step outreach sequence with channel (email/linkedin/call), delay_days, subject, message, and goal for each step. Takes the lead profile and optional value proposition as context.', 4],
+    ['AI Engine', 'Outreach Sequence (AI)', 'Email day 0, LinkedIn note day 1 (you send), emails days 3 and 7',
+      'src/services/ai-agent.js → autoOutreachTask() / rewriteOutreachTask() / craftOutreachTask()',
+      'autoOutreachTask drafts each lead\'s sequence from the Brief and the lead\'s verified signals: an email on day 0, a LinkedIn connection note on day 1 only when the lead has a public LinkedIn profile (max 300 characters, no link; the team sends it from their own account and marks it sent), and emails on days 3 and 7. Every email carries the lead\'s voice link. Each step stores highlights: the phrases taken from the lead\'s signals and from the brief, kept only when found verbatim. The dispatcher never sends a LinkedIn note and never lets one hold up the emails after it. rewriteOutreachTask rewrites one draft shorter or longer, keeping the voice link. craftOutreachTask is the per-lead preview.', 4],
 
     ['AI Engine', 'Content Generation (AI)', 'Email, social, ad copy, SEO keyword generation',
       'src/services/ai-agent.js → generateEmailTask / generateSocialTask / generateAdTask / generateSeoTask',
