@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db from '../db/index.js';
 import { requireAuth, requireSuperadmin, hashPassword } from '../middleware/auth.js';
 import { FOUNDER_HQ_EMAIL, isFounderHq } from '../config/hq.js';
+import { validDomain, domainState, addDomain, checkDomain, disableDomain } from '../services/sending-domains.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -131,6 +132,39 @@ router.put('/:id/password', (req, res) => {
   res.json({ success: true });
 });
 
+// Sending from the customer's own domain (services/sending-domains.js).
+// GET ?domain= shows where it stands; POST adds it to Resend and returns the
+// DNS records for the customer; /check enables it for this account once
+// Resend reports it verified; DELETE stops using it.
+function domainParam(req, res) {
+  const userId = parseInt(req.params.id, 10);
+  if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) { res.status(404).json({ error: 'User not found' }); return null; }
+  const domain = validDomain(req.query.domain ?? req.body?.domain);
+  if (!domain) { res.status(400).json({ error: 'Enter a domain like theleadershiplab.com.my' }); return null; }
+  return { userId, domain };
+}
+
+router.get('/:id/sending-domain', async (req, res) => {
+  const p = domainParam(req, res); if (!p) return;
+  try { res.json(await domainState(p.userId, p.domain)); } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+router.post('/:id/sending-domain', async (req, res) => {
+  const p = domainParam(req, res); if (!p) return;
+  try { res.json(await addDomain(p.userId, p.domain)); } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+router.post('/:id/sending-domain/check', async (req, res) => {
+  const p = domainParam(req, res); if (!p) return;
+  try { res.json(await checkDomain(p.userId, p.domain)); } catch (e) { res.status(409).json({ error: e.message }); }
+});
+
+router.delete('/:id/sending-domain', (req, res) => {
+  const p = domainParam(req, res); if (!p) return;
+  disableDomain(p.userId, p.domain);
+  res.json({ ok: true });
+});
+
 // DELETE /api/users/:id — delete user and all their data
 router.delete('/:id', (req, res) => {
   const userId = parseInt(req.params.id);
@@ -152,6 +186,9 @@ router.delete('/:id', (req, res) => {
     db.prepare('DELETE FROM generated_content WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM activities WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM pipeline WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM appointments WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM replies WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM briefs WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM campaigns WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM leads WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);

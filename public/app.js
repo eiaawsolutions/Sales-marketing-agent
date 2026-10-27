@@ -4950,13 +4950,29 @@ function showCreateAccountModal() {
   render();
 }
 
+// Sending from a customer's own domain: add it to Resend, give them the DNS
+// records, enable it for this account once Resend verifies them.
+async function sendingDomain(userId, action) {
+  const out = document.getElementById('f-domain-out');
+  const domain = document.getElementById('f-domain').value.trim();
+  out.textContent = action === 'add' ? 'Adding…' : 'Checking…';
+  try {
+    const r = action === 'add'
+      ? await api.post(`/users/${userId}/sending-domain`, { domain })
+      : await api.post(`/users/${userId}/sending-domain/check`, { domain });
+    out.innerHTML = `
+      <div><strong>${esc(r.domain)}</strong> — Resend: ${esc(r.status)} · ${r.enabled_for_account ? '<span style="color:var(--success)">sending from it for this account</span>' : 'not enabled yet'}${r.from_email ? ` · their Send-from: ${esc(r.from_email)}` : ' · they have no Send-from address on their Brief yet'}</div>
+      ${r.records.length && !r.enabled_for_account ? `<table style="margin-top:6px;font-size:12px"><tr><th>Type</th><th>Name</th><th>Value</th><th>Priority</th></tr>${r.records.map(x => `<tr><td>${esc(x.type)}</td><td style="word-break:break-all">${esc(x.name)}</td><td style="word-break:break-all">${esc(x.value)}</td><td>${x.priority === null ? '' : Number(x.priority)}</td></tr>`).join('')}</table>` : ''}`;
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+
 async function showEditAccountModal(userId) {
   const user = await api.get(`/users/${userId}`);
   modal = {
-    title: `Edit Account: ${user.display_name || user.username}`,
+    title: `Edit Account: ${esc(user.display_name || user.username)}`,
     body: `
-      <div class="form-group"><label>Display Name</label><input id="f-display" value="${user.display_name || ''}"></div>
-      <div class="form-group"><label>Email</label><input id="f-email" value="${user.email}"${user.is_hq ? ' readonly title="The HQ account email is locked"' : ''}></div>
+      <div class="form-group"><label>Display Name</label><input id="f-display" value="${esc(user.display_name || '')}"></div>
+      <div class="form-group"><label>Email</label><input id="f-email" value="${esc(user.email)}"${user.is_hq ? ' readonly title="The HQ account email is locked"' : ''}></div>
       <div class="grid-2">
         <div class="form-group"><label>Role</label>
           ${user.is_hq
@@ -4995,6 +5011,14 @@ async function showEditAccountModal(userId) {
           </div>
           <small class="text-muted" style="display:block;margin-top:8px">Passwords are shown in plain text so you can verify what you set. The user's existing sessions will be signed out.</small>
         </div>
+      </div>
+      <div class="form-group" style="border:1px solid var(--border);border-radius:8px;padding:12px">
+        <label for="f-domain">Sending domain <span class="text-muted">(their own, e.g. theleadershiplab.com)</span></label>
+        <div class="flex gap-1"><input id="f-domain" placeholder="theirdomain.com" style="flex:1;min-width:0">
+          <button type="button" class="btn btn-sm btn-outline" onclick="sendingDomain(${Number(userId)}, 'add')">Add / show records</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="sendingDomain(${Number(userId)}, 'check')">Check</button></div>
+        <div id="f-domain-out" class="text-sm" style="margin-top:8px"></div>
+        <small class="text-muted">Adds the domain to Resend and lists the DNS records to send the customer. Once Resend verifies them, Check turns it on for this account only; their Brief's 'Send from' address is then used.</small>
       </div>
     `,
     onSave: async () => {
