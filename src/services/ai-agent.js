@@ -521,7 +521,13 @@ function readBant(raw) {
 }
 
 function saveScoreDetail(leadId, { bant, total, reasoning, nextStep, status }) {
-  const detail = { bant, reasoning: reasoning || '', next_step: nextStep || '', scored_at: new Date().toISOString() };
+  // What a call captured (leads.js recordCallCapture) survives a re-score.
+  let previous = {};
+  try { previous = JSON.parse(db.prepare('SELECT score_detail FROM leads WHERE id = ?').get(leadId)?.score_detail || '{}'); } catch { previous = {}; }
+  const detail = {
+    bant, reasoning: reasoning || '', next_step: nextStep || '', scored_at: new Date().toISOString(),
+    ...(previous.call ? { call: previous.call } : {}),
+  };
   db.prepare(`UPDATE leads SET score = ?, score_detail = ?${status ? ', status = ?' : ''}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
     .run(...[total, JSON.stringify(detail), ...(status ? [status] : []), leadId]);
   return detail;

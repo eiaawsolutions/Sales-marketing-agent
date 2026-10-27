@@ -63,8 +63,42 @@ export function scoreView(lead) {
     score: lead.score || 0, status: lead.status,
     bant: detail?.bant || null, reasoning: detail?.reasoning || '', next_step: detail?.next_step || '',
     scored_at: detail?.scored_at || null,
+    call: detail?.call || null,
     ...signalsFromNotes(lead.notes),
   };
+}
+
+// The voice assistant ends every customer call with log_call_outcome, whose
+// summary starts "Need: …; Budget: …; Authority: …; Timeline: …" (the prompt
+// asks for exactly this). Read the four back; "unknown" counts as not said.
+export function readCallBant(summary) {
+  const out = {};
+  for (const key of ['need', 'budget', 'authority', 'timeline']) {
+    const m = String(summary || '').match(new RegExp(`${key}\\s*:\\s*([^;\\n]+)`, 'i'));
+    const v = m ? m[1].trim().replace(/[.\s]+$/, '') : '';
+    if (v && !/^(unknown|n\/?a|not discussed|none)$/i.test(v)) out[key] = v.slice(0, 300);
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * Keep what a call captured on the lead (shown with its score), and log it
+ * on the timeline. Returns the captured fields, or null if the summary had
+ * none. The caller re-scores the lead so the score reflects the call.
+ */
+export function recordCallCapture(userId, leadId, summary, callId) {
+  const call = readCallBant(summary);
+  if (!call) return null;
+  const lead = db.prepare('SELECT score_detail FROM leads WHERE id = ? AND user_id = ?').get(leadId, userId);
+  if (!lead) return null;
+  let detail = {};
+  try { detail = lead.score_detail ? JSON.parse(lead.score_detail) : {}; } catch { detail = {}; }
+  detail.call = { ...call, at: new Date().toISOString(), call_id: callId || null };
+  db.prepare('UPDATE leads SET score_detail = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?').run(JSON.stringify(detail), leadId, userId);
+  const line = ['need', 'budget', 'authority', 'timeline'].filter(k => call[k]).map(k => `${k[0].toUpperCase()}${k.slice(1)}: ${call[k]}`).join('; ');
+  db.prepare("INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, 'note', ?)")
+    .run(userId, leadId, `What the call captured — ${line}`.slice(0, 1000));
+  return call;
 }
 
 export function maskLeads(leads) {

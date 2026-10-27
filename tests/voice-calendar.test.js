@@ -133,3 +133,30 @@ test('if the calendar cannot be read, the meeting is booked here and the host is
   assert.match(db.prepare('SELECT notes FROM appointments').get().notes, /could not be checked/);
   assert.ok(mails.some(m => m.to[0] === 'grace@lumina.example'), 'our own invite goes to the prospect');
 });
+
+test('what the call captured — Need, Budget, Authority, Timeline — stays on the lead and the lead is re-scored', async () => {
+  const { __testing: agent } = await import('../src/services/ai-agent.js');
+  const f = (score, note) => ({ score, note });
+  agent.setChat(async () => JSON.stringify({ bant: { budget: f(22, 'Leadership line in 2027 plan'), authority: f(21, 'CHRO signs above threshold'), need: f(24, '40 nurses to unit managers'), timeline: f(22, 'Feb–Mar 2027') }, reasoning: 'Call confirmed every factor.', recommended_action: 'Prepare outline and cost per participant.' }));
+  db.prepare('UPDATE leads SET score = 81 WHERE id = 20').run();
+  await server(async ({ tool }) => {
+    await tool({ name: 'log_call_outcome', args: { interest_level: 'hot', summary: 'Need: about 40 senior nurses moving into unit-manager roles; Budget: leadership line in the 2027 plan, HRD Corp claims; Authority: Grace leads, CHRO signs off above a threshold; Timeline: first cohort Feb–Mar 2027', next_step: 'Meeting booked' }, call: { call_id: 'c9', metadata: { lead_id: '20' } } });
+  });
+  await new Promise(r => setTimeout(r, 50));
+  const lead = db.prepare('SELECT score, score_detail FROM leads WHERE id = 20').get();
+  const detail = JSON.parse(lead.score_detail);
+  assert.equal(detail.call.need, 'about 40 senior nurses moving into unit-manager roles');
+  assert.equal(detail.call.timeline, 'first cohort Feb–Mar 2027');
+  assert.equal(lead.score, 89, 're-scored from the call');
+  assert.match(db.prepare("SELECT description FROM activities WHERE type = 'note'").get().description, /^What the call captured — Need: about 40/);
+  agent.resetChat();
+});
+
+test('a meeting the assistant only mentions in its notes is not booked unchecked when a calendar is connected', async () => {
+  await server(async ({ tool }) => {
+    await tool({ name: 'log_call_outcome', args: { interest_level: 'hot', summary: 'Need: unknown; Budget: unknown; Authority: unknown; Timeline: unknown', next_step: 'meet', meeting_requested: true, meeting_time: 'Thursday at 3pm' }, call: { call_id: 'c10', metadata: { lead_id: '20' } } });
+  });
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM appointments').get().c, 0);
+  assert.match(db.prepare("SELECT description FROM activities WHERE type = 'task'").get().description, /not booked/);
+  assert.equal(db.prepare('SELECT score_detail FROM leads WHERE id = 20').get().score_detail, null, '"unknown" captures nothing');
+});

@@ -11,6 +11,8 @@ import { personaFor, EMPTY_CUSTOMER_VARS } from '../services/voice-persona.js';
 import { GIT_SHA } from '../version.js';
 import { verifyRetell } from '../services/ingest-auth.js';
 import { parseMeetingTime } from '../services/meeting-time.js';
+import { recordCallCapture } from '../services/leads.js';
+import { runAgent } from '../services/ai-agent.js';
 import { calendarVars, hasCalendar, isFree, offerTimes, bookOnCalendar } from '../services/calendar.js';
 
 const router = Router();
@@ -168,7 +170,12 @@ router.post('/tool-callback', requireRetellSignature, async (req, res) => {
     // Default: log_call_outcome
     let apptMsg = '';
     const alreadyBooked = callId && db.prepare('SELECT 1 FROM appointments WHERE call_id = ?').get(callId);
-    if (args.meeting_requested && leadId && !alreadyBooked) {
+    // A meeting the assistant agreed but never booked with schedule_meeting. With
+    // a booking calendar on the Brief nothing is booked unchecked: a person confirms.
+    if (args.meeting_requested && leadId && !alreadyBooked && hasCalendar(userId)) {
+      db.prepare("INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, 'task', ?)")
+        .run(userId, leadId, `Voice call: they agreed to meet (${String(args.meeting_time || 'time not given').slice(0, 80)}) but it was not booked — confirm a time with them`);
+    } else if (args.meeting_requested && leadId && !alreadyBooked) {
       const meetingTime = args.meeting_time || args.next_step || '';
       const scheduled = parseMeetingTime(meetingTime);
       if (scheduled) {
@@ -191,6 +198,15 @@ router.post('/tool-callback', requireRetellSignature, async (req, res) => {
       } else if (args.interest_level === 'warm') {
         db.prepare('UPDATE leads SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status IN (?, ?)').run('contacted', leadId, 'new', 'cold');
       }
+    }
+
+    // What the call captured (Need, Budget, Authority, Timeline) stays on the
+    // lead, and the lead is re-scored with it in the background.
+    if (leadId && args.summary && recordCallCapture(userId, leadId, args.summary, callId)) {
+      try {
+        checkPlanLimitForUser(loadPlanUser(userId), 'ai_action');
+        runAgent(userId, 'score_lead', { leadId }).catch(e => console.warn(`[voice] re-score after call failed: ${e.message}`));
+      } catch { /* allowance used up: the call notes are still kept */ }
     }
 
     res.json({ result: `Got it, I've noted: ${args.interest_level} interest. ${args.summary || ''}${apptMsg}` });
