@@ -5,6 +5,7 @@ import { runAgent, getAICostStats, getAICostByCampaign, getAICostLog, getOutreac
 import { checkPlanLimit, remainingMonthlyAiLeads } from '../middleware/auth.js';
 import { maskLeads, maskLead } from '../services/leads.js';
 import { approveDrafts, skipLeads, editDraft, validIdFilter } from '../services/outreach-queue.js';
+import { audienceFromBrief } from '../services/account-profile.js';
 
 const router = Router();
 
@@ -285,7 +286,7 @@ router.post('/:id/generate-leads', async (req, res) => {
 
     const result = await runAgent(campaign.user_id, 'generate_leads', {
       campaignId: campaign.id, campaignName: campaign.name,
-      targetAudience: campaign.target_audience,
+      targetAudience: campaign.target_audience || audienceFromBrief(campaign.user_id),
       count: Math.min(parseInt(req.body.count, 10) || 5, remainingMonthlyAiLeads(req.user)),
     });
     res.json(result);

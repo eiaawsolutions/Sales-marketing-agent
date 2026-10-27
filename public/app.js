@@ -658,11 +658,51 @@ async function removeTeammate(id) {
 // What this account sells, the claims it may make and who its email comes
 // from. Every message, score and voice call is written from it.
 const BRIEF_FIELDS = ['business_name', 'website', 'offer', 'proof_points', 'call_to_action', 'tone',
-  'sender_name', 'sender_title', 'reply_to_email', 'from_email', 'meeting_link', 'voice_notes'];
+  'sender_name', 'sender_title', 'reply_to_email', 'from_email', 'meeting_link', 'voice_notes', 'ideal_client', 'company_size'];
+
+// Fields the outreach is written from: changing any of them makes waiting
+// drafts out of date.
+const BRIEF_OFFER_FIELDS = ['business_name', 'offer', 'proof_points', 'call_to_action', 'tone', 'sender_name', 'sender_title'];
+
+// Suggestions for "Who you sell to". Anything else can be typed in.
+const MARKET_SUGGESTIONS = {
+  target_roles: ['HR Director', 'Head of L&D', 'L&D Manager', 'CHRO', 'Talent Development Manager', 'HR Business Partner',
+    'Founder / CEO', 'Managing Director', 'Head of Marketing', 'Head of Sales', 'Operations Director', 'Procurement Manager'],
+  target_sectors: ['Manufacturing', 'Semiconductor', 'Healthcare', 'Logistics', 'Banking & insurance', 'Technology', 'Property',
+    'Hospitality', 'GLCs', 'Plantation', 'Retail', 'Education', 'Oil & gas', 'Professional services'],
+  target_regions: ['Klang Valley', 'Penang & Kedah', 'Johor', 'Perak', 'Sabah & Sarawak', 'Malaysia (nationwide)', 'Singapore'],
+};
+let briefMarket = { target_roles: [], target_sectors: [], target_regions: [] };
+let briefSaved = {};
+
+function renderChips(field) {
+  const selected = briefMarket[field];
+  const options = [...MARKET_SUGGESTIONS[field], ...selected.filter(s => !MARKET_SUGGESTIONS[field].includes(s))];
+  return options.map(o => `<button type="button" class="chip" aria-pressed="${selected.includes(o)}" onclick="toggleChip('${field}', this)" data-v="${esc(o)}">${esc(o)}</button>`).join('');
+}
+
+function toggleChip(field, el) {
+  const v = el.dataset.v;
+  const list = briefMarket[field];
+  briefMarket[field] = list.includes(v) ? list.filter(x => x !== v) : [...list, v];
+  el.setAttribute('aria-pressed', String(briefMarket[field].includes(v)));
+}
+
+function addChip(field) {
+  const input = document.getElementById(`add-${field}`);
+  const v = (input.value || '').replace(/,/g, ' ').trim().slice(0, 60);
+  if (!v) return;
+  if (!briefMarket[field].includes(v)) briefMarket[field] = [...briefMarket[field], v];
+  input.value = '';
+  document.getElementById(`chips-${field}`).innerHTML = renderChips(field);
+}
 
 async function loadBrief() {
   try {
-    const { profile: p, ready, tones, sender, from_domain_verified } = await api.get('/profile');
+    const { profile: p, ready, market_ready, tones, company_sizes, sender, from_domain_verified, drafts_waiting } = await api.get('/profile');
+    briefMarket = { target_roles: [...p.target_roles], target_sectors: [...p.target_sectors], target_regions: [...p.target_regions] };
+    briefSaved = { ...p };
+    const isOwner = !currentUser?.isMember;
     const field = (id, label, hint, opts = {}) => `
       <div class="form-group">
         <label for="br-${id}">${label}</label>
@@ -673,16 +713,42 @@ async function loadBrief() {
         <small class="text-sm" id="br-err-${id}" style="color:var(--danger);display:none"></small>
       </div>`;
 
+    const chipGroup = (field, label, hint) => `
+      <div class="form-group">
+        <label>${label}</label>
+        <div class="chips" id="chips-${field}">${renderChips(field)}</div>
+        <div class="chip-add">
+          <input id="add-${field}" maxlength="60" placeholder="Add another" onkeydown="if(event.key==='Enter'){event.preventDefault();addChip('${field}')}">
+          <button type="button" class="btn btn-sm btn-outline" onclick="addChip('${field}')">Add</button>
+        </div>
+        ${hint ? `<small class="text-muted">${hint}</small>` : ''}
+      </div>`;
+
     document.getElementById('page').innerHTML = `
       <div class="toolbar"><h2>Brief</h2><button class="btn btn-primary" onclick="saveBrief()">Save brief</button></div>
-      ${ready ? '' : `
+      <p class="text-muted text-sm" style="margin:-6px 0 14px">Your market and your offer go in once. Every search, score and message is built from this page.</p>
+      ${ready && market_ready ? '' : `
         <div class="card" style="border:2px solid var(--warning)">
           <h3 style="text-transform:none;letter-spacing:0">Start here</h3>
-          <p class="text-muted text-sm" style="margin:0">Add your business name and what you offer. Until then the agent will not write outreach for you — it never invents an offer.</p>
+          <p class="text-muted text-sm" style="margin:0">${!market_ready ? 'Say who you sell to, so the agent knows who to look for. ' : ''}${!ready ? 'Add your business name and what you offer — until then the agent will not write outreach for you. It never invents an offer.' : ''}</p>
         </div>`}
+      <div id="brief-redraft"></div>
 
       <div class="card">
-        <h3>What you sell</h3>
+        <h3>Who you sell to</h3>
+        ${field('ideal_client', 'Ideal client, in a sentence', 'Plain words. The agent turns this into the search.', { textarea: true, max: 500, rows: 70, placeholder: 'e.g. Malaysian companies with 200+ employees that are growing their management layer and plan structured leadership training for 2027.' })}
+        ${chipGroup('target_roles', 'Decision-makers to find', 'People with these roles count as decision-makers when leads are scored.')}
+        ${chipGroup('target_sectors', 'Sectors')}
+        ${chipGroup('target_regions', 'Regions')}
+        <div class="form-group">
+          <label for="br-company_size">Company size</label>
+          <select id="br-company_size"><option value="">Any size</option>${Object.entries(company_sizes).map(([k, v]) => `<option value="${esc(k)}" ${p.company_size === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
+          <small class="text-sm" id="br-err-company_size" style="color:var(--danger);display:none"></small>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>What you offer</h3>
         <div class="grid-2">
           ${field('business_name', 'Business name *', '', { max: 120, placeholder: 'e.g. The Leadership Lab' })}
           ${field('website', 'Website', 'https only.', { type: 'url', max: 500, placeholder: 'https://' })}
@@ -696,6 +762,17 @@ async function loadBrief() {
             <select id="br-tone">${Object.entries(tones).map(([k, v]) => `<option value="${k}" ${p.tone === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
           </div>
         </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div>
+            <h3 style="margin-bottom:2px">Run a search</h3>
+            <p class="text-muted text-sm" style="margin:0">Each run returns up to 15 verified decision-makers from your Brief. A lead is kept only with a real work email, a source link, and a LinkedIn profile or company website. Nobody's email is ever guessed.</p>
+          </div>
+          <button class="btn btn-primary" id="brief-search-btn" onclick="runBriefSearch()" ${isOwner ? '' : 'title="Saves nothing — searches with the brief as saved"'}>Find decision-makers</button>
+        </div>
+        <div id="brief-search" style="margin-top:12px"></div>
       </div>
 
       <div class="card">
@@ -728,15 +805,22 @@ async function loadBrief() {
         <p class="text-sm text-muted" style="margin:8px 0 0">When on, the agent drafts and you approve from each campaign's approval queue. When off, Day-0 emails go out as soon as they are written.</p>
       </div>
     `;
+    if (drafts_waiting > 0 && sessionStorageGet('brief-offer-changed') === '1') showRedraftPrompt(drafts_waiting);
   } catch (e) {
     document.getElementById('page').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
   }
 }
 
-async function saveBrief() {
+function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
+function sessionStorageSet(k, v) { try { if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch { /* private mode */ } }
+
+// Returns true when saved. quiet: no success toast and no reload (used by search).
+async function saveBrief({ quiet = false } = {}) {
   const body = {};
   for (const f of BRIEF_FIELDS) body[f] = document.getElementById(`br-${f}`)?.value ?? '';
+  Object.assign(body, briefMarket);
   body.outreach_approval = document.getElementById('br-approval').checked ? 1 : 0;
+  const offerChanged = BRIEF_OFFER_FIELDS.some(f => String(body[f] ?? '') !== String(briefSaved[f] ?? ''));
   BRIEF_FIELDS.forEach(f => { const el = document.getElementById(`br-err-${f}`); if (el) el.style.display = 'none'; });
   try {
     const r = await fetch('/api/profile', {
@@ -748,10 +832,116 @@ async function saveBrief() {
         const el = document.getElementById(`br-err-${f}`);
         if (el) { el.textContent = `This ${msg}.`; el.style.display = 'block'; }
       }
-      return showNotification(data.error || 'Could not save', 'error');
+      showNotification(data.error || 'Could not save', 'error');
+      return false;
     }
-    showNotification('Brief saved.', 'success');
-    loadBrief();
+    briefSaved = { ...data.profile };
+    if (offerChanged && data.drafts_waiting > 0) sessionStorageSet('brief-offer-changed', '1');
+    if (!quiet) {
+      showNotification('Brief saved.', 'success');
+      await loadBrief();
+    } else if (offerChanged && data.drafts_waiting > 0) {
+      showRedraftPrompt(data.drafts_waiting);
+    }
+    return true;
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); return false; }
+}
+
+// The offer changed while drafts were waiting: they were written from the old
+// brief. Offer to rewrite them (approved and sent messages are never touched).
+function showRedraftPrompt(n) {
+  const el = document.getElementById('brief-redraft');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="card" style="border:2px solid var(--primary)">
+      <h3 style="text-transform:none;letter-spacing:0">Your offer changed</h3>
+      <p class="text-sm" style="margin:0 0 10px">${n} draft${n === 1 ? ' was' : 's were'} written from the brief before this change. Redraft them now so they say what your brief says today? Approved and sent messages are not touched. This uses AI actions.</p>
+      <div class="flex gap-2">
+        <button class="btn btn-primary btn-sm" id="redraft-btn" onclick="redraftFromBrief()">Redraft ${n} draft${n === 1 ? '' : 's'}</button>
+        <button class="btn btn-outline btn-sm" onclick="sessionStorageSet('brief-offer-changed', null);document.getElementById('brief-redraft').innerHTML=''">Keep them</button>
+      </div>
+    </div>`;
+}
+
+async function redraftFromBrief() {
+  const btn = document.getElementById('redraft-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Redrafting…'; }
+  try {
+    const r = await api.post('/profile/redraft');
+    sessionStorageSet('brief-offer-changed', null);
+    document.getElementById('brief-redraft').innerHTML = '';
+    showNotification(`Redrafted the sequences for ${r.leads_redrafted} lead${r.leads_redrafted === 1 ? '' : 's'} from your current brief.`, 'success');
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Try again'; }
+  }
+}
+
+// "Find decision-makers": save the brief, run one verified search from it,
+// show what was kept and what was thrown away and why, then score the new
+// leads one at a time so progress is visible.
+async function runBriefSearch() {
+  const out = document.getElementById('brief-search');
+  const btn = document.getElementById('brief-search-btn');
+  const log = [];
+  const line = (cls, text) => { log.push(`<div class="${cls}">${esc(text)}</div>`); out.innerHTML = `<div class="search-log" aria-live="polite">${log.join('')}</div>`; };
+  if (!currentUser?.isMember && !(await saveBrief({ quiet: true }))) return;
+  btn.disabled = true;
+  try {
+    const roles = briefMarket.target_roles;
+    line('dim', `brief  → ${document.getElementById('br-company_size').selectedOptions[0]?.text || 'Any size'} · ${briefMarket.target_sectors.length} sectors · ${roles.length} roles`);
+    line('', `people → ${roles.slice(0, 3).join(', ') || 'decision-makers'}${roles.length > 3 ? ' and others' : ''}: verified contact database first, then the open web…`);
+    const r = await api.post('/leads/find', {});
+    line('ok', `         ${r.found} candidate${r.found === 1 ? '' : 's'} found`);
+    if (r.discarded) line('warn', `         ${r.discarded} discarded: no personal email, no source, or not a match`);
+    line('ok', `         ${r.kept} verified and kept${r.already_in_list ? ` · ${r.already_in_list} already in your list` : ''} · no email guessed`);
+    if (r.message && !r.kept) line('warn', `         ${r.message}`);
+    let scored = { hot: 0, warm: 0, nurture: 0 };
+    for (let i = 0; i < r.lead_ids.length; i++) {
+      line('', `score  → ${i + 1} of ${r.lead_ids.length}: Budget, Authority, Need, Timeline…`);
+      try {
+        const s = await api.post(`/leads/${r.lead_ids[i]}/score`);
+        scored[s.score >= 80 ? 'hot' : s.score >= 60 ? 'warm' : 'nurture']++;
+      } catch (e) { line('warn', `         scoring stopped: ${e.message}`); break; }
+    }
+    if (r.lead_ids.length) line('ok', `         done · ${scored.hot} hot · ${scored.warm} warm · ${scored.nurture} nurture`);
+    if (r.monthly_limit !== null) line('dim', `quota  → ${r.used_this_month} of ${r.monthly_limit} verified leads used this month`);
+
+    out.innerHTML = `
+      <div class="search-log" aria-live="polite">${log.join('')}</div>
+      <div class="funnel">
+        <div><b>${r.found}</b><span>candidates found this run</span></div>
+        <div><b>${r.kept}</b><span>verified and kept</span></div>
+        <div><b>${r.discarded}</b><span>discarded, not verifiable</span></div>
+        <div><b>${r.monthly_limit === null ? '—' : `${r.used_this_month} / ${r.monthly_limit}`}</b><span>used this month</span></div>
+      </div>
+      ${r.discarded_list.length ? `
+        <details style="margin-top:12px"><summary class="text-sm" style="cursor:pointer">Discarded this run · ${r.discarded_list.length} — why</summary>
+          <table style="margin-top:8px"><tr><th>Candidate</th><th>Why it was not kept</th></tr>
+            ${r.discarded_list.map(d => `<tr><td>${esc(d.name || '—')}</td><td class="text-sm">${esc(d.reason)}</td></tr>`).join('')}
+          </table>
+          <p class="text-sm text-muted" style="margin:6px 0 0">Discarded people are not stored.</p>
+        </details>` : ''}
+      <div class="flex gap-2" style="margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="navigate('leads')">See the leads</button>
+        ${r.campaign_id && (r.kept || r.already_in_list) ? `<button class="btn btn-success btn-sm" onclick="draftBriefOutreach(${Number(r.campaign_id)})">Draft outreach for these leads</button>` : ''}
+      </div>`;
+  } catch (e) {
+    line('warn', `stopped → ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run again';
+  }
+}
+
+async function draftBriefOutreach(campaignId) {
+  showNotification('Writing a personal sequence for each lead…');
+  try {
+    const r = await api.post(`/campaigns/${campaignId}/auto-outreach`);
+    showNotification(r.approvalRequired
+      ? `${r.drafted} messages drafted for ${r.leadsProcessed} leads — review and approve them.`
+      : `${r.queued} messages queued for ${r.leadsProcessed} leads.`, 'success');
+    await showOutreachQueue(campaignId);
   } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
 

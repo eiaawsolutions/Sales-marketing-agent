@@ -469,6 +469,10 @@ function seedSystemLogic(db) {
       'src/services/ai-agent.js → scoreLeadTask()',
       'Reads the lead\'s verified signals (notes), its last 20 activities, the account\'s offer and the market on its Brief (decision-makers, sectors, regions, company size). Claude scores each BANT factor 0-25 with a sentence of evidence; factors are clamped and the score is their sum. The breakdown, reasoning and next step are kept in leads.score_detail and shown by GET /api/leads/:id/score-detail ("Why this score").', 2],
 
+    ['AI Engine', 'Find decision-makers (Brief search)', 'One verified search run from "Who you sell to" on the Brief',
+      'src/services/lead-search.js → findFromBrief()',
+      'POST /api/leads/find. The Brief\'s ideal client, decision-maker roles, sectors, regions and company size become the search audience (account-profile.js audienceFromBrief). Up to 15 people a run, capped by the month\'s remaining allowance. generate_leads runs the same verification gate as every other search (real personal email, a source URL, a LinkedIn profile or company website; generic inboxes and low confidence rejected). Discarded people are not stored; their names and reasons are returned. Kept leads go into the account\'s "Outreach from your Brief" campaign, which has no audience of its own and so always searches with the current Brief. Campaigns with a blank audience also fall back to the Brief. POST /api/profile/redraft rewrites sequences nobody has approved after the offer changes.', 2],
+
     ['AI Engine', 'Lead Qualification (AI)', 'BANT framework qualification via Claude',
       'src/services/ai-agent.js → qualifyLeadTask()',
       'Uses Budget/Authority/Need/Timeline framework. Claude returns a qualified boolean, bant_score (each 0-25), total_score, qualification_notes, and next_steps. Updates lead status to "qualified" or "contacted" accordingly.', 3],

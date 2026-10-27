@@ -15,20 +15,77 @@ export const TONES = {
   formal: 'Formal (GLC / public sector)',
 };
 
+// Company-size bands for "Who you sell to". The key is what is stored; the
+// label is what people (and the search) read.
+export const COMPANY_SIZES = {
+  '1-49': '1–49 employees', '50-99': '50–99 employees', '100-199': '100–199 employees',
+  '200+': '200+ employees', '500+': '500+ employees', '1000+': '1,000+ employees',
+};
+
 const TEXT_LIMITS = {
   business_name: 120, sender_name: 80, sender_title: 80, offer: 1500,
-  proof_points: 1500, call_to_action: 300, voice_notes: 1500,
+  proof_points: 1500, call_to_action: 300, voice_notes: 1500, ideal_client: 500,
 };
+
+// Market lists: decision-makers' roles, sectors, regions. Stored as JSON.
+const LIST_FIELDS = ['target_roles', 'target_sectors', 'target_regions'];
+const LIST_MAX_ITEMS = 20;
+const LIST_ITEM_MAX = 60;
 
 const EMPTY = {
   business_name: null, sender_name: null, sender_title: null, reply_to_email: null, from_email: null,
   website: null, offer: null, proof_points: null, call_to_action: null, tone: 'warm',
   meeting_link: null, voice_notes: null, outreach_approval: 1,
+  ideal_client: null, target_roles: [], target_sectors: [], target_regions: [], company_size: null,
 };
 
+function parseList(raw) {
+  if (!raw) return [];
+  try { const v = JSON.parse(raw); return Array.isArray(v) ? v.filter(s => typeof s === 'string') : []; } catch { return []; }
+}
+
 export function getProfile(userId) {
-  const row = db.prepare('SELECT * FROM account_profiles WHERE user_id = ?').get(userId);
-  return { ...EMPTY, ...(row || {}), user_id: userId };
+  const row = db.prepare('SELECT * FROM account_profiles WHERE user_id = ?').get(userId) || {};
+  const profile = { ...EMPTY, ...row, user_id: userId };
+  for (const f of LIST_FIELDS) profile[f] = parseList(row[f]);
+  return profile;
+}
+
+// Accepts an array or a comma/newline-separated string. Trimmed, de-duplicated
+// (case-insensitive), capped in count and length.
+function cleanList(v) {
+  const items = Array.isArray(v) ? v : String(v ?? '').split(/[,\n]/);
+  const out = [];
+  const seen = new Set();
+  for (const item of items) {
+    if (typeof item !== 'string') continue;
+    const s = item.replace(/\s+/g, ' ').trim().slice(0, LIST_ITEM_MAX);
+    if (!s || seen.has(s.toLowerCase())) continue;
+    seen.add(s.toLowerCase());
+    out.push(s);
+    if (out.length >= LIST_MAX_ITEMS) break;
+  }
+  return out;
+}
+
+/** True when the brief says enough about who to look for to run a search. */
+export function hasMarket(profile) {
+  return !!(profile.ideal_client || profile.target_roles.length);
+}
+
+/**
+ * The search audience, written from "Who you sell to". A campaign with no
+ * audience of its own searches with this, so it follows edits to the brief.
+ */
+export function audienceFromBrief(userIdOrProfile) {
+  const p = typeof userIdOrProfile === 'object' ? userIdOrProfile : getProfile(userIdOrProfile);
+  const parts = [];
+  if (p.ideal_client) parts.push(p.ideal_client.replace(/\.\s*$/, '') + '.');
+  if (p.target_roles.length) parts.push(`Decision-makers to find: ${p.target_roles.join(', ')}.`);
+  if (p.target_sectors.length) parts.push(`Sectors: ${p.target_sectors.join(', ')}.`);
+  if (p.target_regions.length) parts.push(`Regions: ${p.target_regions.join('; ')}.`);
+  if (p.company_size && COMPANY_SIZES[p.company_size]) parts.push(`Company size: ${COMPANY_SIZES[p.company_size]}.`);
+  return parts.join(' ');
 }
 
 export function approvalRequired(userId) {
@@ -82,20 +139,33 @@ export function saveProfile(userId, input = {}) {
   if ('outreach_approval' in input) {
     out.outreach_approval = input.outreach_approval === false || input.outreach_approval === 0 || input.outreach_approval === '0' ? 0 : 1;
   }
+  for (const field of LIST_FIELDS) {
+    if (field in input) out[field] = cleanList(input[field]);
+  }
+  if ('company_size' in input) {
+    const size = cleanText(input.company_size, 20);
+    if (size && !(size in COMPANY_SIZES)) errors.company_size = 'must be one of: ' + Object.keys(COMPANY_SIZES).join(', ');
+    else out.company_size = size;
+  }
   if (Object.keys(errors).length) return { errors };
 
   const merged = { ...getProfile(userId), ...out };
+  for (const f of LIST_FIELDS) merged[f] = JSON.stringify(merged[f] || []);
   db.prepare(`
     INSERT INTO account_profiles (user_id, business_name, sender_name, sender_title, reply_to_email, from_email, website,
-      offer, proof_points, call_to_action, tone, meeting_link, voice_notes, outreach_approval, updated_at)
+      offer, proof_points, call_to_action, tone, meeting_link, voice_notes, outreach_approval,
+      ideal_client, target_roles, target_sectors, target_regions, company_size, updated_at)
     VALUES (@user_id, @business_name, @sender_name, @sender_title, @reply_to_email, @from_email, @website,
-      @offer, @proof_points, @call_to_action, @tone, @meeting_link, @voice_notes, @outreach_approval, CURRENT_TIMESTAMP)
+      @offer, @proof_points, @call_to_action, @tone, @meeting_link, @voice_notes, @outreach_approval,
+      @ideal_client, @target_roles, @target_sectors, @target_regions, @company_size, CURRENT_TIMESTAMP)
     ON CONFLICT(user_id) DO UPDATE SET
       business_name = excluded.business_name, sender_name = excluded.sender_name, sender_title = excluded.sender_title,
       reply_to_email = excluded.reply_to_email, from_email = excluded.from_email, website = excluded.website,
       offer = excluded.offer, proof_points = excluded.proof_points, call_to_action = excluded.call_to_action,
       tone = excluded.tone, meeting_link = excluded.meeting_link, voice_notes = excluded.voice_notes,
-      outreach_approval = excluded.outreach_approval, updated_at = CURRENT_TIMESTAMP
+      outreach_approval = excluded.outreach_approval,
+      ideal_client = excluded.ideal_client, target_roles = excluded.target_roles, target_sectors = excluded.target_sectors,
+      target_regions = excluded.target_regions, company_size = excluded.company_size, updated_at = CURRENT_TIMESTAMP
   `).run({ ...merged, user_id: userId });
   return { profile: getProfile(userId) };
 }

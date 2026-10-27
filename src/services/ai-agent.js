@@ -6,7 +6,7 @@ import { isApolloConfigured, searchPeople, enrichPerson, describeApolloSource, d
 import { leadSourcesService } from './lead-sources.js';
 import { normalizePhone, isRoleMailbox } from '../utils/normalize.js';
 import { DEFAULT_MODEL, resolveModel } from '../config/models.js';
-import { approvalRequired, getProfile, hasOffer, isHqAccount, TONES } from './account-profile.js';
+import { approvalRequired, getProfile, hasOffer, isHqAccount, TONES, COMPANY_SIZES } from './account-profile.js';
 import { kickDispatch } from './outreach-dispatch.js';
 
 function getSettings() {
@@ -530,10 +530,10 @@ function saveScoreDetail(leadId, { bant, total, reasoning, nextStep, status }) {
 function marketFor(profile) {
   const market = {
     ideal_client: profile.ideal_client || '',
-    decision_makers: profile.target_roles || '',
-    sectors: profile.target_sectors || '',
-    regions: profile.target_regions || '',
-    company_size: profile.company_size || '',
+    decision_makers: (profile.target_roles || []).join(', '),
+    sectors: (profile.target_sectors || []).join(', '),
+    regions: (profile.target_regions || []).join('; '),
+    company_size: COMPANY_SIZES[profile.company_size] || '',
   };
   return Object.values(market).some(Boolean) ? market : null;
 }
@@ -1605,24 +1605,30 @@ async function generateLeadsViaApollo(input) {
   };
 }
 
+// input.leadIds limits the run to those leads. input.replaceDrafts rewrites
+// leads whose whole sequence is still unapproved drafts (the brief changed):
+// each lead's old drafts are deleted in the same transaction that writes its
+// new ones, so a failed AI call leaves the old drafts in place.
 async function autoOutreachTask(input) {
   const { campaignId } = input;
   const campaign = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(campaignId);
   if (!campaign) throw new Error('Campaign not found');
 
+  const only = Array.isArray(input.leadIds) ? new Set(input.leadIds.map(Number)) : null;
   const leads = db.prepare(`
     SELECT l.*, cl.status as campaign_status
     FROM campaign_leads cl JOIN leads l ON cl.lead_id = l.id
     WHERE cl.campaign_id = ?
-  `).all(campaignId);
+  `).all(campaignId).filter(l => !only || only.has(l.id));
 
   if (!leads.length) throw new Error('No leads assigned to this campaign. Add leads first.');
 
-  const alreadyQueued = db.prepare(
-    'SELECT DISTINCT lead_id FROM outreach_queue WHERE campaign_id = ?'
-  ).all(campaignId).map(r => r.lead_id);
+  const queuedStatuses = db.prepare(
+    'SELECT lead_id, MAX(status <> \'draft\') AS touched FROM outreach_queue WHERE campaign_id = ? GROUP BY lead_id'
+  ).all(campaignId);
+  const blocked = new Set(queuedStatuses.filter(r => !input.replaceDrafts || r.touched).map(r => r.lead_id));
 
-  const newLeads = leads.filter(l => !alreadyQueued.includes(l.id));
+  const newLeads = leads.filter(l => !blocked.has(l.id));
   if (!newLeads.length) throw new Error('All leads already have outreach sequences. Check the outreach queue.');
 
   // Before anything is written: no offer on file, no outreach.
@@ -1703,10 +1709,12 @@ Rules:
 
     const sequences = result.sequences || [];
 
+    const dropDrafts = db.prepare("DELETE FROM outreach_queue WHERE campaign_id = ? AND lead_id = ? AND status = 'draft'");
     const queueBatch = db.transaction(() => {
       for (const seq of sequences) {
         const lead = batch.find(l => l.name === seq.lead_name);
-        if (!lead) continue;
+        if (!lead || !(seq.steps || []).length) continue;
+        if (input.replaceDrafts) dropDrafts.run(campaignId, lead.id);
 
         const callUrl = leadCallLinks.get(lead.id);
 

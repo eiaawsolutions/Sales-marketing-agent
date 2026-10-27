@@ -6,6 +6,7 @@
  */
 import db from '../db/index.js';
 import { kickDispatch } from './outreach-dispatch.js';
+import { runAgent } from './ai-agent.js';
 
 const MAX_SUBJECT = 200;
 const MAX_MESSAGE = 20000;
@@ -58,6 +59,39 @@ export function skipLeads({ campaignId, leadIds }) {
      WHERE campaign_id = ? AND status IN ('draft', 'pending')
        AND lead_id IN (${leads.map(() => '?').join(',')})
   `).run(campaignId, ...leads).changes;
+}
+
+/** Drafts waiting for approval across the account's campaigns. */
+export function draftsWaiting(userId) {
+  return db.prepare(`
+    SELECT COUNT(*) AS c FROM outreach_queue oq JOIN campaigns c ON c.id = oq.campaign_id
+     WHERE c.user_id = ? AND oq.status = 'draft'
+  `).get(userId).c;
+}
+
+/**
+ * After the brief changes: rewrite every sequence nobody has approved yet, from
+ * the brief as it is now. A lead with any step approved, sent or skipped keeps
+ * its sequence as it is. Returns how many leads were redrafted.
+ */
+export async function redraftFromBrief(userId) {
+  const rows = db.prepare(`
+    SELECT oq.campaign_id, oq.lead_id FROM outreach_queue oq JOIN campaigns c ON c.id = oq.campaign_id
+     WHERE c.user_id = ? AND c.status NOT IN ('stopped', 'completed')
+     GROUP BY oq.campaign_id, oq.lead_id
+    HAVING SUM(oq.status <> 'draft') = 0
+  `).all(userId);
+  const byCampaign = new Map();
+  for (const r of rows) {
+    if (!byCampaign.has(r.campaign_id)) byCampaign.set(r.campaign_id, []);
+    byCampaign.get(r.campaign_id).push(r.lead_id);
+  }
+  let leadsRedrafted = 0;
+  for (const [campaignId, leadIds] of byCampaign) {
+    const r = await runAgent(userId, 'auto_outreach', { campaignId, leadIds, replaceDrafts: true });
+    leadsRedrafted += r.leadsProcessed || 0;
+  }
+  return { leads_redrafted: leadsRedrafted, campaigns: byCampaign.size };
 }
 
 /** Edit a draft's subject and/or body. Returns 'ok', 'not_found' or 'not_draft'. */

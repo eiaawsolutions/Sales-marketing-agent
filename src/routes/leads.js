@@ -4,8 +4,19 @@ import { runAgent } from '../services/ai-agent.js';
 import { checkPlanLimit } from '../middleware/auth.js';
 import db from '../db/index.js';
 import { handleReply, sendReply } from '../services/replies.js';
+import { findFromBrief } from '../services/lead-search.js';
 
 const router = Router();
+
+// POST /api/leads/find — "Find decision-makers": one search from the Brief.
+// Must be before /:id routes.
+router.post('/find', async (req, res) => {
+  try {
+    res.json(await findFromBrief(req.user, { count: req.body?.count }));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
 
 router.get('/', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;

@@ -1,7 +1,7 @@
 import db from '../db/index.js';
 import { runAgent } from './ai-agent.js';
 import { loadPlanUser, checkPlanLimitForUser, remainingMonthlyAiLeads } from '../middleware/auth.js';
-import { getProfile, hasOffer, isHqAccount, TONES } from './account-profile.js';
+import { getProfile, hasOffer, isHqAccount, TONES, audienceFromBrief } from './account-profile.js';
 
 const LEADS_PER_LAUNCH = 10;
 
@@ -41,19 +41,21 @@ export async function launchCampaignPipeline(userId, campaignId) {
       try { checkPlanLimitForUser(owner, resource); return null; } catch (e) { return e.message; }
     };
 
-    // Step 1: Generate leads if needed
+    // Step 1: Generate leads if needed. A campaign with no audience of its own
+    // searches with "Who you sell to" on the Brief.
     const existingLeadCount = db.prepare('SELECT COUNT(*) as c FROM campaign_leads WHERE campaign_id = ?').get(campaignId).c;
     const leadBlock = planBlock('auto_leads') || planBlock('ai_leads_per_month');
+    const audience = campaign.target_audience || audienceFromBrief(campaign.user_id);
 
-    if (campaign.target_audience && existingLeadCount === 0 && leadBlock) {
+    if (audience && existingLeadCount === 0 && leadBlock) {
       updateStatus('running', `Step 1: Skipped — ${leadBlock}`);
-    } else if (campaign.target_audience && existingLeadCount === 0) {
+    } else if (audience && existingLeadCount === 0) {
       updateStatus('running', 'Step 1: Generating leads...');
       try {
         const leadResult = await runAgent(campaign.user_id, 'generate_leads', {
           campaignId,
           campaignName: campaign.name,
-          targetAudience: campaign.target_audience,
+          targetAudience: audience,
           count: Math.min(LEADS_PER_LAUNCH, remainingMonthlyAiLeads(owner)),
         });
         const newCount = db.prepare('SELECT COUNT(*) as c FROM campaign_leads WHERE campaign_id = ?').get(campaignId).c;
@@ -101,7 +103,7 @@ export async function launchCampaignPipeline(userId, campaignId) {
       updateStatus('running', 'Step 3: Generating email content...');
       try {
         const content = await runAgent(campaign.user_id, 'generate_email', {
-          audience: campaign.target_audience || 'general',
+          audience: audience || 'general',
           subject: campaign.subject || campaign.name,
           purpose: 'promotional',
           tone: briefReady ? (TONES[profile.tone] || TONES.warm) : 'professional',
