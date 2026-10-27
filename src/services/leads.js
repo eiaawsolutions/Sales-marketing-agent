@@ -15,21 +15,55 @@ function maskPhone(phone) {
   return phone.substring(0, 4) + '*'.repeat(phone.length - 6) + phone.substring(phone.length - 2);
 }
 
-function maskName(name) {
-  if (!name) return '';
-  const parts = name.split(' ');
-  if (parts.length === 1) return parts[0].charAt(0) + '.';
-  return parts[0] + ' ' + parts.slice(1).map(p => p.charAt(0) + '.').join(' ');
-}
 
+// Contact details are what a reveal credit pays for, so email and phone stay
+// masked. The name is shown in full: every verified lead already carries its
+// public profile link, and the team needs the name to send a LinkedIn note.
 export function maskLead(lead) {
   if (!lead) return lead;
   return {
     ...lead,
-    name: maskName(lead.name),
     email: maskEmail(lead.email),
     phone: maskPhone(lead.phone),
     _masked: true,
+  };
+}
+
+// Lines the lead generators and ingest write into notes (ai-agent.js
+// buildNotes, the Apollo path, referrals), read back for "why this score".
+const SIGNAL_LABELS = {
+  'Buying signal': 'Buying signal', 'Enrichment': 'Recent activity', 'Fit': 'Fit',
+  'Apollo source': 'Contact database', 'Referral': 'Referral', 'Reason for fit': 'Fit',
+};
+
+export function signalsFromNotes(notes) {
+  const signals = [];
+  const sources = [];
+  for (const line of String(notes || '').split('\n')) {
+    const m = line.match(/^\s*([A-Za-z ]+):\s*(.+)$/);
+    if (!m) continue;
+    const [, key, value] = m;
+    if (SIGNAL_LABELS[key]) signals.push({ label: SIGNAL_LABELS[key], text: value.trim().slice(0, 400) });
+    if (['Verification', 'Profile', 'Website'].includes(key)) {
+      for (const part of value.split('|')) {
+        const url = part.trim();
+        if (/^https?:\/\/\S+$/i.test(url) && !sources.includes(url)) sources.push(url);
+      }
+    }
+  }
+  return { signals, sources };
+}
+
+/** The score and the reasons behind it — no contact details. */
+export function scoreView(lead) {
+  let detail = null;
+  try { detail = lead.score_detail ? JSON.parse(lead.score_detail) : null; } catch { detail = null; }
+  return {
+    id: lead.id, name: lead.name, title: lead.title || '', company: lead.company || '',
+    score: lead.score || 0, status: lead.status,
+    bant: detail?.bant || null, reasoning: detail?.reasoning || '', next_step: detail?.next_step || '',
+    scored_at: detail?.scored_at || null,
+    ...signalsFromNotes(lead.notes),
   };
 }
 

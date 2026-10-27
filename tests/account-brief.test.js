@@ -119,7 +119,8 @@ test('Launch writes the campaign email from the brief, never about EIAAW', async
 test('lead scoring reads the lead\'s signals and the offer it is scored against', async () => {
   await as(2, (call) => call('PUT', TLL));
   let prompt = '';
-  agent.setChat(async (message) => { prompt = message; return '{"score":80,"reasoning":"fit","recommended_action":"send"}'; });
+  const f = (score) => ({ score, note: 'n' });
+  agent.setChat(async (message) => { prompt = message; return JSON.stringify({ bant: { budget: f(20), authority: f(20), need: f(20), timeline: f(20) }, reasoning: 'fit', recommended_action: 'send' }); });
   await runAgent(2, 'score_lead', { leadId: 20 });
   assert.match(prompt, /second plant in Kulim/);
   assert.match(prompt, /first-time managers/);

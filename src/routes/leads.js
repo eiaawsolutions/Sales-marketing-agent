@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { leadsService, maskLeads, maskLead } from '../services/leads.js';
+import { leadsService, maskLeads, maskLead, scoreView } from '../services/leads.js';
 import { runAgent } from '../services/ai-agent.js';
 import { checkPlanLimit } from '../middleware/auth.js';
 import db from '../db/index.js';
@@ -78,6 +78,14 @@ function requireOwnedLead(req, res) {
   }
   return lead;
 }
+
+// GET /:id/score-detail — the BANT breakdown, reasoning, next step and the
+// signals and sources the lead was verified with. No contact details.
+router.get('/:id/score-detail', (req, res) => {
+  const lead = requireOwnedLead(req, res);
+  if (!lead) return;
+  res.json(scoreView(lead));
+});
 
 router.post('/:id/score', async (req, res) => {
   try {

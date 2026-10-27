@@ -4,6 +4,7 @@ import { migrateOmnichannel } from './schema-omnichannel.js';
 import { migrateSuppressions } from './schema-suppressions.js';
 import { migrateOutreach } from './schema-outreach.js';
 import { migrateTeam } from './schema-team.js';
+import { migrateFlow } from './schema-flow.js';
 import { FOUNDER_HQ_EMAIL } from '../config/hq.js';
 
 export function initializeDatabase(db) {
@@ -443,6 +444,9 @@ export function initializeDatabase(db) {
   // Seats: teammates attached to a paying account (see schema-team.js).
   migrateTeam(db);
 
+  // Score breakdowns, the brief's market, replies, calendar (see schema-flow.js).
+  migrateFlow(db);
+
   // Seed system logic from codebase on every startup (auto-update)
   seedSystemLogic(db);
 }
@@ -461,9 +465,9 @@ function seedSystemLogic(db) {
       'src/services/ai-agent.js',
       'The AI agent is the brain of the system. It receives a task type and input, logs the task to the database, dispatches to the correct handler (score_lead, generate_email, etc.), and records the result or error.\n\nKey functions:\n- runAgent(taskType, input) — entry point, logs to agent_tasks table\n- executeTask() — dispatcher mapping task types to handlers\n- chat() / chatJSON() — low-level Claude API calls\n\nThe client and model are read dynamically from the settings DB on every call so changes in Settings take effect immediately.', 1],
 
-    ['AI Engine', 'Lead Scoring (AI)', 'Scores leads 0-100 using profile + activity history',
+    ['AI Engine', 'Lead Scoring (AI)', 'BANT score 0-100: Budget, Authority, Need, Timeline, 0-25 each',
       'src/services/ai-agent.js → scoreLeadTask()',
-      'Fetches the lead profile and last 20 activities from the DB. Sends them to Claude asking for a JSON response with score, reasoning, and recommended_action. Updates the lead\'s score in the DB and logs an ai_action activity.', 2],
+      'Reads the lead\'s verified signals (notes), its last 20 activities, the account\'s offer and the market on its Brief (decision-makers, sectors, regions, company size). Claude scores each BANT factor 0-25 with a sentence of evidence; factors are clamped and the score is their sum. The breakdown, reasoning and next step are kept in leads.score_detail and shown by GET /api/leads/:id/score-detail ("Why this score").', 2],
 
     ['AI Engine', 'Lead Qualification (AI)', 'BANT framework qualification via Claude',
       'src/services/ai-agent.js → qualifyLeadTask()',

@@ -833,16 +833,27 @@ async function loadDashboard() {
 }
 
 // ========== Leads ==========
+let leadsTierFilter = 'all';
+const LEAD_TIERS = { all: ['All', () => true], hot: ['Hot 80+', s => s >= 80], warm: ['Warm 60–79', s => s >= 60 && s < 80], nurture: ['Nurture', s => s < 60] };
+
+function setLeadsTier(tier) { leadsTierFilter = tier; loadLeads(); }
+
 async function loadLeads() {
   try {
-    const leads = await api.get('/leads');
+    const all = await api.get('/leads');
+    const keep = (LEAD_TIERS[leadsTierFilter] || LEAD_TIERS.all)[1];
+    const leads = all.filter(l => keep(l.score || 0));
     document.getElementById('page').innerHTML = `
       <div class="toolbar">
-        <h2>Leads (${leads.length})</h2>
+        <h2>Leads (${all.length})</h2>
         <div class="flex gap-2">
           <button class="btn btn-primary" onclick="showLeadModal()">+ Add Lead</button>
           <button class="btn btn-outline" onclick="showBulkImportModal()">Import CSV</button>
         </div>
+      </div>
+      <div class="flex gap-1" style="flex-wrap:wrap;margin-bottom:10px">
+        ${Object.entries(LEAD_TIERS).map(([k, [label]]) => `<button class="btn btn-sm ${leadsTierFilter === k ? 'btn-primary' : 'btn-outline'}" onclick="setLeadsTier('${k}')">${label}</button>`).join('')}
+        <span class="text-sm text-muted" style="align-self:center;margin-left:6px">Click a score to see why. Emails stay masked until you reveal them.</span>
       </div>
       <div class="card">
         <div class="camp-leads-table-wrap">
@@ -873,7 +884,7 @@ async function loadLeads() {
               : '<span class="text-muted text-sm">&mdash;</span>';
             return `
             <tr>
-              <td data-label="Name" title="${esc(l.name)}"><strong><span id="lead-name-${l.id}">${esc(l.name)}</span></strong></td>
+              <td data-label="Name" title="${esc(l.name)}"><strong><span id="lead-name-${l.id}">${esc(l.name)}</span></strong>${l.title ? `<div class="text-sm text-muted">${esc(l.title)}</div>` : ''}</td>
               <td data-label="Email" title="${esc(l.email)}">
                 <span id="lead-email-${l.id}">${l._masked ? `<span class="text-muted">${esc(l.email)}</span>` : esc(l.email)}</span>
                 ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" id="reveal-btn-${l.id}" onclick="revealContact(${l.id})">Reveal</button>` : ''}
@@ -881,12 +892,7 @@ async function loadLeads() {
               <td data-label="Phone"><span id="lead-phone-${l.id}">${l._masked ? `<span class="text-muted">${l.phone ? esc(l.phone) : '-'}</span>` : esc(l.phone || '-')}</span></td>
               <td data-label="Company" title="${esc(l.company || '')}">${esc(l.company || '-')}</td>
               <td data-label="Source">${renderSourceBadge(l.source)}</td>
-              <td data-label="Score">
-                <div style="display:inline-flex;align-items:center;gap:6px">
-                  <div class="score-bar" style="width:40px;flex-shrink:0"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
-                  ${l.score}
-                </div>
-              </td>
+              <td data-label="Score">${scoreCell(l)}</td>
               <td data-label="Status"><span class="badge badge-${l.status}">${l.status}</span></td>
               <td data-label="Campaigns" class="wrap">${campsHtml}</td>
               <td data-label="Performance">
@@ -992,17 +998,68 @@ async function revealContact(leadId, campaignId) {
 async function aiScoreLead(id, campaignId) {
   showNotification('Scoring lead with AI...');
   try {
-    const result = await api.post(`/leads/${id}/score`);
-    showResultModal('AI Lead Score', `
-      <div class="stat-card mb-4">
-        <div class="stat-value ${result.score > 70 ? 'green' : result.score > 40 ? 'yellow' : ''}">${result.score}/100</div>
-        <div class="stat-label">Lead Score</div>
-      </div>
-      <p><strong>Reasoning:</strong> ${esc(result.reasoning)}</p>
-      <p style="margin-top:8px"><strong>Recommended Action:</strong> ${esc(result.recommended_action)}</p>
-    `);
+    await api.post(`/leads/${id}/score`);
+    await showScoreDetail(id, campaignId);
     if (campaignId) { refreshCampaignLeads(campaignId); }
     else if (currentPage === 'leads') loadLeads();
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+// Hot 80+, Warm 60–79, Nurture below.
+function scoreTier(score) {
+  return score >= 80 ? ['active', 'Hot'] : score >= 60 ? ['paused', 'Warm'] : ['draft', 'Nurture'];
+}
+
+function scoreCell(l, campaignId) {
+  const [badge] = scoreTier(l.score || 0);
+  return `<button class="badge badge-${badge}" style="border:none;cursor:pointer;font-weight:700" title="Why this score" onclick="showScoreDetail(${Number(l.id)}${campaignId ? `, ${Number(campaignId)}` : ''})">${Number(l.score) || 0}</button>`;
+}
+
+// The score out of 100, the four BANT factors that add up to it, why, the
+// signals and sources the lead was verified with, and the next step.
+async function showScoreDetail(leadId, campaignId) {
+  try {
+    const d = await api.get(`/leads/${leadId}/score-detail`);
+    const [badge, tier] = scoreTier(d.score);
+    const factor = (key, label) => {
+      const f = d.bant?.[key];
+      if (!f) return '';
+      return `
+        <div style="display:grid;grid-template-columns:90px minmax(0,1fr) 46px;gap:10px;align-items:start;margin-bottom:10px">
+          <span class="text-sm" style="font-weight:600">${label}</span>
+          <div>
+            <div class="score-bar" style="width:100%;height:6px"><div class="score-fill" style="width:${Number(f.score) * 4}%;background:var(--primary)"></div></div>
+            <div class="text-sm text-muted" style="margin-top:4px">${esc(f.note || '')}</div>
+          </div>
+          <span class="text-sm" style="text-align:right"><strong>${Number(f.score)}</strong>/25</span>
+        </div>`;
+    };
+    const safeUrl = (u) => /^https?:\/\//i.test(u) ? esc(u) : '#';
+    modal = {
+      title: 'Why this score',
+      body: `
+        <div style="display:flex;gap:16px;align-items:center;margin-bottom:12px">
+          <div class="stat-value ${d.score >= 80 ? 'green' : d.score >= 60 ? 'yellow' : ''}" style="font-size:40px;line-height:1">${Number(d.score)}<span class="text-muted" style="font-size:14px">/100</span></div>
+          <div>
+            <span class="badge badge-${badge}">${tier}</span>
+            <div style="font-weight:700;margin-top:4px">${esc(d.name)}</div>
+            <div class="text-sm text-muted">${esc([d.title, d.company].filter(Boolean).join(' · '))}</div>
+          </div>
+        </div>
+        ${d.bant ? `
+          <div style="border-top:1px solid var(--border);padding-top:12px">
+            ${factor('budget', 'Budget')}${factor('authority', 'Authority')}${factor('need', 'Need')}${factor('timeline', 'Timeline')}
+          </div>` : `<p class="text-sm text-muted">This lead has a score but no breakdown yet. Re-score it to see Budget, Authority, Need and Timeline.</p>`}
+        ${d.reasoning ? `<div style="border-top:1px solid var(--border);padding-top:10px"><div class="text-sm" style="font-weight:600;margin-bottom:4px">Why this score</div><p class="text-sm" style="margin:0">${esc(d.reasoning)}</p></div>` : ''}
+        ${d.signals.length ? `<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px"><div class="text-sm" style="font-weight:600;margin-bottom:4px">Signals found</div>
+          <ul class="text-sm" style="margin:0;padding-left:18px">${d.signals.map(s => `<li><span class="text-muted">${esc(s.label)}:</span> ${esc(s.text)}</li>`).join('')}</ul></div>` : ''}
+        ${d.sources.length ? `<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px"><div class="text-sm" style="font-weight:600;margin-bottom:4px">Verified by</div>
+          <ul class="text-sm" style="margin:0;padding-left:18px;word-break:break-all">${d.sources.map(u => `<li><a href="${safeUrl(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a></li>`).join('')}</ul></div>` : ''}
+        ${d.next_step ? `<p class="text-sm" style="border-top:1px solid var(--border);padding-top:10px;margin:10px 0 0"><strong>Next step:</strong> ${esc(d.next_step)}</p>` : ''}`,
+      saveLabel: 'Re-score',
+      onSave: () => aiScoreLead(leadId, campaignId),
+    };
+    render();
   } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
 
@@ -1671,12 +1728,7 @@ async function toggleCampaignLeads(id) {
                   </td>
                   <td data-label="Company" title="${esc(l.company || '')}">${esc(l.company || '-')}</td>
                   <td data-label="Source">${renderSourceBadge(l.source)}</td>
-                  <td data-label="Score">
-                    <div style="display:inline-flex;align-items:center;gap:6px">
-                      <div class="score-bar" style="width:32px;flex-shrink:0"><div class="score-fill" style="width:${l.score}%;background:${l.score > 70 ? 'var(--success)' : l.score > 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
-                      ${l.score}
-                    </div>
-                  </td>
+                  <td data-label="Score">${scoreCell(l, id)}</td>
                   <td data-label="Status"><span class="badge badge-${cs}">${cs}</span></td>
                   <td data-label="Performance">
                     <span style="color:${openCount > 0 ? 'var(--success)' : 'var(--text-muted)'}">${openCount} open${openCount !== 1 ? 's' : ''}</span>,
