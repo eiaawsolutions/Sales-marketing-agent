@@ -22,6 +22,7 @@ import { sendEmail } from '../utils/email.js';
 import { injectTracking, appendFormCta } from './campaigns.js';
 import { isSuppressed, prepareOutreachEmail } from './unsubscribe.js';
 import { senderFor } from './account-profile.js';
+import { replyAddressFor } from './reply-routing.js';
 
 const BATCH = 20;
 // A row stuck in 'sending' means the process died mid-send. Whether the email
@@ -124,6 +125,8 @@ export async function processOutreachQueue({ campaignId = null } = {}) {
           html: trackedHtml,
           headers,
           ...senderFor(item.user_id),
+          // Replies come back to the agent (and are forwarded to the account's inbox).
+          ...(replyAddressFor(item.lead_id) ? { replyTo: replyAddressFor(item.lead_id) } : {}),
         });
 
         db.prepare("UPDATE outreach_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP, provider_message_id = ? WHERE id = ?")

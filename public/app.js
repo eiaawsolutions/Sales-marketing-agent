@@ -261,6 +261,7 @@ async function doLogin() {
     if (errEl) { errEl.style.display = 'block'; errEl.style.color = 'var(--success)'; errEl.textContent = `Login successful! Welcome ${result.user?.displayName || result.user?.username}. Redirecting...`; }
     authToken = result.token;
     currentUser = result.user;
+    refreshRepliesBadge();
     sessionStorage.setItem('auth_token', authToken);
     if (result.mustEnrolMfa) {
       sessionStorage.setItem('must_enrol_mfa', '1');
@@ -472,6 +473,7 @@ function renderSidebar() {
     { id: 'dashboard', icon: '&#9632;', label: 'Dashboard' },
     { id: 'brief', icon: '&#9873;', label: 'Brief' },
     { id: 'leads', icon: '&#9679;', label: 'Leads' },
+    { id: 'replies', icon: '&#9993;', label: 'Replies', badge: openRepliesCount },
     { id: 'sources', icon: '&#9741;', label: 'Sources' },
     { id: 'pipeline', icon: '&#9654;', label: 'Pipeline' },
     { id: 'campaigns', icon: '&#9993;', label: 'Campaigns' },
@@ -500,7 +502,7 @@ function renderSidebar() {
 
   const navHtml = items.map(i => `
     <div class="nav-item ${currentPage === i.id ? 'active' : ''}" onclick="closeMobileMenu(); navigate('${i.id}')">
-      <span>${i.icon}</span> ${i.label}
+      <span>${i.icon}</span> ${i.label}${'badge' in i ? ` <span id="nav-${i.id}-badge" class="badge badge-paused" style="margin-left:auto${i.badge ? '' : ';display:none'}" title="Waiting for you">${Number(i.badge) || 0}</span>` : ''}
     </div>
   `).join('');
 
@@ -558,6 +560,7 @@ function renderPage() {
     case 'dashboard': return '<div id="page" class="loading">Loading dashboard...</div>';
     case 'brief': return '<div id="page" class="loading">Loading brief...</div>';
     case 'leads': return '<div id="page" class="loading">Loading leads...</div>';
+    case 'replies': return '<div id="page" class="loading">Loading replies...</div>';
     case 'sources': return '<div id="page" class="loading">Loading sources...</div>';
     case 'pipeline': return '<div id="page" class="loading">Loading pipeline...</div>';
     case 'campaigns': return '<div id="page" class="loading">Loading campaigns...</div>';
@@ -595,6 +598,7 @@ async function afterRender() {
     case 'dashboard': return loadDashboard();
     case 'brief': return loadBrief();
     case 'leads': return loadLeads();
+    case 'replies': return loadReplies();
     case 'sources': return loadSources();
     case 'pipeline': return loadPipeline();
     case 'campaigns': return loadCampaigns();
@@ -2095,8 +2099,10 @@ function showReplyResult(leadId, campaignId, r) {
     body: `
       <p><span class="badge badge-${badge}">${esc(label)}</span> <span class="text-sm text-muted">${Math.round((r.confidence || 0) * 100)}% sure</span></p>
       ${r.summary ? `<p class="text-sm">${esc(r.summary)}</p>` : ''}
-      <p class="text-sm text-muted">${esc(action)}${r.next_step ? ` Next: ${esc(r.next_step)}` : ''}</p>
-      ${r.referral?.name ? `<p class="text-sm"><strong>Referred to:</strong> ${esc(r.referral.name)}${r.referral.role ? ` (${esc(r.referral.role)})` : ''} — a task was added to find and verify them.</p>` : ''}
+      ${Array.isArray(r.actions) && r.actions.length
+        ? `<ul class="text-sm" style="margin:0 0 8px;padding-left:18px">${r.actions.map(a => `<li>${esc(a)}</li>`).join('')}</ul>`
+        : `<p class="text-sm text-muted">${esc(action)}</p>`}
+      ${r.next_step ? `<p class="text-sm text-muted">Next: ${esc(r.next_step)}</p>` : ''}
       ${r.suggested_reply ? `
         <div class="form-group"><label>Subject</label><input id="rp-subject" value="${esc(r.suggested_reply.subject || '')}" maxlength="200"></div>
         <div class="form-group"><label>Suggested answer — edit before sending</label><textarea id="rp-body" style="min-height:180px">${esc(r.suggested_reply.body || '')}</textarea></div>` : ''}`,
@@ -2114,6 +2120,118 @@ function showReplyResult(leadId, campaignId, r) {
     } : {}),
   };
   render();
+}
+
+// ===== Replies inbox =====
+// Every prospect reply: its label, what the agent did, and the drafted answer
+// waiting for approval. Replies are read automatically when the reply address
+// is on; otherwise they are pasted in from the lead (Reply button).
+let openRepliesCount = 0;
+let repliesState = { filter: 'open', selected: null, list: [], automatic: false };
+
+async function refreshRepliesBadge() {
+  try {
+    const { open } = await api.get('/replies/count');
+    openRepliesCount = open;
+    const badge = document.getElementById('nav-replies-badge');
+    if (badge) { badge.textContent = String(open); badge.style.display = open ? '' : 'none'; }
+  } catch { /* not signed in yet */ }
+}
+
+function replyTime(iso) {
+  const raw = String(iso || '');
+  const d = new Date(raw.includes('T') ? raw : raw.replace(' ', 'T') + 'Z');
+  if (Number.isNaN(d.getTime())) return '';
+  return new Date().toDateString() === d.toDateString()
+    ? d.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
+}
+
+async function loadReplies() {
+  try {
+    const r = await api.get(`/replies${repliesState.filter === 'open' ? '?status=open' : ''}`);
+    repliesState.list = r.replies;
+    repliesState.automatic = r.automatic;
+    if (!r.replies.some(x => x.id === repliesState.selected)) repliesState.selected = r.replies[0]?.id || null;
+    renderReplies();
+    refreshRepliesBadge();
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function setRepliesFilter(f) { repliesState.filter = f; loadReplies(); }
+function selectReply(id) { repliesState.selected = id; renderReplies(); }
+
+function replyPill(x) {
+  if (!x.intent) {
+    const reading = ['failed', 'processing', 'received'].includes(x.status);
+    return `<span class="badge badge-draft">${reading ? 'Reading…' : 'Not labelled'}</span>`;
+  }
+  const [badge, label] = REPLY_LABELS[x.intent] || ['draft', x.intent];
+  return `<span class="badge badge-${badge}">${esc(label)}${x.confidence ? ` · ${Math.round(x.confidence * 100)}%` : ''}</span>`;
+}
+
+function renderReplies() {
+  const { list, selected, filter, automatic } = repliesState;
+  const r = list.find(x => x.id === selected);
+  const firstLine = (body) => String(body || '').split('\n').find(l => l.trim()) || '';
+  document.getElementById('page').innerHTML = `
+    <div class="toolbar"><h2>Replies</h2>
+      <div class="flex gap-1">
+        <button class="btn btn-sm ${filter === 'open' ? 'btn-primary' : 'btn-outline'}" onclick="setRepliesFilter('open')">Waiting for you</button>
+        <button class="btn btn-sm ${filter === 'all' ? 'btn-primary' : 'btn-outline'}" onclick="setRepliesFilter('all')">All</button>
+      </div>
+    </div>
+    <p class="text-muted text-sm" style="margin:-6px 0 12px">${automatic
+      ? 'Replies to your outreach are read automatically: the sequence stops, the reply is labelled and forwarded to your inbox, and an answer is drafted for you to approve. Opt-outs are suppressed across every campaign straight away.'
+      : 'Replies arrive in your inbox. Paste one on the lead (Reply button) and the agent stops the sequence, labels it and drafts an answer.'}</p>
+    ${list.length ? `
+    <div class="replies-grid">
+      <div class="card" style="padding:0;overflow:hidden">
+        ${list.map(x => `
+          <button type="button" class="reply-item${x.id === selected ? ' selected' : ''}" onclick="selectReply(${Number(x.id)})">
+            <span style="display:flex;justify-content:space-between;gap:8px"><strong class="text-sm">${esc(x.lead_name)}</strong><span class="text-sm text-muted">${esc(replyTime(x.received_at))}</span></span>
+            <span class="text-sm text-muted reply-excerpt">${esc(firstLine(x.body))}</span>
+            ${replyPill(x)}${x.status === 'answered' ? ' <span class="badge badge-active">answered</span>' : ''}
+          </button>`).join('')}
+      </div>
+      <div class="card">${r ? `
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+          <div><h3 style="margin:0;text-transform:none;letter-spacing:0">${esc(r.lead_name)}</h3>
+            <div class="text-sm text-muted">${esc(r.lead_company || '')}${r.source === 'pasted' ? ' · pasted in' : ''}</div></div>
+          ${replyPill(r)}
+        </div>
+        <div class="reply-quote">${esc(r.body || '')}</div>
+        ${r.actions.length ? `<div class="text-sm" style="font-weight:600;margin-bottom:4px">What the agent did</div>
+          <ul class="text-sm" style="margin:0 0 12px;padding-left:18px">${r.actions.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
+        ${r.suggested_body && r.status === 'new' ? `
+          <div class="text-sm" style="font-weight:600;margin-bottom:4px">Suggested reply · waiting for your approval</div>
+          <div class="form-group"><input id="rp-subject-${Number(r.id)}" value="${esc(r.suggested_subject || '')}" maxlength="200" aria-label="Subject"></div>
+          <div class="form-group"><textarea id="rp-body-${Number(r.id)}" style="min-height:170px" aria-label="Reply">${esc(r.suggested_body)}</textarea></div>
+          <div class="flex gap-2"><button class="btn btn-primary" onclick="sendReplyAnswer(${Number(r.id)})">Approve and send</button>
+            <button class="btn btn-outline" onclick="dismissReplyItem(${Number(r.id)})">Dismiss</button></div>`
+        : r.status === 'new' ? `<button class="btn btn-outline" onclick="dismissReplyItem(${Number(r.id)})">Mark as handled</button>` : ''}
+      ` : '<div class="empty">Pick a reply.</div>'}</div>
+    </div>` : `<div class="card empty">${filter === 'open' ? 'Nothing waiting for you.' : 'No replies yet.'}</div>`}`;
+}
+
+async function sendReplyAnswer(id) {
+  try {
+    await api.post(`/replies/${id}/send`, {
+      subject: document.getElementById(`rp-subject-${id}`).value,
+      body: document.getElementById(`rp-body-${id}`).value,
+    });
+    showNotification('Answer sent.', 'success');
+    loadReplies();
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+async function dismissReplyItem(id) {
+  try {
+    await api.post(`/replies/${id}/dismiss`);
+    loadReplies();
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
 
 // ===== Outreach approval queue =====
@@ -6404,6 +6522,12 @@ async function init() {
     window.history.replaceState({}, '', '/app');
   }
 
+  // Deep links from emails (e.g. a forwarded reply opens Replies).
+  if (['replies', 'leads', 'brief', 'pipeline', 'campaigns'].includes(params.get('p'))) {
+    currentPage = params.get('p');
+    window.history.replaceState({}, '', '/app');
+  }
+
   // Handle billing redirects
   if (params.get('page') === 'billing') {
     currentPage = 'billing';
@@ -6439,6 +6563,9 @@ async function init() {
     }
   }
   render();
+  // Replies waiting for a person: shown on the sidebar, checked every 2 minutes.
+  if (currentUser) refreshRepliesBadge();
+  setInterval(() => { if (currentUser) refreshRepliesBadge(); }, 120000);
 
   // Show welcome modal for new signups
   if (params.get('welcome') === '1' && currentUser) {

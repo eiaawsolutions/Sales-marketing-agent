@@ -3,6 +3,7 @@ import { sendEmail } from '../utils/email.js';
 import { signTracking } from '../utils/tracking-token.js';
 import { isSuppressed, prepareOutreachEmail, UNSUBSCRIBE_PATH } from './unsubscribe.js';
 import { senderFor } from './account-profile.js';
+import { replyAddressFor } from './reply-routing.js';
 
 export const campaignsService = {
   getAll(userId, filters = {}) {
@@ -116,6 +117,7 @@ export const campaignsService = {
           html: trackedHtml,
           headers,
           ...senderFor(campaign.user_id),
+          ...(replyAddressFor(lead.id) ? { replyTo: replyAddressFor(lead.id) } : {}),
         });
 
         // Resend's id ties later webhook events (opened, bounced, complained) to this send.

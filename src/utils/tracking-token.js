@@ -38,6 +38,20 @@ export function verifyUnsubscribe(campaignId, leadId, token) {
   return crypto.timingSafeEqual(Buffer.from(signUnsubscribe(campaignId, leadId), 'hex'), Buffer.from(token, 'hex'));
 }
 
+// Reply addresses (r-<leadId>-<token>@<inbound domain>) carry their own
+// token. The "reply:" prefix keeps it from ever matching a tracking or
+// unsubscribe token for the same lead.
+const REPLY_TOKEN_LEN = 16;
+
+export function signReply(leadId) {
+  return crypto.createHmac('sha256', getSecret()).update(`reply:${leadId}`).digest('hex').slice(0, REPLY_TOKEN_LEN);
+}
+
+export function verifyReply(leadId, token) {
+  if (typeof token !== 'string' || !/^[0-9a-f]{16}$/.test(token)) return false;
+  return crypto.timingSafeEqual(Buffer.from(signReply(leadId), 'hex'), Buffer.from(token, 'hex'));
+}
+
 export function verifyTracking(campaignId, leadId, token) {
   if (!token || typeof token !== 'string' || token.length !== TOKEN_LEN) return false;
   const expected = signTracking(campaignId, leadId);

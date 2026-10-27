@@ -102,6 +102,7 @@ function deleteLeadRows(db, leadIdsSql, params) {
   n += run(`DELETE FROM appointments WHERE lead_id IN (${leadIdsSql})`);
   n += run(`DELETE FROM activities WHERE lead_id IN (${leadIdsSql})`);
   n += run(`DELETE FROM pipeline WHERE lead_id IN (${leadIdsSql})`);
+  if (tableExists(db, 'replies')) n += run(`DELETE FROM replies WHERE lead_id IN (${leadIdsSql})`);
   if (tableExists(db, 'lead_touchpoints')) n += run(`DELETE FROM lead_touchpoints WHERE lead_id IN (${leadIdsSql})`);
   if (tableExists(db, 'segment_members')) n += run(`DELETE FROM segment_members WHERE lead_id IN (${leadIdsSql})`);
   if (tableExists(db, 'lead_inbox')) {
@@ -174,6 +175,7 @@ export function deleteAccountData(db, userId) {
     run('appointments', `DELETE FROM appointments WHERE user_id = @uid OR lead_id IN (${LEADS})`);
     run('activities', `DELETE FROM activities WHERE user_id = @uid OR lead_id IN (${LEADS}) OR campaign_id IN (${CAMPAIGNS})`);
     run('pipeline', `DELETE FROM pipeline WHERE user_id = @uid OR lead_id IN (${LEADS})`);
+    if (tableExists(db, 'replies')) run('replies', `DELETE FROM replies WHERE user_id = @uid OR lead_id IN (${LEADS})`);
     run('generated_content', `DELETE FROM generated_content WHERE user_id = @uid OR campaign_id IN (${CAMPAIGNS})`);
     run('ai_cost_log', `DELETE FROM ai_cost_log WHERE user_id = @uid OR campaign_id IN (${CAMPAIGNS})`);
     if (tableExists(db, 'lead_touchpoints')) run('lead_touchpoints', `DELETE FROM lead_touchpoints WHERE user_id = @uid OR lead_id IN (${LEADS})`);

@@ -3,6 +3,7 @@ import db from '../db/index.js';
 import { processOutreachQueue } from './outreach-dispatch.js';
 import { refreshMetrics } from './metrics.js';
 import { runRetention } from './retention.js';
+import { processInboundReplies } from './inbound-replies.js';
 
 /**
  * Background scheduler — runs every 30 minutes.
@@ -15,6 +16,7 @@ export function startScheduler() {
     console.log('[Scheduler] Running at', new Date().toISOString());
     await processOutreachQueue();
     await processScheduledCampaigns();
+    await processInboundReplies().catch(e => console.error('[Scheduler] replies:', e.message));
   });
 
   // Daily midnight: refresh system metrics (code stats, AI costs, DB counts)

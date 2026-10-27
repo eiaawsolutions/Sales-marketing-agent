@@ -1529,6 +1529,15 @@
     /* Outreach drafts: what was personalised */
     mark.hl-lead { background: rgba(31,168,150,0.18); color: inherit; padding: 0 2px; border-radius: 3px; }
     mark.hl-brief { background: rgba(217,119,6,0.14); color: inherit; padding: 0 2px; border-radius: 3px; }
+
+    /* Replies inbox */
+    .replies-grid { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); gap: 14px; align-items: start; }
+    .reply-item { display: block; width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--border); padding: 12px 14px; cursor: pointer; font-family: inherit; background: var(--surface); color: var(--text); }
+    .reply-item.selected { background: var(--primary-light); }
+    .reply-item:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+    .reply-excerpt { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 2px 0 6px; }
+    .reply-quote { background: var(--surface2); border-radius: var(--radius); padding: 12px; margin: 12px 0; white-space: pre-wrap; font-size: 14px; line-height: 1.55; word-break: break-word; }
+    @media (max-width: 768px) { .replies-grid { grid-template-columns: minmax(0, 1fr); } }
   </style>
 </head>
 <body>
@@ -1541,6 +1550,6 @@
   <script src="/email-templates.js?v=20260422e"></script>
   <script src="/email-designer.js?v=20260422e"></script>
   <script src="/sources-ui.js?v=20260815-modalbridge"></script>
-  <script src="/app.js?v=20261027-calendar"></script>
+  <script src="/app.js?v=20261027-replies"></script>
 </body>
 </html>

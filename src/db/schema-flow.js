@@ -34,6 +34,43 @@ export function migrateFlow(db) {
   // and for Calendly the account's personal access token, encrypted.
   addColumn(db, 'account_profiles', 'booking_link', 'TEXT');
   addColumn(db, 'account_profiles', 'calendly_token', 'TEXT');
+
+  // Prospects' replies (replies.js, inbound-replies.js): read automatically
+  // from the reply address, or pasted in. Each keeps its label, what the agent
+  // did, and the drafted answer waiting for a person. A reply that is not
+  // addressed to one of our signed reply addresses is never stored.
+  //   status: received → processing → new (waiting for a person) →
+  //           answered | dismissed; failed is retried; unmatched is dropped.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS replies (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
+      source TEXT NOT NULL CHECK(source IN ('inbound', 'pasted')),
+      provider_email_id TEXT UNIQUE,
+      message_id TEXT,
+      from_address TEXT,
+      to_address TEXT,
+      subject TEXT,
+      body TEXT,
+      intent TEXT,
+      confidence REAL,
+      summary TEXT,
+      next_step TEXT,
+      actions TEXT,
+      suggested_subject TEXT,
+      suggested_body TEXT,
+      status TEXT NOT NULL DEFAULT 'received'
+        CHECK(status IN ('received', 'processing', 'new', 'answered', 'dismissed', 'unmatched', 'failed')),
+      attempts INTEGER NOT NULL DEFAULT 0,
+      error TEXT,
+      forwarded_at DATETIME,
+      received_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      handled_at DATETIME
+    );
+    CREATE INDEX IF NOT EXISTS idx_replies_user ON replies(user_id, received_at);
+    CREATE INDEX IF NOT EXISTS idx_replies_status ON replies(status);
+  `);
 }
 
 function addColumn(db, table, column, type) {

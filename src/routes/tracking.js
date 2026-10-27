@@ -3,6 +3,7 @@ import db from '../db/index.js';
 import { verifyTracking } from '../utils/tracking-token.js';
 import { verifySvix } from '../services/ingest-auth.js';
 import { recordEmailEvent } from '../services/email-events.js';
+import { acceptInbound, kickInbound } from '../services/inbound-replies.js';
 
 const router = Router();
 
@@ -124,6 +125,13 @@ router.post('/webhook', (req, res) => {
   try { event = JSON.parse(req.body.toString('utf8')); } catch { return res.status(400).json({ error: 'Invalid JSON' }); }
 
   try {
+    // A prospect's reply (reply-routing.js): stored now, read in the background.
+    if (event.type === 'email.received') {
+      const result = acceptInbound(event);
+      if (result === 'queued') kickInbound();
+      console.log(`[resend-webhook] email.received -> ${result}`);
+      return res.json({ received: true });
+    }
     const result = recordEmailEvent(event);
     if (result !== 'ignored') console.log(`[resend-webhook] ${event.type} -> ${result}`);
   } catch (e) {

@@ -23,7 +23,7 @@ let mails = [];
 after(() => { globalThis.fetch = realFetch; agent.resetChat(); db.close(); rmSync(dir, { recursive: true, force: true }); });
 
 function reset() {
-  for (const t of ['outreach_queue', 'campaign_leads', 'activities', 'ai_cost_log', 'agent_tasks', 'email_suppressions', 'leads', 'campaigns', 'account_profiles', 'users']) {
+  for (const t of ['replies', 'pipeline', 'appointments', 'outreach_queue', 'campaign_leads', 'activities', 'ai_cost_log', 'agent_tasks', 'email_suppressions', 'leads', 'campaigns', 'account_profiles', 'users']) {
     db.prepare(`DELETE FROM ${t}`).run();
   }
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('resend_api_key', 're_test_key_123')").run();

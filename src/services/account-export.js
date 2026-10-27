@@ -53,7 +53,9 @@ export function exportAccountData(db, userId) {
     data.segment_members = all('SELECT * FROM segment_members WHERE segment_id IN (SELECT id FROM segments WHERE user_id = @uid)');
   }
   if (tableExists(db, 'lead_touchpoints')) data.lead_touchpoints = all('SELECT * FROM lead_touchpoints WHERE user_id = @uid ORDER BY id');
-  if (tableExists(db, 'account_profiles')) data.account_profile = all('SELECT * FROM account_profiles WHERE user_id = @uid');
+  // The brief, without the Calendly token: a credential, not personal data.
+  if (tableExists(db, 'account_profiles')) data.account_profile = all('SELECT * FROM account_profiles WHERE user_id = @uid').map(({ calendly_token: _t, ...p }) => p);
+  if (tableExists(db, 'replies')) data.replies = all(`SELECT * FROM replies WHERE user_id = @uid OR lead_id IN (${LEADS}) ORDER BY id`);
   if (db.prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'account_owner_id'").get()) {
     data.team_members = all(`SELECT id, username, email, display_name, created_at FROM users WHERE account_owner_id = @uid ORDER BY id`);
   }
