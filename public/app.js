@@ -924,11 +924,11 @@ async function showLeadModal(id) {
   modal = {
     title: id ? 'Edit Lead' : 'Add Lead',
     body: `
-      <div class="form-group"><label>Name *</label><input id="f-name" value="${lead.name}"></div>
-      <div class="form-group"><label>Email *</label><input id="f-email" type="email" value="${lead.email}"></div>
+      <div class="form-group"><label>Name *</label><input id="f-name" value="${esc(lead.name)}"></div>
+      <div class="form-group"><label>Email *</label><input id="f-email" type="email" value="${esc(lead.email)}"></div>
       <div class="grid-2">
-        <div class="form-group"><label>Company</label><input id="f-company" value="${lead.company || ''}"></div>
-        <div class="form-group"><label>Title</label><input id="f-title" value="${lead.title || ''}"></div>
+        <div class="form-group"><label>Company</label><input id="f-company" value="${esc(lead.company || '')}"></div>
+        <div class="form-group"><label>Title</label><input id="f-title" value="${esc(lead.title || '')}"></div>
       </div>
       <div class="grid-2">
         <div class="form-group"><label>Phone</label><input id="f-phone" value="${lead.phone || ''}"></div>
@@ -938,7 +938,7 @@ async function showLeadModal(id) {
           </select>
         </div>
       </div>
-      <div class="form-group"><label>Notes</label><textarea id="f-notes">${lead.notes || ''}</textarea></div>
+      <div class="form-group"><label>Notes</label><textarea id="f-notes">${esc(lead.notes || '')}</textarea></div>
     `,
     onSave: async () => {
       const data = {
@@ -998,8 +998,8 @@ async function aiScoreLead(id, campaignId) {
         <div class="stat-value ${result.score > 70 ? 'green' : result.score > 40 ? 'yellow' : ''}">${result.score}/100</div>
         <div class="stat-label">Lead Score</div>
       </div>
-      <p><strong>Reasoning:</strong> ${result.reasoning}</p>
-      <p style="margin-top:8px"><strong>Recommended Action:</strong> ${result.recommended_action}</p>
+      <p><strong>Reasoning:</strong> ${esc(result.reasoning)}</p>
+      <p style="margin-top:8px"><strong>Recommended Action:</strong> ${esc(result.recommended_action)}</p>
     `);
     if (campaignId) { refreshCampaignLeads(campaignId); }
     else if (currentPage === 'leads') loadLeads();
@@ -1029,9 +1029,9 @@ async function aiQualifyLead(id, campaignId) {
         <div>Need: ${result.bant_score?.need || 0}/25</div>
         <div>Timeline: ${result.bant_score?.timeline || 0}/25</div>
       </div>
-      <p><strong>Notes:</strong> ${result.qualification_notes}</p>
+      <p><strong>Notes:</strong> ${esc(result.qualification_notes)}</p>
       <p style="margin-top:8px"><strong>Next Steps:</strong></p>
-      <ul>${(result.next_steps || []).map(s => `<li>${s}</li>`).join('')}</ul>
+      <ul>${(result.next_steps || []).map(s => `<li>${esc(s)}</li>`).join('')}</ul>
     `);
     if (campaignId) refreshCampaignLeads(campaignId);
     else if (currentPage === 'leads') loadLeads();
@@ -1136,8 +1136,8 @@ async function aiVoiceCall(leadId) {
         <div class="vc-status connecting">Connecting...</div>
         <button onclick="endVoiceCall()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:18px">&times;</button>
       </div>
-      <div class="vc-lead">${lead.name || 'Lead'}</div>
-      <div class="vc-meta">${lead.company || ''}</div>
+      <div class="vc-lead">${esc(lead.name || 'Lead')}</div>
+      <div class="vc-meta">${esc(lead.company || '')}</div>
       <div class="vc-timer" id="vc-timer">00:00</div>
       <div class="vc-wave" id="vc-wave" style="display:none">
         <span></span><span></span><span></span><span></span><span></span>
@@ -1188,7 +1188,7 @@ async function aiVoiceCall(leadId) {
       if (update.transcript) {
         const el = document.getElementById('vc-transcript');
         if (el) {
-          const lines = update.transcript.map(t => `<b>${t.role === 'agent' ? 'AI' : 'You'}:</b> ${t.content}`);
+          const lines = update.transcript.map(t => `<b>${t.role === 'agent' ? 'AI' : 'You'}:</b> ${esc(t.content)}`);
           el.innerHTML = lines.slice(-3).join('<br>');
           el.scrollTop = el.scrollHeight;
         }
@@ -1222,19 +1222,20 @@ function endVoiceCall() {
   activeCall = null;
 }
 
+// A one-off sequence for a single lead, written from the account's Brief (the
+// server reads it — nothing about the offer is sent from here). The text is
+// AI output shaped by web-sourced lead data, so every field is escaped.
 async function aiOutreach(id, campaignId) {
   showNotification('Generating outreach sequence...');
   try {
-    const result = await api.post(`/leads/${id}/outreach`, {
-      valueProposition: 'We help businesses automate their sales and marketing with AI.',
-    });
+    const result = await api.post(`/leads/${id}/outreach`, {});
     showResultModal('AI Outreach Sequence', `
       ${(result.sequence || []).map(s => `
         <div class="content-card">
-          <div class="type">Step ${s.step} — ${s.channel} (Day ${s.delay_days})</div>
-          ${s.subject ? `<div><strong>Subject:</strong> ${s.subject}</div>` : ''}
-          <pre>${s.message}</pre>
-          <div class="text-muted text-sm">Goal: ${s.goal}</div>
+          <div class="type">Step ${Number(s.step) || ''} — ${esc(s.channel === 'linkedin' ? 'LinkedIn note · you send it' : s.channel)} (Day ${Number(s.delay_days) || 0})</div>
+          ${s.subject ? `<div><strong>Subject:</strong> ${esc(s.subject)}</div>` : ''}
+          <pre>${esc(s.message)}</pre>
+          ${s.goal ? `<div class="text-muted text-sm">Goal: ${esc(s.goal)}</div>` : ''}
         </div>
       `).join('')}
     `);
@@ -1287,9 +1288,9 @@ async function loadPipeline() {
                 <span>$${total.toLocaleString()}</span>
               </h4>
               ${stageDeals.map(d => `
-                <div class="pipeline-card" onclick="showDealModal(${d.id})">
-                  <div class="name">${d.name}</div>
-                  <div class="company">${d.company || ''}</div>
+                <div class="pipeline-card" onclick="showDealModal(${Number(d.id)})">
+                  <div class="name">${esc(d.name)}</div>
+                  <div class="company">${esc(d.company || '')}</div>
                   <div class="value">$${d.deal_value.toLocaleString()}</div>
                   <div class="text-muted text-sm">${d.probability}% probability</div>
                 </div>
@@ -1324,7 +1325,7 @@ async function showDealModal(id) {
         <div class="form-group"><label>Probability (%)</label><input id="f-prob" type="number" min="0" max="100" value="${deal.probability}"></div>
       </div>
       <div class="form-group"><label>Expected Close Date</label><input id="f-close" type="date" value="${deal.expected_close_date || ''}"></div>
-      <div class="form-group"><label>Notes</label><textarea id="f-notes">${deal.notes || ''}</textarea></div>
+      <div class="form-group"><label>Notes</label><textarea id="f-notes">${esc(deal.notes || '')}</textarea></div>
     `,
     onSave: async () => {
       const data = {
@@ -1361,9 +1362,9 @@ async function requestPipelineAnalysis() {
         <div class="stat-card"><div class="stat-value yellow text-sm">$${(a.forecast?.pessimistic || 0).toLocaleString()}</div><div class="stat-label">Pessimistic</div></div>
       </div>
       <h4>Bottlenecks</h4>
-      <ul>${(a.bottlenecks || []).map(b => `<li>${b}</li>`).join('')}</ul>
+      <ul>${(a.bottlenecks || []).map(b => `<li>${esc(typeof b === 'string' ? b : JSON.stringify(b))}</li>`).join('')}</ul>
       <h4 style="margin-top:12px">Recommendations</h4>
-      <ul>${(a.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
+      <ul>${(a.recommendations || []).map(r => `<li>${esc(typeof r === 'string' ? r : JSON.stringify(r))}</li>`).join('')}</ul>
     `);
   } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
@@ -1438,7 +1439,7 @@ async function loadCampaigns() {
           <div class="camp-header" onclick="toggleCampaignLeads(${c.id})">
             <div class="camp-info">
               <div class="camp-title">
-                <strong>${c.name}</strong>
+                <strong>${esc(c.name)}</strong>
                 <span class="badge badge-${c.status}">${c.status}</span>
                 <span class="badge badge-new">${c.type}</span>
                 <span class="camp-toggle-inline" id="camp-toggle-${c.id}">&#9660;</span>
@@ -2099,7 +2100,7 @@ function renderWizardStepContent(step) {
     case 0: return `
       <div class="form-group">
         <label>Campaign Name *</label>
-        <input id="wz-name" value="${d.name}" placeholder="e.g. Q2 Product Launch, Welcome Series..."
+        <input id="wz-name" value="${esc(d.name)}" placeholder="e.g. Q2 Product Launch, Welcome Series..."
           oninput="wizardState.data.name=this.value">
         <small class="text-muted">Pick a name that helps you remember what this campaign is about.</small>
       </div>
@@ -2321,7 +2322,7 @@ function renderWizardReview() {
     <div class="wizard-review">
       <div class="wizard-review-section">
         <div class="wizard-review-label">Campaign Name</div>
-        <div class="wizard-review-value">${d.name || '<span class="text-muted">Not set</span>'}</div>
+        <div class="wizard-review-value">${d.name ? esc(d.name) : '<span class="text-muted">Not set</span>'}</div>
       </div>
       <div class="wizard-review-section">
         <div class="wizard-review-label">Type</div>
@@ -2815,7 +2816,7 @@ function formatContentDisplay(type, data) {
           <span class="cw-label">Email Preview</span>
         </div>
         <div class="cw-field" style="padding:10px 14px;background:var(--bg);border-radius:var(--radius);border-left:3px solid #3b82f6">
-          <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">${data.subject || ''}</div>
+          <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">${esc(data.subject || '')}</div>
           <div style="font-size:13px;color:var(--text-muted)">${data.preview_text || ''}</div>
         </div>
         <div class="cw-divider"></div>
@@ -2999,7 +3000,7 @@ function formatContentDisplay(type, data) {
             <div class="cw-option" style="margin-bottom:4px;flex-direction:column">
               <div style="display:flex;align-items:center;gap:10px;width:100%">
                 <span class="cw-num" style="background:linear-gradient(135deg,#22c55e,#16a34a)">${i+1}</span>
-                <strong style="color:var(--text);flex:1">${idea.title || idea}</strong>
+                <strong style="color:var(--text);flex:1">${esc(idea.title || idea)}</strong>
                 ${idea.type ? `<span class="cw-tag" style="font-size:10px;padding:2px 8px">${idea.type}</span>` : ''}
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;padding-left:34px">
