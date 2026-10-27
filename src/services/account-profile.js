@@ -8,6 +8,8 @@
 import db from '../db/index.js';
 import { isFounderHq } from '../config/hq.js';
 import { normalizeEmail } from '../utils/normalize.js';
+import { encrypt } from '../utils/crypto.js';
+import { parseBookingLink } from './calendar.js';
 
 export const TONES = {
   warm: 'Warm and professional',
@@ -37,6 +39,7 @@ const EMPTY = {
   website: null, offer: null, proof_points: null, call_to_action: null, tone: 'warm',
   meeting_link: null, voice_notes: null, outreach_approval: 1,
   ideal_client: null, target_roles: [], target_sectors: [], target_regions: [], company_size: null,
+  booking_link: null,
 };
 
 function parseList(raw) {
@@ -44,9 +47,11 @@ function parseList(raw) {
   try { const v = JSON.parse(raw); return Array.isArray(v) ? v.filter(s => typeof s === 'string') : []; } catch { return []; }
 }
 
+// The Calendly token never leaves the server: callers see only whether one is
+// on file. calendar.js reads it straight from the table.
 export function getProfile(userId) {
-  const row = db.prepare('SELECT * FROM account_profiles WHERE user_id = ?').get(userId) || {};
-  const profile = { ...EMPTY, ...row, user_id: userId };
+  const { calendly_token: token, ...row } = db.prepare('SELECT * FROM account_profiles WHERE user_id = ?').get(userId) || {};
+  const profile = { ...EMPTY, ...row, user_id: userId, calendly_connected: !!token };
   for (const f of LIST_FIELDS) profile[f] = parseList(row[f]);
   return profile;
 }
@@ -127,10 +132,20 @@ export function saveProfile(userId, input = {}) {
     if (!email) errors[field] = 'is not a valid email address';
     else out[field] = email;
   }
-  for (const field of ['website', 'meeting_link']) {
+  for (const field of ['website', 'meeting_link', 'booking_link']) {
     if (!(field in input)) continue;
     const { value, error } = cleanHttpsUrl(input[field]);
     if (error) errors[field] = error; else out[field] = value;
+  }
+  if (out.booking_link && !parseBookingLink(out.booking_link)) {
+    errors.booking_link = 'must be a Cal.com or Calendly booking link, like https://cal.com/you/30min';
+  }
+  // Write-only: a string sets it, null removes it, absent leaves it as is.
+  let token;
+  if ('calendly_token' in input) {
+    if (input.calendly_token === null || input.calendly_token === '') token = null;
+    else if (typeof input.calendly_token === 'string' && /^\S{20,4000}$/.test(input.calendly_token.trim())) token = input.calendly_token.trim();
+    else errors.calendly_token = 'does not look like a Calendly personal access token';
   }
   if ('tone' in input) {
     if (!(input.tone in TONES)) errors.tone = 'must be one of: ' + Object.keys(TONES).join(', ');
@@ -149,15 +164,16 @@ export function saveProfile(userId, input = {}) {
   }
   if (Object.keys(errors).length) return { errors };
 
-  const merged = { ...getProfile(userId), ...out };
+  const { calendly_connected: _connected, ...current } = getProfile(userId);
+  const merged = { ...current, ...out };
   for (const f of LIST_FIELDS) merged[f] = JSON.stringify(merged[f] || []);
   db.prepare(`
     INSERT INTO account_profiles (user_id, business_name, sender_name, sender_title, reply_to_email, from_email, website,
       offer, proof_points, call_to_action, tone, meeting_link, voice_notes, outreach_approval,
-      ideal_client, target_roles, target_sectors, target_regions, company_size, updated_at)
+      ideal_client, target_roles, target_sectors, target_regions, company_size, booking_link, updated_at)
     VALUES (@user_id, @business_name, @sender_name, @sender_title, @reply_to_email, @from_email, @website,
       @offer, @proof_points, @call_to_action, @tone, @meeting_link, @voice_notes, @outreach_approval,
-      @ideal_client, @target_roles, @target_sectors, @target_regions, @company_size, CURRENT_TIMESTAMP)
+      @ideal_client, @target_roles, @target_sectors, @target_regions, @company_size, @booking_link, CURRENT_TIMESTAMP)
     ON CONFLICT(user_id) DO UPDATE SET
       business_name = excluded.business_name, sender_name = excluded.sender_name, sender_title = excluded.sender_title,
       reply_to_email = excluded.reply_to_email, from_email = excluded.from_email, website = excluded.website,
@@ -165,8 +181,13 @@ export function saveProfile(userId, input = {}) {
       tone = excluded.tone, meeting_link = excluded.meeting_link, voice_notes = excluded.voice_notes,
       outreach_approval = excluded.outreach_approval,
       ideal_client = excluded.ideal_client, target_roles = excluded.target_roles, target_sectors = excluded.target_sectors,
-      target_regions = excluded.target_regions, company_size = excluded.company_size, updated_at = CURRENT_TIMESTAMP
+      target_regions = excluded.target_regions, company_size = excluded.company_size, booking_link = excluded.booking_link,
+      updated_at = CURRENT_TIMESTAMP
   `).run({ ...merged, user_id: userId });
+  if (token !== undefined) {
+    db.prepare('UPDATE account_profiles SET calendly_token = ? WHERE user_id = ?').run(token ? encrypt(token) : null, userId);
+    db.prepare('DELETE FROM settings WHERE key = ?').run(`calendly_event_type_${userId}`);
+  }
   return { profile: getProfile(userId) };
 }
 

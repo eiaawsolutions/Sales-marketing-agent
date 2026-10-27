@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getProfile, saveProfile, senderFor, hasOffer, hasMarket, TONES, COMPANY_SIZES } from '../services/account-profile.js';
 import { draftsWaiting, redraftFromBrief } from '../services/outreach-queue.js';
 import { requireAccountOwner, checkPlanLimit } from '../middleware/auth.js';
+import { hasCalendar, offerTimes } from '../services/calendar.js';
 
 // The signed-in account's brief: its offer, the claims it may make, who it
 // sells to, who its email comes from, and whether outreach waits for
@@ -33,6 +34,20 @@ router.put('/', requireAccountOwner, (req, res) => {
   const { errors } = saveProfile(req.user.id, req.body || {});
   if (errors) return res.status(400).json({ error: 'Please fix the highlighted fields.', errors });
   res.json(view(req.user.id));
+});
+
+// GET /calendar-check — the next free times the assistant would offer, to
+// confirm the booking calendar on the Brief is connected.
+router.get('/calendar-check', async (req, res) => {
+  if (!hasCalendar(req.user.id)) {
+    return res.json({ connected: false, times: [], message: 'Add a Cal.com link, or a Calendly link and its personal access token.' });
+  }
+  const times = await offerTimes(req.user.id, { count: 5 });
+  res.json({
+    connected: times.length > 0,
+    times: times.map(t => t.label),
+    message: times.length ? null : 'No free times came back for the next week. Check the link, the token, and that the event has availability.',
+  });
 });
 
 // POST /redraft — rewrite unapproved drafts from the brief as it is now.

@@ -15,6 +15,8 @@ import { getProfile, hasOffer, isHqAccount } from './account-profile.js';
 export const EMPTY_CUSTOMER_VARS = {
   business_name: '', sender_name: '', offer: '', proof_points: '',
   call_to_action: '', voice_notes: '', meeting_link_present: 'no',
+  // Real free times from the account's calendar (calendar.js calendarVars).
+  calendar_connected: 'no', available_times: '', available_slot_codes: '',
 };
 
 export function firstName(name) {

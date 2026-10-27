@@ -658,7 +658,8 @@ async function removeTeammate(id) {
 // What this account sells, the claims it may make and who its email comes
 // from. Every message, score and voice call is written from it.
 const BRIEF_FIELDS = ['business_name', 'website', 'offer', 'proof_points', 'call_to_action', 'tone',
-  'sender_name', 'sender_title', 'reply_to_email', 'from_email', 'meeting_link', 'voice_notes', 'ideal_client', 'company_size'];
+  'sender_name', 'sender_title', 'reply_to_email', 'from_email', 'meeting_link', 'voice_notes', 'ideal_client', 'company_size',
+  'booking_link'];
 
 // Fields the outreach is written from: changing any of them makes waiting
 // drafts out of date.
@@ -792,7 +793,19 @@ async function loadBrief() {
 
       <div class="card">
         <h3>Meetings &amp; voice assistant</h3>
-        ${field('meeting_link', 'Meeting link', 'Your Google Meet room, Zoom link or booking page (https). Sent in every meeting invite the voice assistant books.', { type: 'url', max: 500, placeholder: 'https://' })}
+        ${field('booking_link', 'Booking calendar', 'Your Cal.com or Calendly event link. The voice assistant and drafted replies offer only times that are free on it, and meetings are booked straight into it.', { type: 'url', max: 500, placeholder: 'https://cal.com/you/30min' })}
+        <div class="form-group">
+          <label for="br-calendly_token">Calendly personal access token <span class="text-muted">(Calendly only)</span></label>
+          <input id="br-calendly_token" type="password" autocomplete="off" maxlength="4000" placeholder="${p.calendly_connected ? 'Saved — leave blank to keep it' : 'Only needed for a Calendly link'}">
+          <small class="text-muted">Calendly → Integrations → API &amp; webhooks → Personal access tokens. Stored encrypted and never shown again. Booking through Calendly needs a paid Calendly plan; without one, times are still offered and the invite comes from here.</small>
+          <small class="text-sm" id="br-err-calendly_token" style="color:var(--danger);display:none"></small>
+          ${p.calendly_connected ? `<label class="flex gap-2" style="align-items:center;margin-top:6px;cursor:pointer"><input type="checkbox" id="br-calendly-remove" style="width:auto"> <span class="text-sm">Remove the saved token</span></label>` : ''}
+        </div>
+        <div class="flex gap-2" style="align-items:center;margin-bottom:12px;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm btn-outline" onclick="checkCalendar()">Check calendar</button>
+          <span class="text-sm text-muted" id="calendar-check"></span>
+        </div>
+        ${field('meeting_link', 'Meeting link', 'Your Google Meet room or Zoom link (https), sent in invites when the calendar does not create its own.', { type: 'url', max: 500, placeholder: 'https://' })}
         ${field('voice_notes', 'Notes for the voice assistant', 'Anything it should know when prospects call: formats, typical cohort sizes, what you need before quoting. It will only say what is here or in your offer.', { textarea: true })}
       </div>
 
@@ -820,6 +833,10 @@ async function saveBrief({ quiet = false } = {}) {
   for (const f of BRIEF_FIELDS) body[f] = document.getElementById(`br-${f}`)?.value ?? '';
   Object.assign(body, briefMarket);
   body.outreach_approval = document.getElementById('br-approval').checked ? 1 : 0;
+  // The Calendly token is write-only: sent only when typed, or to remove it.
+  const token = document.getElementById('br-calendly_token')?.value.trim();
+  if (token) body.calendly_token = token;
+  else if (document.getElementById('br-calendly-remove')?.checked) body.calendly_token = null;
   const offerChanged = BRIEF_OFFER_FIELDS.some(f => String(body[f] ?? '') !== String(briefSaved[f] ?? ''));
   BRIEF_FIELDS.forEach(f => { const el = document.getElementById(`br-err-${f}`); if (el) el.style.display = 'none'; });
   try {
@@ -845,6 +862,17 @@ async function saveBrief({ quiet = false } = {}) {
     }
     return true;
   } catch (e) { showNotification('Error: ' + e.message, 'error'); return false; }
+}
+
+async function checkCalendar() {
+  const el = document.getElementById('calendar-check');
+  el.textContent = 'Checking…';
+  if (!currentUser?.isMember && !(await saveBrief({ quiet: true }))) { el.textContent = ''; return; }
+  try {
+    const r = await api.get('/profile/calendar-check');
+    el.textContent = r.connected ? `Connected. Next free times: ${r.times.join('; ')}` : (r.message || 'Not connected.');
+    el.style.color = r.connected ? 'var(--teal-dark)' : 'var(--warning)';
+  } catch (e) { el.textContent = 'Error: ' + e.message; }
 }
 
 // The offer changed while drafts were waiting: they were written from the old

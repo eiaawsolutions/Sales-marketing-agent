@@ -230,7 +230,10 @@ function hostFor(userId) {
 // The prospect gets the meeting details only. `notes` (e.g. the voice
 // assistant's Need/Budget/Authority/Timeline summary) are internal: they go in
 // the host's copy, never to the prospect.
-async function sendCalendarInviteEmail({ apptId, lead, scheduled, title, duration, location, notes, type, userId, leadId }) {
+// bookedOn: 'calcom' | 'calendly' when the meeting was booked on the host's own
+// calendar — that calendar sends the prospect its confirmation and holds the
+// event, so only the host's notes copy goes from here, with no .ics.
+async function sendCalendarInviteEmail({ apptId, lead, scheduled, title, duration, location, notes, type, userId, leadId, bookedOn = null }) {
   const end = new Date(scheduled.getTime() + (duration || 15) * 60000);
   const host = hostFor(userId);
   const icsContent = generateICS({
@@ -251,8 +254,9 @@ async function sendCalendarInviteEmail({ apptId, lead, scheduled, title, duratio
       ${where}
     </div>`;
   const ical = { filename: 'invite.ics', method: 'REQUEST', content: icsContent };
+  const calendarName = bookedOn === 'calcom' ? 'Cal.com' : bookedOn === 'calendly' ? 'Calendly' : null;
 
-  await sendEmail({
+  if (!bookedOn) await sendEmail({
     to: lead.email,
     subject: `Confirmed: ${title} — ${dateStr}`,
     html: `
@@ -275,16 +279,18 @@ async function sendCalendarInviteEmail({ apptId, lead, scheduled, title, duratio
           <p style="font-size:15px;color:#333">A meeting is booked with <strong>${htmlText(lead.name || '')}</strong>${lead.company ? ` from ${htmlText(lead.company)}` : ''} (${htmlText(lead.email)}).</p>
           ${details}
           ${notes ? `<p style="font-size:14px;color:#333"><strong>Notes from the call:</strong><br>${htmlText(notes).replace(/\n/g, '<br>')}</p>` : ''}
-          <p style="font-size:13px;color:#888">The prospect has the invite. Add the attached event to your calendar.</p>
+          <p style="font-size:13px;color:#888">${calendarName
+            ? `It is on your ${calendarName} calendar, and ${calendarName} has sent the prospect a confirmation.`
+            : 'The prospect has the invite. Add the attached event to your calendar.'}</p>
         </div>`,
-      icalEvent: ical,
+      ...(bookedOn ? {} : { icalEvent: ical }),
     }).catch(err => console.error('Host meeting copy failed:', err.message));
   }
 
   db.prepare('UPDATE appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('confirmed', apptId);
   if (leadId) {
     db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
-      .run(userId, leadId, 'email', `Sent calendar invite for: ${title}`);
+      .run(userId, leadId, 'email', calendarName ? `Booked on ${calendarName}; host sent the call notes for: ${title}` : `Sent calendar invite for: ${title}`);
   }
 }
 

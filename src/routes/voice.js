@@ -10,6 +10,8 @@ import { getProfile, senderFor } from '../services/account-profile.js';
 import { personaFor, EMPTY_CUSTOMER_VARS } from '../services/voice-persona.js';
 import { GIT_SHA } from '../version.js';
 import { verifyRetell } from '../services/ingest-auth.js';
+import { parseMeetingTime } from '../services/meeting-time.js';
+import { calendarVars, hasCalendar, isFree, offerTimes, bookOnCalendar } from '../services/calendar.js';
 
 const router = Router();
 
@@ -218,27 +220,54 @@ async function handleScheduleMeeting(args, callId, leadId, userId, res) {
     return res.json({ result: `That's already booked for ${dateStr} at ${timeStr}, Malaysia time, with ${host.name}.` });
   }
 
+  // With a booking calendar on the Brief, only a time it says is free is
+  // booked, and it is booked there so it lands in the host's own calendar.
+  // If the calendar cannot be read, the meeting is booked here and the host
+  // is asked to confirm the time.
+  let calendarNote = '';
+  let booked = null;
+  if (hasCalendar(userId)) {
+    const free = await isFree(userId, scheduled.toISOString());
+    if (free === false) {
+      const offers = await offerTimes(userId, { count: 2 });
+      return res.json({ result: offers.length
+        ? `That time isn't free on ${host.name}'s calendar. The nearest free times are ${offers.map(o => o.label).join(', or ')}, Malaysia time. Which suits them? (Exact times for booking: ${offers.map(o => `${o.label} = ${o.start}`).join('; ')})`
+        : `${host.name} has no free time on the calendar this week. Say ${host.name} will email to find a time, and do not book.` });
+    }
+    if (free === true && lead?.email) {
+      booked = await bookOnCalendar(userId, { start: scheduled.toISOString(), name: lead.name, email: lead.email, notes });
+      if (!booked.ok) console.warn(`[voice] calendar booking failed for account ${userId}: ${booked.reason}`);
+    }
+    if (free === null) calendarNote = 'The calendar could not be checked during the call — please confirm this time with the prospect.';
+  }
+
   const type = ['demo', 'call', 'meeting', 'follow_up'].includes(meeting_type) ? meeting_type : 'meeting';
   const title = `${lead?.name || 'Prospect'}${lead?.company ? ` (${lead.company})` : ''} with ${host.name}`;
-  // The account's own meeting room from its brief, or none (the host sends
-  // the link). Never a made-up meet.google.com code.
-  const location = getProfile(userId).meeting_link || null;
+  // The calendar's own meeting room when it made one, else the account's
+  // meeting link from its brief, or none (the host sends the link). Never a
+  // made-up meet.google.com code.
+  const location = (booked?.ok && booked.location) || getProfile(userId).meeting_link || null;
   const dur = parseInt(duration, 10) || 30;
+  const apptNotes = [notes || '', calendarNote].filter(Boolean).join('\n');
 
   const result = db.prepare(
     `INSERT INTO appointments (lead_id, user_id, title, scheduled_at, duration_minutes, type, notes, call_id, location)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(leadId, userId, title, scheduled.toISOString(), dur, type, notes || '', callId, location);
+  ).run(leadId, userId, title, scheduled.toISOString(), dur, type, apptNotes, callId, location);
 
   if (leadId) {
     db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
-      .run(userId, leadId, 'meeting', `Meeting booked by the voice assistant: ${title}`);
+      .run(userId, leadId, 'meeting', `Meeting booked by the voice assistant: ${title}${booked?.ok ? ` (on ${booked.provider === 'calcom' ? 'Cal.com' : 'Calendly'})` : ''}`);
+    // A booked meeting qualifies the lead.
+    db.prepare("UPDATE leads SET status = 'qualified', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status IN ('new', 'contacted')").run(leadId);
   }
 
-  // Fire-and-forget: invite to the prospect, copy (with the call notes) to the host
+  // Fire-and-forget. When the calendar booked it, the calendar has already
+  // sent the prospect its confirmation: only the host gets the call notes.
   if (lead?.email) {
     sendCalendarInviteEmail({
-      apptId: result.lastInsertRowid, lead, scheduled, title, duration: dur, location, notes, type, userId, leadId,
+      apptId: result.lastInsertRowid, lead, scheduled, title, duration: dur, location, notes: apptNotes, type, userId, leadId,
+      bookedOn: booked?.ok ? booked.provider : null,
     }).catch(err => console.error('Calendar invite send error:', err.message));
   }
 
@@ -404,75 +433,6 @@ async function sendDemoLinkEmail(lead, token, baseUrl) {
   });
 }
 
-// --- Date parser for meeting times from voice ---
-// All times are interpreted as Malaysian time (UTC+8) since leads and users are in Malaysia.
-// We store as ISO string with the correct UTC offset applied.
-const MYT_OFFSET_MS = 8 * 60 * 60 * 1000; // UTC+8
-
-function nowInMYT() {
-  const utc = new Date();
-  return new Date(utc.getTime() + MYT_OFFSET_MS);
-}
-
-function parseMeetingTime(text) {
-  if (!text) return null;
-
-  // Try direct ISO parse first (already has timezone info)
-  const direct = new Date(text);
-  if (!isNaN(direct.getTime()) && direct > new Date()) return direct;
-
-  // Work in Malaysian time
-  const myt = nowInMYT();
-  const lower = text.toLowerCase();
-
-  // "Thursday at 3pm", "Friday 2:30pm", etc.
-  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const dayMatch = dayNames.findIndex(d => lower.includes(d));
-
-  // Start with today in MYT
-  let targetYear = myt.getUTCFullYear();
-  let targetMonth = myt.getUTCMonth();
-  let targetDay = myt.getUTCDate();
-  let found = false;
-
-  if (lower.includes('tomorrow')) {
-    targetDay += 1;
-    found = true;
-  } else if (lower.includes('today')) {
-    found = true;
-  } else if (dayMatch >= 0) {
-    let daysAhead = dayMatch - myt.getUTCDay();
-    if (daysAhead <= 0) daysAhead += 7;
-    targetDay += daysAhead;
-    found = true;
-  } else if (lower.includes('next week')) {
-    let daysAhead = 8 - myt.getUTCDay(); // Next Monday
-    targetDay += daysAhead;
-    found = true;
-  }
-
-  if (!found) return null;
-
-  // Extract time: "4pm", "2:30 pm", "15:00", "10am"
-  let hour = 10, min = 0; // Default 10am MYT
-  const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
-  if (timeMatch) {
-    hour = parseInt(timeMatch[1]);
-    min = parseInt(timeMatch[2] || '0');
-    const ampm = timeMatch[3];
-    if (ampm === 'pm' && hour < 12) hour += 12;
-    if (ampm === 'am' && hour === 12) hour = 0;
-    if (!ampm && hour < 8) hour += 12; // Assume PM for business hours
-  }
-
-  // Build the date in MYT then convert to UTC for storage
-  // We construct the MYT time, then subtract 8 hours to get UTC
-  const mytDate = new Date(Date.UTC(targetYear, targetMonth, targetDay, hour, min, 0, 0));
-  const utcDate = new Date(mytDate.getTime() - MYT_OFFSET_MS);
-
-  return utcDate > new Date() ? utcDate : null;
-}
-
 // GET /api/voice/call-link-info — public, read-only: which business a call link
 // speaks for, so call.html can say so before a call (and its cost) is created.
 // Returns the business name only — nothing about the lead.
@@ -579,7 +539,7 @@ router.get('/call-link-token', async (req, res) => {
       try { checkPlanLimitForUser(loadPlanUser(lead.user_id), 'voice_call'); } catch {
         return res.status(429).json({ error: 'This line is busy right now. Please reply to the email and we will find a time.' });
       }
-      if (persona.kind === 'customer') vars = { ...vars, ...persona.vars };
+      if (persona.kind === 'customer') vars = { ...vars, ...persona.vars, ...(await calendarVars(lead.user_id)) };
     }
 
     // Create web call with Retell
@@ -1002,7 +962,7 @@ router.post('/call', async (req, res) => {
           call_objective: callObjective,
           begin_message: beginMessage,
           custom_script: script || '',
-          ...(persona.kind === 'customer' ? persona.vars : {}),
+          ...(persona.kind === 'customer' ? { ...persona.vars, ...(await calendarVars(lead.user_id)) } : {}),
         },
         metadata: {
           lead_id: String(lead.id),
@@ -1199,7 +1159,7 @@ router.post('/web-call', async (req, res) => {
         call_objective: callObjective,
         begin_message: beginMessage,
         site_scope: 'lead',
-        ...(persona.kind === 'customer' ? persona.vars : {}),
+        ...(persona.kind === 'customer' ? { ...persona.vars, ...(await calendarVars(lead.user_id)) } : {}),
       };
       description = `Web call with ${lead.name} (${dynamicVars.call_objective})`;
     } else {
@@ -1293,7 +1253,7 @@ router.post('/auto-call', async (req, res) => {
             call_objective: stage === 'qualified' ? 'book_meeting' : stage === 'contacted' ? 'follow_up' : 'introduce_and_qualify',
             begin_message: `Hey, is this ${lead.name}? I'm Sarah, an AI assistant from E-I-A-A-W A.I. Sales Agent — I'll be super quick, do you have one minute?`,
             site_scope: 'lead',
-            ...(persona.kind === 'customer' ? persona.vars : {}),
+            ...(persona.kind === 'customer' ? { ...persona.vars, ...(await calendarVars(lead.user_id)) } : {}),
           },
           metadata: { lead_id: String(lead.id), user_id: String(lead.user_id), campaign_id: String(campaignId) },
         };
@@ -1357,6 +1317,9 @@ const SALES_AGENT_PROMPT = `You are Sarah — a sharp, warm AI assistant for EIA
 - What the business wants the prospect to agree to: {{call_to_action}}
 - Notes from the business for these calls: {{voice_notes}}
 - Meeting link on file: {{meeting_link_present}}
+- Calendar connected: {{calendar_connected}}
+- Times free on that calendar: {{available_times}}
+- Exact values to book those times: {{available_slot_codes}}
 
 ## Opening
 Use {{begin_message}} as your opening. Then WAIT for their response.
@@ -1366,7 +1329,10 @@ On these calls you are the AI assistant of {{business_name}}, speaking to one of
 - SCOPE: you may ONLY discuss {{business_name}}'s offer, the facts in the variables above, the prospect's situation, and booking a meeting with {{sender_name}}. Never mention EIAAW, its products, prices, websites or the Talk-to-us form. If asked who made you: "I'm an AI assistant that {{business_name}} uses." Anything else: "That's outside what I can help with on this call — {{sender_name}} can pick it up when you meet."
 - FACTS: everything you know about {{business_name}} is in {{offer}}, {{proof_points}} and {{voice_notes}}. For anything not there — prices, dates, trainers, outcomes, client names, numbers — say "I don't have that detail — {{sender_name}} will cover it when you meet." Never invent results, figures or guarantees.
 - QUALIFY gently, one short question at a time, at most four, skipping any already answered: what is prompting this now (Need); who else is involved in choosing (Authority); when they would want to start (Timeline); whether budget is planned for it (Budget).
-- BOOK: offer a meeting with {{sender_name}} ({{call_to_action}} if given). Ask which weekday and time suit them, Malaysia time, between 9am and 6pm. When they confirm, call schedule_meeting with date_time, duration "30", meeting_type "meeting", and notes summarising Need, Budget, Authority and Timeline. Then read back the day and time and say a calendar invite is on its way to their email.
+- BOOK: offer a meeting with {{sender_name}} ({{call_to_action}} if given).
+  - If {{calendar_connected}} is "yes": offer the times free on {{sender_name}}'s calendar, {{available_times}}. When they pick one, call schedule_meeting with date_time set to that time's exact value from {{available_slot_codes}}. If neither suits, ask which weekday and time would, Malaysia time, between 9am and 6pm, and call schedule_meeting with it. If the tool says that time is not free, offer the times it gives instead.
+  - Otherwise: ask which weekday and time suit them, Malaysia time, between 9am and 6pm, and call schedule_meeting with the day, date and time they confirm.
+  - Always pass duration "30", meeting_type "meeting", and notes summarising Need, Budget, Authority and Timeline. Never offer or confirm a time the tool has not booked. Once it confirms, read back the day and time and say a calendar invite is on its way to their email.
 - If they don't want a meeting, thank them and say {{sender_name}} can follow up by email.
 - Never use send_demo_link on these calls. Use send_overview only if they ask for something in writing.
 - Before ending, call log_call_outcome. Its summary must start "Need: …; Budget: …; Authority: …; Timeline: …" (write "unknown" for anything not discussed).

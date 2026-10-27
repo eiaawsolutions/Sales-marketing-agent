@@ -15,6 +15,10 @@
 //     public signals and which from the brief: [{ text, from: 'lead'|'brief' }].
 //     Only phrases found verbatim in the message are kept.
 //
+//   account_profiles.booking_link / calendly_token — the calendar real
+//     meeting times are offered from (calendar.js). The token is encrypted
+//     and never returned by the API.
+//
 // Plain ADD COLUMNs only: nothing here rebuilds a table.
 
 export function migrateFlow(db) {
@@ -25,6 +29,11 @@ export function migrateFlow(db) {
   }
 
   addColumn(db, 'outreach_queue', 'highlights', 'TEXT');
+
+  // The account's booking calendar (calendar.js): a Cal.com or Calendly link,
+  // and for Calendly the account's personal access token, encrypted.
+  addColumn(db, 'account_profiles', 'booking_link', 'TEXT');
+  addColumn(db, 'account_profiles', 'calendly_token', 'TEXT');
 }
 
 function addColumn(db, table, column, type) {
