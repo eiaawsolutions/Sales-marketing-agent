@@ -3,6 +3,8 @@ import { pipelineService } from '../services/pipeline.js';
 import { runAgent } from '../services/ai-agent.js';
 import { maskLead, leadsService } from '../services/leads.js';
 import { checkPlanLimit } from '../middleware/auth.js';
+import { boardFor } from '../services/pipeline-board.js';
+import { writeBrief, latestBrief, factLines } from '../services/weekly-brief.js';
 
 const router = Router();
 
@@ -21,6 +23,28 @@ router.get('/', (req, res) => {
 router.get('/stats', (req, res) => {
   const userId = req.user.role === 'superadmin' ? null : req.user.id;
   res.json(pipelineService.getStats(userId));
+});
+
+// The board: every lead in the account by stage, with what matters about it now.
+// (Before /:id.)
+router.get('/board', (req, res) => {
+  res.json(boardFor(req.user.id));
+});
+
+// The latest Monday brief or review, and a new review on request (AI action).
+router.get('/brief', (req, res) => {
+  const b = latestBrief(req.user.id);
+  res.json(b ? { ...b, lines: factLines(b.facts) } : null);
+});
+
+router.post('/brief', async (req, res) => {
+  try {
+    try { checkPlanLimit(req, 'ai_action'); } catch (e) { return res.status(403).json({ error: e.message }); }
+    const b = await writeBrief(req.user.id, { kind: 'review' });
+    res.json({ ...b, lines: factLines(b.facts) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/:id', (req, res) => {

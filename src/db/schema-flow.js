@@ -71,6 +71,25 @@ export function migrateFlow(db) {
     CREATE INDEX IF NOT EXISTS idx_replies_user ON replies(user_id, received_at);
     CREATE INDEX IF NOT EXISTS idx_replies_status ON replies(status);
   `);
+
+  // The Monday brief, pipeline reviews asked for in the app, and the monthly
+  // report (weekly-brief.js, monthly-report.js). facts are the numbers; the
+  // narrative is the assistant's reading of them. A weekly or monthly row is
+  // unique per period, so a rerun of the job never emails twice.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS briefs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      kind TEXT NOT NULL CHECK(kind IN ('weekly', 'review', 'monthly')),
+      period TEXT NOT NULL,
+      facts TEXT NOT NULL,
+      narrative TEXT,
+      emailed_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_briefs_period ON briefs(user_id, kind, period) WHERE kind <> 'review';
+    CREATE INDEX IF NOT EXISTS idx_briefs_user ON briefs(user_id, created_at);
+  `);
 }
 
 function addColumn(db, table, column, type) {

@@ -148,6 +148,9 @@ const PLAN_LIMITS = {
   enterprise: { leads: 99999, campaigns: 99999, ai_actions: 99999,ai_leads_per_month: 99999,contact_reveals: 9999,users: 9999,auto_outreach: true, auto_leads: true,  voice_calls: 9999,chatbot: true  },
 };
 
+// Monthly plan prices in RM (no SST). Billing charges these; reports divide by them.
+export const PLAN_PRICES_MYR = { starter: 99, pro: 199, business: 399 };
+
 // Voice AI add-on pricing
 export const VOICE_ADDONS = {
   voice_starter: { name: 'Voice Starter', calls: 50, price_myr: 49, per_min: 0.50 },

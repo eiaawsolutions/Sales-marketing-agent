@@ -1538,6 +1538,10 @@
     .reply-excerpt { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 2px 0 6px; }
     .reply-quote { background: var(--surface2); border-radius: var(--radius); padding: 12px; margin: 12px 0; white-space: pre-wrap; font-size: 14px; line-height: 1.55; word-break: break-word; }
     @media (max-width: 768px) { .replies-grid { grid-template-columns: minmax(0, 1fr); } }
+
+    /* Pipeline board: a reply or meeting waiting stands out */
+    .pipeline-card-hot { border-left: 3px solid var(--primary); }
+    .pipeline-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   </style>
 </head>
 <body>
@@ -1550,6 +1554,6 @@
   <script src="/email-templates.js?v=20260422e"></script>
   <script src="/email-designer.js?v=20260422e"></script>
   <script src="/sources-ui.js?v=20260815-modalbridge"></script>
-  <script src="/app.js?v=20261027-callcapture"></script>
+  <script src="/app.js?v=20261027-pipeline"></script>
 </body>
 </html>

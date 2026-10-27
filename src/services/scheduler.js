@@ -4,6 +4,8 @@ import { processOutreachQueue } from './outreach-dispatch.js';
 import { refreshMetrics } from './metrics.js';
 import { runRetention } from './retention.js';
 import { processInboundReplies } from './inbound-replies.js';
+import { runMondayBriefs } from './weekly-brief.js';
+import { runMonthlyReports } from './monthly-report.js';
 
 /**
  * Background scheduler — runs every 30 minutes.
@@ -37,6 +39,16 @@ export function startScheduler() {
     }
   }, { timezone: 'Asia/Kuala_Lumpur' });
 
+  // Monday 08:00 MYT: the Monday brief to every active account with leads.
+  cron.schedule('0 8 * * 1', async () => {
+    try { console.log(`[Brief] sent ${await runMondayBriefs()} Monday briefs`); } catch (err) { console.error('[Brief] failed:', err.message); }
+  }, { timezone: 'Asia/Kuala_Lumpur' });
+
+  // 1st of the month, 08:00 MYT: last month's report to every account that did anything.
+  cron.schedule('0 8 1 * *', async () => {
+    try { console.log(`[Report] sent ${await runMonthlyReports()} monthly reports`); } catch (err) { console.error('[Report] failed:', err.message); }
+  }, { timezone: 'Asia/Kuala_Lumpur' });
+
   // Also run once on startup (after 15-second delay to let DB initialize)
   setTimeout(async () => {
     console.log('[Scheduler] Initial run');
@@ -45,7 +57,7 @@ export function startScheduler() {
     await refreshMetrics();
   }, 15000);
 
-  console.log('[Scheduler] Started — outreach every 30min, metrics daily at midnight MYT, retention daily at 03:15 MYT');
+  console.log('[Scheduler] Started — outreach and replies every 30min, metrics daily at midnight MYT, retention daily at 03:15 MYT, Monday brief Mon 08:00 MYT, monthly report 1st 08:00 MYT');
 }
 
 // The dispatcher lives in outreach-dispatch.js so approvals can kick it too.

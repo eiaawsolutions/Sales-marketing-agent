@@ -34,6 +34,7 @@ import ingestRouter from './routes/ingest.js';
 import sourcesRouter from './routes/sources.js';
 import segmentsRouter from './routes/segments.js';
 import repliesRouter from './routes/replies.js';
+import reportsRouter from './routes/reports.js';
 import { maskLeads, maskLead } from './services/leads.js';
 import { startScheduler } from './services/scheduler.js';
 import { SALES_AGENT_PROMPT } from './routes/voice.js';
@@ -799,6 +800,7 @@ app.use('/api/ingest', ingestRouter);
 app.use('/api/sources', requireAuth, actAsAccount, sourcesRouter);
 app.use('/api/segments', requireAuth, actAsAccount, segmentsRouter);
 app.use('/api/replies', requireAuth, actAsAccount, repliesRouter);
+app.use('/api/reports', requireAuth, actAsAccount, reportsRouter);
 
 // Dashboard overview endpoint
 app.get('/api/dashboard', requireAuth, actAsAccount, (req, res) => {

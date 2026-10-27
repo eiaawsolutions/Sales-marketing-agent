@@ -476,6 +476,7 @@ function renderSidebar() {
     { id: 'replies', icon: '&#9993;', label: 'Replies', badge: openRepliesCount },
     { id: 'sources', icon: '&#9741;', label: 'Sources' },
     { id: 'pipeline', icon: '&#9654;', label: 'Pipeline' },
+    { id: 'reports', icon: '&#9776;', label: 'Reports' },
     { id: 'campaigns', icon: '&#9993;', label: 'Campaigns' },
     { id: 'forms', icon: '&#9634;', label: 'Forms' },
     { id: 'content', icon: '&#9998;', label: 'AI Content' },
@@ -563,6 +564,7 @@ function renderPage() {
     case 'replies': return '<div id="page" class="loading">Loading replies...</div>';
     case 'sources': return '<div id="page" class="loading">Loading sources...</div>';
     case 'pipeline': return '<div id="page" class="loading">Loading pipeline...</div>';
+    case 'reports': return '<div id="page" class="loading">Loading report...</div>';
     case 'campaigns': return '<div id="page" class="loading">Loading campaigns...</div>';
     case 'forms': return '<div id="page" class="loading">Loading forms...</div>';
     case 'content': return '<div id="page" class="loading">Loading content...</div>';
@@ -601,6 +603,7 @@ async function afterRender() {
     case 'replies': return loadReplies();
     case 'sources': return loadSources();
     case 'pipeline': return loadPipeline();
+    case 'reports': return loadReports();
     case 'campaigns': return loadCampaigns();
     case 'forms': return loadForms();
     case 'content': return loadContent();
@@ -1044,7 +1047,7 @@ async function loadDashboard() {
           <button class="btn btn-outline" onclick="showGenerateModal('email')">Generate Email</button>
           <button class="btn btn-outline" onclick="showGenerateModal('social')">Generate Social Post</button>
           <button class="btn btn-outline" onclick="showGenerateModal('ad')">Generate Ad Copy</button>
-          <button class="btn btn-outline" onclick="requestPipelineAnalysis()">Analyze Pipeline</button>
+          <button class="btn btn-outline" onclick="navigate('pipeline'); setTimeout(requestPipelineReview, 300)">Review my pipeline</button>
           <button class="btn btn-outline" onclick="navigate('chat')">Chat with AI</button>
         </div>
       </div>
@@ -1525,65 +1528,173 @@ async function aiOutreach(id, campaignId) {
 }
 
 // ========== Pipeline ==========
+// One board from first email to signed deal: every lead by stage, each with
+// what matters about it now. Click a card for the lead's timeline. The
+// assistant's pipeline review is generated on request (and every Monday).
+const BOARD_LABELS = { new: 'New', contacted: 'Contacted', qualified: 'Qualified', proposal: 'Proposal', negotiation: 'Negotiation', won: 'Won' };
+const rm = (n) => `RM ${Math.round(Number(n) || 0).toLocaleString('en-MY')}`;
+
 async function loadPipeline() {
   try {
-    const [deals, stats] = await Promise.all([api.get('/pipeline'), api.get('/pipeline/stats')]);
-    const stages = ['prospecting', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost'];
-
+    const [board, brief, stats] = await Promise.all([
+      api.get('/pipeline/board'), api.get('/pipeline/brief').catch(() => null), api.get('/pipeline/stats').catch(() => ({})),
+    ]);
+    const openValue = ['new', 'contacted', 'qualified', 'proposal', 'negotiation'].reduce((s, k) => s + board.columns[k].value, 0);
     document.getElementById('page').innerHTML = `
       <div class="toolbar">
-        <h2>Sales Pipeline</h2>
+        <h2>Pipeline</h2>
         <div class="flex gap-2">
-          <button class="btn btn-primary" onclick="showDealModal()">+ Add Deal</button>
-          <button class="btn btn-outline" onclick="requestPipelineAnalysis()">AI Analysis</button>
+          <button class="btn btn-primary" id="review-btn" onclick="requestPipelineReview()">Review my pipeline</button>
         </div>
       </div>
-
+      <p class="text-muted text-sm" style="margin:-6px 0 12px">Every lead from first email to signed deal. Emails, calls, replies and meetings all land on each lead's timeline — click a card to see it.</p>
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value blue">${stats.open?.count || 0}</div>
-          <div class="stat-label">Open Deals</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value yellow">$${(stats.open?.total_value || 0).toLocaleString()}</div>
-          <div class="stat-label">Open Value</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value green">$${(stats.weightedPipelineValue || 0).toLocaleString()}</div>
-          <div class="stat-label">Weighted Pipeline</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value purple">${stats.winRate || 0}%</div>
-          <div class="stat-label">Win Rate</div>
-        </div>
+        <div class="stat-card"><div class="stat-value blue">${['new', 'contacted', 'qualified', 'proposal', 'negotiation'].reduce((s, k) => s + board.columns[k].count, 0)}</div><div class="stat-label">Open leads</div></div>
+        <div class="stat-card"><div class="stat-value yellow">${rm(openValue)}</div><div class="stat-label">Open deal value</div></div>
+        <div class="stat-card"><div class="stat-value green">${rm(stats.weightedPipelineValue)}</div><div class="stat-label">Weighted</div></div>
+        <div class="stat-card"><div class="stat-value purple">${board.columns.won.count}</div><div class="stat-label">Won · ${board.lost} lost</div></div>
       </div>
-
       <div class="pipeline-board">
-        ${stages.map(stage => {
-          const stageDeals = deals.filter(d => d.stage === stage);
-          const total = stageDeals.reduce((s, d) => s + d.deal_value, 0);
+        ${Object.entries(BOARD_LABELS).map(([k, label]) => {
+          const col = board.columns[k];
           return `
-            <div class="pipeline-column">
-              <h4>
-                <span>${stage.replace(/_/g, ' ')}</span>
-                <span>$${total.toLocaleString()}</span>
-              </h4>
-              ${stageDeals.map(d => `
-                <div class="pipeline-card" onclick="showDealModal(${Number(d.id)})">
-                  <div class="name">${esc(d.name)}</div>
-                  <div class="company">${esc(d.company || '')}</div>
-                  <div class="value">$${d.deal_value.toLocaleString()}</div>
-                  <div class="text-muted text-sm">${d.probability}% probability</div>
-                </div>
-              `).join('') || '<div class="text-muted text-sm" style="text-align:center">No deals</div>'}
-            </div>
-          `;
+          <div class="pipeline-column">
+            <h4><span>${label} <span class="text-muted">${col.count}</span></span><span>${col.value ? rm(col.value) : ''}</span></h4>
+            ${col.cards.map(c => `
+              <div class="pipeline-card${/^(Meeting|Reply)/.test(c.hint) ? ' pipeline-card-hot' : ''}" onclick="showLeadDetail(${Number(c.lead_id)})" tabindex="0" onkeydown="if(event.key==='Enter')showLeadDetail(${Number(c.lead_id)})">
+                <div class="name">${esc(c.company || c.name)}</div>
+                <div class="company">${esc(c.company ? c.name : c.title)}</div>
+                ${c.hint ? `<div class="text-sm" style="margin-top:4px;color:var(--teal-dark)">${esc(c.hint)}</div>` : ''}
+                ${c.deal_value ? `<div class="value">${rm(c.deal_value)}</div>` : ''}
+              </div>`).join('') || '<div class="text-muted text-sm" style="text-align:center">Nothing yet</div>'}
+            ${col.count > col.cards.length ? `<div class="text-muted text-sm" style="text-align:center">+ ${col.count - col.cards.length} more</div>` : ''}
+          </div>`;
         }).join('')}
       </div>
-    `;
+      <div class="card" style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <h3 style="margin:0">Assistant · pipeline review</h3>
+          <span class="badge badge-new">${brief ? `${brief.kind === 'weekly' ? 'Monday brief' : 'Generated on request'} · ${esc(new Date(String(brief.created_at).replace(' ', 'T') + 'Z').toLocaleString('en-MY', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}` : 'Generated on request'}</span>
+        </div>
+        <div id="pipeline-review" style="margin-top:10px">${renderBrief(brief)}</div>
+      </div>`;
   } catch (e) {
-    document.getElementById('page').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
   }
+}
+
+function renderBrief(b) {
+  if (!b) return '<p class="text-sm text-muted" style="margin:0">Ask for a review and the assistant tells you where deals are stuck and what to do next. You also get one by email every Monday morning.</p>';
+  const n = b.narrative;
+  return `
+    ${n ? [n.headline, n.stuck, n.focus].filter(Boolean).map(p => `<p class="text-sm" style="margin:0 0 8px">${esc(p)}</p>`).join('') : ''}
+    ${b.lines?.length ? `<ul class="text-sm" style="margin:6px 0 0;padding-left:18px">${b.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : '<p class="text-sm text-muted" style="margin:0">Nothing is waiting for you.</p>'}`;
+}
+
+async function requestPipelineReview() {
+  const btn = document.getElementById('review-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reviewing…'; }
+  try {
+    await api.post('/pipeline/brief');
+    await loadPipeline();
+  } catch (e) {
+    showNotification('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Review my pipeline'; }
+  }
+}
+
+// One lead: its stage, deal value, score and full activity timeline.
+const ACTIVITY_ICONS = { email: '&#9993;', call: '&#9742;', voice_call: '&#127897;', meeting: '&#128197;', note: '&#9998;', task: '&#9745;', ai_action: '&#10022;', contact_reveal: '&#128065;' };
+
+async function showLeadDetail(leadId) {
+  try {
+    const [lead, activities, deals] = await Promise.all([
+      api.get(`/leads/${leadId}`), api.get(`/leads/${leadId}/activities`), api.get(`/pipeline?lead_id=${leadId}`).catch(() => []),
+    ]);
+    const deal = (Array.isArray(deals) ? deals : []).find(d => d.lead_id === leadId && d.stage !== 'closed_lost');
+    const stages = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'];
+    modal = {
+      title: esc(lead.name),
+      body: `
+        <p class="text-sm text-muted" style="margin:-6px 0 12px">${esc([lead.title, lead.company].filter(Boolean).join(' · '))}</p>
+        <div class="grid-2">
+          <div class="form-group"><label for="ld-stage">Stage</label>
+            <select id="ld-stage">${stages.map(s => `<option value="${s}" ${lead.status === s ? 'selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select></div>
+          <div class="form-group"><label for="ld-value">Deal value (RM)</label>
+            <input id="ld-value" type="number" min="0" step="500" value="${Number(deal?.deal_value) || ''}" placeholder="Your estimate"></div>
+        </div>
+        <div class="flex gap-1" style="flex-wrap:wrap;margin-bottom:12px">
+          <button class="btn btn-sm btn-outline" onclick="showScoreDetail(${Number(leadId)})">Score ${Number(lead.score) || 0} — why</button>
+          <button class="btn btn-sm btn-outline" onclick="logReply(${Number(leadId)})">Log a reply</button>
+          <button class="btn btn-sm btn-outline" onclick="shareCallLink(${Number(leadId)})">Voice link</button>
+        </div>
+        <div class="text-sm" style="font-weight:600;margin-bottom:6px">Timeline</div>
+        <div style="max-height:40vh;overflow-y:auto">
+          ${activities.length ? activities.map(a => `
+            <div style="display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+              <span aria-hidden="true">${ACTIVITY_ICONS[a.type] || '&#8226;'}</span>
+              <div><div class="text-sm">${esc(a.description)}</div>
+                <div class="text-sm text-muted">${esc(new Date(String(a.created_at).replace(' ', 'T') + 'Z').toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }))}</div></div>
+            </div>`).join('') : '<p class="text-sm text-muted">Nothing yet.</p>'}
+        </div>`,
+      saveLabel: 'Save',
+      onSave: async () => {
+        const status = document.getElementById('ld-stage').value;
+        const value = parseFloat(document.getElementById('ld-value').value);
+        if (status !== lead.status) await api.put(`/leads/${leadId}`, { status });
+        if (Number.isFinite(value) && value !== (Number(deal?.deal_value) || 0)) {
+          if (deal) await api.put(`/pipeline/${deal.id}`, { deal_value: value });
+          else await api.post('/pipeline', { lead_id: leadId, stage: status === 'won' ? 'closed_won' : 'qualification', deal_value: value, probability: 30 });
+        }
+        modal = null;
+        showNotification('Saved.', 'success');
+        if (currentPage === 'pipeline') loadPipeline(); else render();
+      },
+    };
+    render();
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+// ========== Reports ==========
+// The month's numbers: verified leads, prospects emailed, reply rate,
+// positive replies, meetings booked, cost per meeting. Emailed on the 1st.
+let reportMonth = null;
+
+async function loadReports() {
+  try {
+    const months = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+      months.push(d.toISOString().slice(0, 7));
+    }
+    const month = reportMonth || months[0];
+    const r = await api.get(`/reports/monthly?month=${month}`);
+    const finished = month !== months[0];
+    document.getElementById('page').innerHTML = `
+      <div class="toolbar"><h2>Reports</h2>
+        <div class="flex gap-2" style="align-items:center">
+          <select id="report-month" onchange="reportMonth=this.value;loadReports()" aria-label="Month">${months.map(m => `<option value="${m}" ${m === month ? 'selected' : ''}>${new Date(m + '-15T00:00:00Z').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</option>`).join('')}</select>
+          ${finished ? `<button class="btn btn-outline" onclick="emailReport('${month}')">Email me this report</button>` : ''}
+        </div>
+      </div>
+      <p class="text-muted text-sm" style="margin:-6px 0 12px">What the agent did in ${esc(r.label)}, counted from your account. ${finished ? '' : 'This month is still running. '}The full report is emailed to you on the 1st of each month.</p>
+      <div class="card">
+        <table>
+          ${r.rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${esc(v)}</td></tr>`).join('')}
+        </table>
+        <p class="text-sm text-muted" style="margin:10px 0 0">Reply rate is replies over prospects emailed. Cost per meeting is your plan price${r.plan_price_myr ? ` (RM ${Number(r.plan_price_myr)})` : ''} over meetings booked. Replies count when the agent saw them — read automatically, or pasted in. Automatic away messages are not counted.</p>
+      </div>`;
+  } catch (e) {
+    document.getElementById('page').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+async function emailReport(month) {
+  try {
+    const r = await api.post('/reports/monthly/email', { month });
+    showNotification(r.sent ? 'Report sent to your inbox.' : 'This month\'s report was already sent.', 'success');
+  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }
 
 async function showDealModal(id) {
@@ -1626,29 +1737,6 @@ async function showDealModal(id) {
   render();
 }
 
-async function requestPipelineAnalysis() {
-  showNotification('Running AI pipeline analysis...');
-  try {
-    const result = await api.post('/pipeline/analyze');
-    const a = result.analysis;
-    showResultModal('AI Pipeline Analysis', `
-      <div class="stat-card mb-4">
-        <div class="stat-value ${a.health_score > 70 ? 'green' : a.health_score > 40 ? 'yellow' : ''}">${a.health_score}/100</div>
-        <div class="stat-label">Pipeline Health Score</div>
-      </div>
-      <h4>Revenue Forecast</h4>
-      <div class="grid-2 mb-4" style="grid-template-columns:1fr 1fr 1fr">
-        <div class="stat-card"><div class="stat-value green text-sm">$${(a.forecast?.optimistic || 0).toLocaleString()}</div><div class="stat-label">Optimistic</div></div>
-        <div class="stat-card"><div class="stat-value blue text-sm">$${(a.forecast?.realistic || 0).toLocaleString()}</div><div class="stat-label">Realistic</div></div>
-        <div class="stat-card"><div class="stat-value yellow text-sm">$${(a.forecast?.pessimistic || 0).toLocaleString()}</div><div class="stat-label">Pessimistic</div></div>
-      </div>
-      <h4>Bottlenecks</h4>
-      <ul>${(a.bottlenecks || []).map(b => `<li>${esc(typeof b === 'string' ? b : JSON.stringify(b))}</li>`).join('')}</ul>
-      <h4 style="margin-top:12px">Recommendations</h4>
-      <ul>${(a.recommendations || []).map(r => `<li>${esc(typeof r === 'string' ? r : JSON.stringify(r))}</li>`).join('')}</ul>
-    `);
-  } catch (e) { showNotification('Error: ' + e.message, 'error'); }
-}
 
 // ========== Campaigns ==========
 // wizardState is exposed on window so the email-designer module can read/write the same object.
@@ -4256,10 +4344,12 @@ async function loadBilling() {
             : ''))}
 
         <h4 style="margin-bottom:12px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">This Month's Usage</h4>
-        ${usageBar(u.leads, l.leads, 'Leads')}
+        ${usageBar(u.verifiedLeads, l.verifiedLeads, 'Verified leads')}
+        ${usageBar(u.contactReveals, l.contactRevealsTotal, 'Contact Reveals', revealExtra)}
         ${usageBar(u.campaigns, l.campaigns, 'Campaigns')}
         ${usageBar(u.aiActions, l.aiActionsTotal, 'AI Actions', aiExtra)}
-        ${usageBar(u.contactReveals, l.contactRevealsTotal, 'Contact Reveals', revealExtra)}
+        ${usageBar(u.voiceCalls, l.voiceCalls, 'Voice calls')}
+        ${usageBar(u.seats, l.seats, 'Seats')}
 
         <div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap">
           <span class="text-sm">Auto-Outreach: ${l.autoOutreach ? '<span style="color:var(--success)">Enabled</span>' : '<span class="text-muted">Pro+</span>'}</span>
@@ -6525,7 +6615,7 @@ async function init() {
   }
 
   // Deep links from emails (e.g. a forwarded reply opens Replies).
-  if (['replies', 'leads', 'brief', 'pipeline', 'campaigns'].includes(params.get('p'))) {
+  if (['replies', 'leads', 'brief', 'pipeline', 'campaigns', 'reports'].includes(params.get('p'))) {
     currentPage = params.get('p');
     window.history.replaceState({}, '', '/app');
   }

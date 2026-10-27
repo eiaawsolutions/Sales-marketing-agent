@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import Stripe from 'stripe';
 import db from '../db/index.js';
-import { hashPassword, generateToken, getPlanLimits, requireAuth, actAsAccount, requireAccountOwner } from '../middleware/auth.js';
+import { hashPassword, generateToken, getPlanLimits, requireAuth, actAsAccount, requireAccountOwner, PLAN_PRICES_MYR } from '../middleware/auth.js';
 import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
 import { isFounderHq } from '../config/hq.js';
@@ -60,19 +60,19 @@ function userIdForSubscription(subId) {
 const PLANS = {
   starter: {
     name: 'Starter',
-    price_myr: 99,
+    price_myr: PLAN_PRICES_MYR.starter,
     trial_days: 0,
     features: '30 AI-verified leads/mo · 3 campaigns · 50 AI actions/mo · 5 voice calls/mo',
   },
   pro: {
     name: 'Pro',
-    price_myr: 199,
+    price_myr: PLAN_PRICES_MYR.pro,
     trial_days: 0,
     features: '70 AI-verified leads/mo · 10 campaigns · 200 AI actions/mo · 20 voice calls/mo · auto-outreach · AI lead gen',
   },
   business: {
     name: 'Business',
-    price_myr: 399,
+    price_myr: PLAN_PRICES_MYR.business,
     trial_days: 0,
     features: '140 AI-verified leads/mo · 25 campaigns · 1,000 AI actions/mo · 100 voice calls/mo · priority Sonnet · up to 10 seats',
   },
@@ -111,6 +111,17 @@ router.get('/usage', requireAuth, actAsAccount, (req, res) => {
   const contactReveals = db.prepare(
     "SELECT COUNT(*) as c FROM activities WHERE user_id = ? AND description LIKE 'Contact revealed:%' AND created_at >= datetime('now', 'start of month')"
   ).get(userId).c;
+
+  // The plan's monthly allowances as the proposal lists them: verified leads,
+  // voice calls and seats.
+  const verifiedLeads = db.prepare(
+    "SELECT COUNT(*) as c FROM leads WHERE user_id = ? AND source IN ('ai_generated', 'apollo') AND created_at >= datetime('now', 'start of month')"
+  ).get(userId).c;
+  const voiceCalls = db.prepare(
+    "SELECT COUNT(*) as c FROM activities WHERE user_id = ? AND type = 'voice_call' AND created_at >= datetime('now', 'start of month')"
+  ).get(userId).c;
+  const seats = 1 + db.prepare("SELECT COUNT(*) as c FROM users WHERE account_owner_id = ? AND status = 'active'").get(userId).c;
+  const voiceAddonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`voice_addon_${userId}`)?.value || '0');
 
   const addonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`reveal_addon_${userId}`)?.value || '0');
   const aiAddonCredits = parseInt(db.prepare("SELECT value FROM settings WHERE key = ?").get(`ai_addon_${userId}`)?.value || '0');
@@ -154,7 +165,7 @@ router.get('/usage', requireAuth, actAsAccount, (req, res) => {
     trialEnd: trialEnd || null,
     cancelPending: !!cancelPendingRaw,
     cancelAt,
-    usage: { leads, campaigns, aiActions, contactReveals },
+    usage: { leads, campaigns, aiActions, contactReveals, verifiedLeads, voiceCalls, seats },
     limits: {
       leads: limits.leads,
       campaigns: limits.campaigns,
@@ -164,6 +175,9 @@ router.get('/usage', requireAuth, actAsAccount, (req, res) => {
       contactReveals: limits.contact_reveals,
       contactRevealsAddon: addonCredits,
       contactRevealsTotal: limits.contact_reveals + addonCredits,
+      verifiedLeads: limits.ai_leads_per_month,
+      voiceCalls: limits.voice_calls + voiceAddonCredits,
+      seats: limits.users,
       autoOutreach: limits.auto_outreach,
       autoLeads: limits.auto_leads,
       chatbot: limits.chatbot,
