@@ -912,6 +912,21 @@ async function redraftFromBrief() {
   }
 }
 
+// Lead searches run as background jobs on the server: one can outlast the
+// 100-second limit Cloudflare puts on a single request, which used to end in
+// "Unexpected token '<'". Start returns a job id; ask for the result every
+// few seconds. A failed or vanished job comes back as an error from api.get.
+async function waitForJob(path, onWait) {
+  const started = Date.now();
+  while (Date.now() - started < 10 * 60_000) {
+    await new Promise(r => setTimeout(r, 3000));
+    const job = await api.get(path);
+    if (job.status === 'done') return job.result;
+    if (onWait) onWait(job.seconds);
+  }
+  throw new Error('Still running after 10 minutes. Any leads it keeps will appear on the Leads page.');
+}
+
 // "Find decision-makers": save the brief, run one verified search from it,
 // show what was kept and what was thrown away and why, then score the new
 // leads one at a time so progress is visible.
@@ -926,7 +941,9 @@ async function runBriefSearch() {
     const roles = briefMarket.target_roles;
     line('dim', `brief  → ${document.getElementById('br-company_size').selectedOptions[0]?.text || 'Any size'} · ${briefMarket.target_sectors.length} sectors · ${roles.length} roles`);
     line('', `people → ${roles.slice(0, 3).join(', ') || 'decision-makers'}${roles.length > 3 ? ' and others' : ''}: the open web, then each company's own website…`);
-    const r = await api.post('/leads/find', {});
+    const job = await api.post('/leads/find', {});
+    if (job.already_running) line('dim', '         a search was already running for this account: following that one');
+    const r = await waitForJob(`/leads/find/${encodeURIComponent(job.job_id)}`, (s) => { btn.textContent = `Searching… ${s}s`; });
     line('ok', `         ${r.found} candidate${r.found === 1 ? '' : 's'} found`);
     if (r.discarded) line('warn', `         ${r.discarded} discarded: no personal email, no source, or not a match`);
     line('ok', `         ${r.kept} verified and kept${r.already_in_list ? ` · ${r.already_in_list} already in your list` : ''} · no email guessed`);
@@ -2123,7 +2140,8 @@ async function aiGenerateLeads(campaignId) {
   showNotification(`AI is finding ${count} leads for your campaign...`);
 
   try {
-    const result = await api.post(`/campaigns/${campaignId}/generate-leads`, { count });
+    const job = await api.post(`/campaigns/${campaignId}/generate-leads`, { count });
+    const result = await waitForJob(`/campaigns/${campaignId}/generate-leads/${encodeURIComponent(job.job_id)}`);
     // Surface up to 2 rejection reasons so the user understands WHY the strict gate dropped leads.
     let rejectedNote = '';
     if (result?.rejected) {

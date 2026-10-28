@@ -13,8 +13,10 @@ import db from '../db/index.js';
 import { runAgent } from './ai-agent.js';
 import { getProfile, hasMarket, audienceFromBrief } from './account-profile.js';
 import { checkPlanLimitForUser, remainingMonthlyAiLeads, getPlanLimits } from '../middleware/auth.js';
+import { runningJob, startJob } from './jobs.js';
 
 export const BRIEF_CAMPAIGN = 'Outreach from your Brief';
+export const SEARCH_JOB = 'brief-search';
 const MAX_PER_RUN = 15;
 
 export class SearchRefused extends Error {
@@ -33,7 +35,8 @@ export function ensureBriefCampaign(user) {
     .run(user.id, BRIEF_CAMPAIGN, BRIEF_CAMPAIGN).lastInsertRowid;
 }
 
-export async function findFromBrief(user, { count } = {}) {
+// The checks that refuse a search. Quick, so they answer the request itself.
+function prepareSearch(user, { count } = {}) {
   for (const resource of ['auto_leads', 'ai_leads_per_month', 'ai_action']) {
     try { checkPlanLimitForUser(user, resource); } catch (e) { throw new SearchRefused(e.message, 403); }
   }
@@ -41,11 +44,26 @@ export async function findFromBrief(user, { count } = {}) {
   if (!hasMarket(profile)) {
     throw new SearchRefused('Add who you sell to on your Brief first: your ideal client, or the decision-makers to find.', 400);
   }
-
   const requested = Math.max(1, parseInt(count, 10) || MAX_PER_RUN);
-  const n = Math.min(MAX_PER_RUN, requested, remainingMonthlyAiLeads(user));
-  const campaignId = ensureBriefCampaign(user);
+  return {
+    profile,
+    n: Math.min(MAX_PER_RUN, requested, remainingMonthlyAiLeads(user)),
+    campaignId: ensureBriefCampaign(user),
+  };
+}
 
+/**
+ * Starts the search as a background job (see jobs.js) and returns its id.
+ * Refusals throw at once; a press while a search runs joins that search.
+ */
+export function startBriefSearch(user, opts = {}) {
+  const running = runningJob(user.id, SEARCH_JOB);
+  if (running) return running;
+  const plan = prepareSearch(user, opts);
+  return startJob(user.id, SEARCH_JOB, () => runSearch(user, plan));
+}
+
+async function runSearch(user, { profile, n, campaignId }) {
   const r = await runAgent(user.id, 'generate_leads', {
     campaignId, campaignName: BRIEF_CAMPAIGN, targetAudience: audienceFromBrief(profile), count: n,
   });

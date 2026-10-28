@@ -106,15 +106,27 @@ test('Find decision-makers runs from the brief, keeps verified people, and repor
   const { call, close } = server(2);
   try {
     await call('PUT', '/api/profile', MARKET);
-    const r = await call('POST', '/api/leads/find', { count: 50 });
-    assert.equal(r.status, 200);
-    assert.equal(r.body.kept, 2);
-    assert.equal(r.body.discarded, 3);
-    assert.equal(r.body.found, 5);
-    assert.ok(r.body.discarded_list.some(d => /generic mailbox/.test(d.reason)));
-    assert.equal(r.body.used_this_month, 2);
-    assert.equal(r.body.monthly_limit, 140);
-    assert.ok(r.body.campaign_id, 'kept leads go into the account\'s brief campaign');
+    // The search runs as a background job: 202 with a job id, then poll.
+    const start = await call('POST', '/api/leads/find', { count: 50 });
+    assert.equal(start.status, 202);
+    assert.ok(start.body.job_id);
+    let poll;
+    for (let i = 0; i < 50; i++) {
+      poll = await call('GET', `/api/leads/find/${start.body.job_id}`);
+      if (poll.body.status !== 'running') break;
+      await new Promise(res => setTimeout(res, 10));
+    }
+    assert.equal(poll.status, 200);
+    assert.equal(poll.body.status, 'done');
+    const result = poll.body.result;
+    assert.equal(result.kept, 2);
+    assert.equal(result.discarded, 3);
+    assert.equal(result.found, 5);
+    assert.ok(result.discarded_list.some(d => /generic mailbox/.test(d.reason)));
+    assert.equal(result.used_this_month, 2);
+    assert.equal(result.monthly_limit, 140);
+    assert.ok(result.campaign_id, 'kept leads go into the account\'s brief campaign');
+    assert.equal((await call('GET', '/api/leads/find/not-a-job')).status, 404);
   } finally { close(); }
   assert.match(searchPrompt, /Requested lead count \(maximum, not a quota\): 15/, 'a run is capped at 15');
   assert.match(searchPrompt, /Head of L&D/);

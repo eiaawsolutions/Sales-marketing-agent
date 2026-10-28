@@ -4,18 +4,28 @@ import { runAgent } from '../services/ai-agent.js';
 import { checkPlanLimit } from '../middleware/auth.js';
 import db from '../db/index.js';
 import { handleReply, sendReply } from '../services/replies.js';
-import { findFromBrief } from '../services/lead-search.js';
+import { startBriefSearch } from '../services/lead-search.js';
+import { getJob } from '../services/jobs.js';
 
 const router = Router();
 
 // POST /api/leads/find — "Find decision-makers": one search from the Brief.
-// Must be before /:id routes.
-router.post('/find', async (req, res) => {
+// Starts it as a background job and answers at once (202); the page polls
+// GET /find/:jobId, because a search can outlast Cloudflare's 100-second
+// request limit (jobs.js). Must be before /:id routes.
+router.post('/find', (req, res) => {
   try {
-    res.json(await findFromBrief(req.user, { count: req.body?.count }));
+    const job = startBriefSearch(req.user, { count: req.body?.count });
+    res.status(202).json({ job_id: job.id, status: job.status, already_running: job.alreadyRunning });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
+});
+
+router.get('/find/:jobId', (req, res) => {
+  const job = getJob(req.user.id, req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'That search is no longer running (the server may have restarted). Run it again.' });
+  res.json(job);
 });
 
 router.get('/', (req, res) => {

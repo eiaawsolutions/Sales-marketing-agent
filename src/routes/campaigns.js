@@ -6,6 +6,7 @@ import { checkPlanLimit, remainingMonthlyAiLeads } from '../middleware/auth.js';
 import { maskLeads, maskLead } from '../services/leads.js';
 import { approveDrafts, skipLeads, editDraft, validIdFilter, getQueueItem, markLinkedinSent } from '../services/outreach-queue.js';
 import { audienceFromBrief } from '../services/account-profile.js';
+import { getJob, startJob } from '../services/jobs.js';
 
 const router = Router();
 
@@ -275,7 +276,9 @@ router.post('/:id/leads', (req, res) => {
   }
 });
 
-router.post('/:id/generate-leads', async (req, res) => {
+// A lead search can outlast Cloudflare's 100-second request limit, so it runs
+// as a background job (jobs.js): 202 with a job id, then the page polls.
+router.post('/:id/generate-leads', (req, res) => {
   try {
     checkPlanLimit(req, 'auto_leads');
     checkPlanLimit(req, 'ai_leads_per_month');
@@ -284,15 +287,22 @@ router.post('/:id/generate-leads', async (req, res) => {
     const campaign = campaignsService.getById(userId, req.params.id);
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
 
-    const result = await runAgent(campaign.user_id, 'generate_leads', {
+    const input = {
       campaignId: campaign.id, campaignName: campaign.name,
       targetAudience: campaign.target_audience || audienceFromBrief(campaign.user_id),
       count: Math.min(parseInt(req.body.count, 10) || 5, remainingMonthlyAiLeads(req.user)),
-    });
-    res.json(result);
+    };
+    const job = startJob(req.user.id, `campaign-leads:${campaign.id}`, () => runAgent(campaign.user_id, 'generate_leads', input));
+    res.status(202).json({ job_id: job.id, status: job.status, already_running: job.alreadyRunning });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+router.get('/:id/generate-leads/:jobId', (req, res) => {
+  const job = getJob(req.user.id, req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'That search is no longer running (the server may have restarted). Run it again.' });
+  res.json(job);
 });
 
 router.post('/:id/auto-outreach', async (req, res) => {
