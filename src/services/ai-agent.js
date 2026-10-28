@@ -1156,10 +1156,13 @@ async function generateLeadsViaAI(input) {
   // company's own site for an address it publishes. Off, the rule stays strict.
   const siteReader = isSiteReaderConfigured();
   const emailRules = siteReader
-    ? `5. **REAL EMAIL OR COMPANY WEBSITE**: Give an email only if you saw it written on a real web page (company team page, speaker bio, conference page, news article, public directory). If you confirmed the person on a real page but found no public email, return them with "email": "" and their real company_website — the system then reads that company's own website for an address it publishes. NEVER guess or construct an email.
+    ? `5. **REAL EMAIL OR COMPANY WEBSITE**: Give an email only if you saw it written on a real web page (company team page, speaker bio, conference page, news article, public directory). If you confirmed the person on a real page but found no public email, return them with "email": "" and their real company_website — the system then reads that company's own website for an address it publishes. A person with no email and no company_website will be REJECTED, so before returning someone without an email, find their company's official website. NEVER guess or construct an email.
 6. Returning ZERO leads is the correct answer when nobody qualifies. Returning fewer real leads is ALWAYS better than returning more weak ones.`
     : `5. **REAL EMAIL REQUIRED**: Only return leads where you can cite a REAL public email address found on a real web page (company team page, speaker bio, conference page, news article, public directory). Leads without a public email MUST BE DISCARDED — do not return them at all. The system will REJECT every lead with no email.
 6. Returning ZERO leads is the correct answer when no qualifying public emails exist. Returning fewer real leads is ALWAYS better than returning more weak ones.`;
+  const websiteField = siteReader
+    ? `- "company_website": The company's official website (home page URL), as shown in your search results or on a page you visited — REQUIRED for every lead without an email`
+    : `- "company_website": Company / platform website URL (or "")`;
   const emailField = siteReader
     ? `- "email": REAL public email address seen on a real web page, or "" when you found none (company_website is then REQUIRED). NEVER guess patterns like first.last@company.com.`
     : `- "email": REAL public email address verified on a real web page — REQUIRED. Do NOT return the lead at all if you cannot find a real public email. NEVER guess patterns like first.last@company.com.`;
@@ -1241,7 +1244,7 @@ ${emailField}
 - "phone": Publicly listed phone only; otherwise ""
 - "other_contact": Any additional verified contact channel, or ""
 - "linkedin_url": LinkedIn or primary profile URL (or "")
-- "company_website": Company / platform website URL (or "")
+${websiteField}
 - "verification_sources": Array of URLs (≥1 required) that prove the identity + role
 - "reason_for_fit": Why this lead matches the ICP
 - "buying_signal": Required if lead_type is "Hot"; else ""
@@ -1381,11 +1384,19 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
 
   addLeads(leads);
 
+  // Counts and reasons only. People discarded are not stored, so their names
+  // and addresses stay out of the logs too; the person who ran the search
+  // sees them once, in the response.
   if (skippedInBatch.length) {
-    console.log(`[generateLeads] AI returned ${skippedInBatch.length} in-batch duplicates (skipped):`, skippedInBatch);
+    console.log(`[generateLeads] AI returned ${skippedInBatch.length} in-batch duplicate${skippedInBatch.length === 1 ? '' : 's'} (skipped)`);
   }
   if (rejected.length) {
-    console.log(`[generateLeads] Rejected ${rejected.length} leads that failed the verification gate:`, rejected);
+    const byReason = {};
+    for (const r of rejected) {
+      const reason = String(r.reason || 'unknown').replace(/[^\s()]+@[^\s()]+/g, '<address>');
+      byReason[reason] = (byReason[reason] || 0) + 1;
+    }
+    console.log(`[generateLeads] Rejected ${rejected.length} leads that failed the verification gate: ${JSON.stringify(byReason)}`);
   }
 
   return {

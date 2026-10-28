@@ -116,6 +116,39 @@ test('a person the company site does not publish an email for is still discarded
   assert.match(res.rejectedLeads[0].reason, /no public email/);
 });
 
+test("with the website reader on, every lead without an email must come with its company's website", async () => {
+  leadTools();
+  let prompt = '';
+  agent.setChat(async (message) => { prompt = message; return JSON.stringify({ leads: [] }); });
+  await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
+  assert.match(prompt, /"company_website": .*REQUIRED for every lead without an email/);
+  assert.match(prompt, /no email and no company_website will be REJECTED/);
+});
+
+test('the search log counts discards by reason and never names the people discarded', async () => {
+  agent.setChat(async () => JSON.stringify({ leads: [
+    { ...webLead(''), name: 'Sabrie Salleh' },
+    { ...webLead('hr@permata.example'), name: 'Daniel Lim' },
+    { ...webLead('nurul@seri.example'), name: 'Nurul Huda' },
+    { ...webLead('nurul@seri.example'), name: 'Nurul Huda' },
+  ] }));
+  const logged = [];
+  const realLog = console.log;
+  console.log = (...args) => logged.push(args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
+  try {
+    await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
+  } finally {
+    console.log = realLog;
+  }
+  const text = logged.join('\n');
+  assert.match(text, /Rejected 2 leads/);
+  assert.match(text, /no public email found/);
+  assert.match(text, /1 in-batch duplicate/);
+  for (const secret of ['Sabrie', 'Daniel', 'Nurul', 'hr@permata.example', 'nurul@seri.example']) {
+    assert.ok(!text.includes(secret), `the log names ${secret}`);
+  }
+});
+
 test('without the website reader the search still asks only for public emails', async () => {
   let prompt = '';
   agent.setChat(async (message) => { prompt = message; return JSON.stringify({ leads: [] }); });
