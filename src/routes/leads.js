@@ -179,10 +179,12 @@ router.post('/:id/send-reply', async (req, res) => {
 // POST /api/leads/:id/reveal — reveal masked contact (costs 1 credit)
 router.post('/:id/reveal', (req, res) => {
   try {
-    checkPlanLimit(req, 'contact_reveal');
     const userId = req.user.role === 'superadmin' ? null : req.user.id;
     const lead = leadsService.getById(userId, req.params.id);
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    // A LinkedIn-only lead: a reveal would use a credit and show nothing.
+    if (!lead.email && !lead.phone) return res.status(409).json({ error: 'This lead has no email or phone to reveal. Reach them on LinkedIn.' });
+    checkPlanLimit(req, 'contact_reveal');
 
     db.prepare('INSERT INTO activities (user_id, lead_id, type, description) VALUES (?, ?, ?, ?)')
       .run(req.user.id, lead.id, 'ai_action', `Contact revealed: ${lead.name} (${lead.email}${lead.phone ? ', ' + lead.phone : ''})`);

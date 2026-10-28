@@ -776,7 +776,7 @@ async function loadBrief() {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
           <div>
             <h3 style="margin-bottom:2px">Run a search</h3>
-            <p class="text-muted text-sm" style="margin:0">Each run returns up to 15 verified decision-makers from your Brief. A lead is kept only with a real work email, a source link, and a LinkedIn profile or company website. Nobody's email is ever guessed.</p>
+            <p class="text-muted text-sm" style="margin:0">Each run returns up to 15 verified decision-makers from your Brief. A lead is kept only with a source link and a real work email, or, when they publish no email of their own, a LinkedIn profile the search found under their name: those are reached by a LinkedIn note you send. Nobody's email is ever guessed.</p>
           </div>
           <button class="btn btn-primary" id="brief-search-btn" onclick="runBriefSearch()" ${isOwner ? '' : 'title="Saves nothing — searches with the brief as saved"'}>Find decision-makers</button>
         </div>
@@ -947,8 +947,8 @@ async function runBriefSearch() {
     if (job.already_running) line('dim', '         a search was already running for this account: following that one');
     const r = await waitForJob(`/leads/find/${encodeURIComponent(job.job_id)}`, (s) => { btn.textContent = `Searching… ${s}s`; });
     line('ok', `         ${r.found} candidate${r.found === 1 ? '' : 's'} found`);
-    if (r.discarded) line('warn', `         ${r.discarded} discarded: no personal email, no source, or not a match`);
-    line('ok', `         ${r.kept} verified and kept${r.already_in_list ? ` · ${r.already_in_list} already in your list` : ''} · no email guessed`);
+    if (r.discarded) line('warn', `         ${r.discarded} discarded: no personal email or LinkedIn profile, no source, or not a match`);
+    line('ok', `         ${r.kept} verified and kept${r.linkedin_only ? ` (${r.linkedin_only} LinkedIn only, no public email)` : ''}${r.already_in_list ? ` · ${r.already_in_list} already in your list` : ''} · no email guessed`);
     if (r.message && !r.kept) line('warn', `         ${r.message}`);
     let scored = { hot: 0, warm: 0, nurture: 0 };
     for (let i = 0; i < r.lead_ids.length; i++) {
@@ -1101,6 +1101,14 @@ function companyCell(l) {
   return `${esc(l.company || '-')}${line ? `<div class="text-sm text-muted">${esc(line)}</div>` : ''}`;
 }
 
+// A lead found on LinkedIn with no public email is reached there only, and
+// has nothing for a reveal credit to show.
+function emailText(l) {
+  if (!l.email) return l.linkedin_url ? '<span class="text-sm">LinkedIn only</span>' : '<span class="text-muted">-</span>';
+  return l._masked ? `<span class="text-muted">${esc(l.email)}</span>` : esc(l.email);
+}
+function canReveal(l) { return l._masked && !!(l.email || l.phone); }
+
 function verifiedCell(l) {
   const f = noteFacts(l.notes);
   const v = [f.linkedin && 'LinkedIn', f.website && 'Website', f.sources && `${f.sources} source${f.sources === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
@@ -1155,8 +1163,8 @@ async function loadLeads() {
             <tr>
               <td data-label="Name" title="${esc(l.name)}"><strong><span id="lead-name-${l.id}">${esc(l.name)}</span></strong>${l.title ? `<div class="text-sm text-muted">${esc(l.title)}</div>` : ''}</td>
               <td data-label="Email" title="${esc(l.email)}">
-                <span id="lead-email-${l.id}">${l._masked ? `<span class="text-muted">${esc(l.email)}</span>` : esc(l.email)}</span>
-                ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" id="reveal-btn-${l.id}" onclick="revealContact(${l.id})">Reveal</button>` : ''}
+                <span id="lead-email-${l.id}">${emailText(l)}</span>
+                ${canReveal(l) ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" id="reveal-btn-${l.id}" onclick="revealContact(${l.id})">Reveal</button>` : ''}
               </td>
               <td data-label="Phone"><span id="lead-phone-${l.id}">${l._masked ? `<span class="text-muted">${l.phone ? esc(l.phone) : '-'}</span>` : esc(l.phone || '-')}</span></td>
               <td data-label="Company" title="${esc(l.company || '')}">${companyCell(l)}</td>
@@ -2079,8 +2087,8 @@ async function toggleCampaignLeads(id) {
                 <tr id="cl-row-${id}-${l.id}">
                   <td data-label="Name" title="${esc(l.name)}"><strong><span id="cl-name-${id}-${l.id}">${esc(l.name)}</span></strong></td>
                   <td data-label="Email" title="${esc(l.email)}">
-                    <span id="cl-email-${id}-${l.id}">${l._masked ? `<span class="text-muted">${esc(l.email)}</span>` : esc(l.email)}</span>
-                    ${l._masked ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" onclick="revealContact(${l.id}, ${id})">Reveal</button>` : ''}
+                    <span id="cl-email-${id}-${l.id}">${emailText(l)}</span>
+                    ${canReveal(l) ? `<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:10px;margin-left:4px" onclick="revealContact(${l.id}, ${id})">Reveal</button>` : ''}
                   </td>
                   <td data-label="Company" title="${esc(l.company || '')}">${esc(l.company || '-')}</td>
                   <td data-label="Source">${renderSourceBadge(l.source)}</td>
@@ -2153,7 +2161,7 @@ async function aiGenerateLeads(campaignId) {
     if (result.generated > 0) {
       showNotification(`Found ${result.generated} verified leads from AI Web Search${rejectedNote}`, 'success');
     } else {
-      const msg = result?.message || `AI Web Search returned no leads matching this audience${rejectedNote}. Strict mode requires real public emails — try broadening titles, seniorities, or location.`;
+      const msg = result?.message || `AI Web Search returned no leads matching this audience${rejectedNote}. Strict mode requires a real public email or a LinkedIn profile the search found — try broadening titles, seniorities, or location.`;
       showNotification(msg, 'error');
     }
 
@@ -2840,7 +2848,7 @@ async function loadWizardLeads() {
               onchange="wizardToggleLead(${l.id}, this.checked)">
             <div class="wizard-lead-info">
               <strong>${esc(l.name)}</strong>
-              <span class="text-muted">${esc(l.email)}</span>
+              <span class="text-muted">${l.email ? esc(l.email) : l.linkedin_url ? 'LinkedIn only' : ''}</span>
             </div>
             <div class="text-sm text-muted">${esc(l.company || '')}</div>
             <div>
@@ -3093,7 +3101,7 @@ async function wizardSave(action) {
     // Send if requested
     if (action === 'send' && campaign.id && d.type === 'email') {
       const sendResult = await api.post(`/campaigns/${campaign.id}/send`);
-      showNotification(`Campaign saved & sent to ${sendResult.sent}/${sendResult.total} leads!`, 'success');
+      showNotification(`Campaign saved & sent to ${sendResult.sent}/${sendResult.total} leads!${sendResult.no_email ? ` ${sendResult.no_email} LinkedIn-only lead${sendResult.no_email === 1 ? ' has' : 's have'} no email and ${sendResult.no_email === 1 ? 'was' : 'were'} skipped.` : ''}`, 'success');
     } else if (action === 'launch' && campaign.id) {
       await api.post(`/campaigns/${campaign.id}/launch`);
       showNotification('AI Pipeline launched! Finding leads, scoring them and writing outreach...', 'success');
@@ -3158,7 +3166,7 @@ async function sendCampaign(id) {
   showNotification('Sending campaign...');
   try {
     const result = await api.post(`/campaigns/${id}/send`);
-    showNotification(`Sent to ${result.sent}/${result.total} leads`, 'success');
+    showNotification(`Sent to ${result.sent}/${result.total} leads${result.no_email ? ` · ${result.no_email} LinkedIn-only (no email) skipped` : ''}`, 'success');
     loadCampaigns();
   } catch (e) { showNotification('Error: ' + e.message, 'error'); }
 }

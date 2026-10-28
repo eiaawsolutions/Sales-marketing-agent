@@ -73,6 +73,8 @@ async function runSearch(user, { profile, n, campaignId }) {
   return {
     found: (r.generated || 0) + (r.reused || 0) + (r.rejected || 0),
     kept: r.generated || 0,
+    // Of those kept, people with no public email, reached on LinkedIn only.
+    linkedin_only: r.linkedin_only || 0,
     already_in_list: r.reused || 0,
     discarded: r.rejected || 0,
     // Names and reasons only: a discarded person's contact details are not

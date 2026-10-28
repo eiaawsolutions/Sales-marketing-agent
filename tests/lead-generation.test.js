@@ -116,13 +116,13 @@ test('a person the company site does not publish an email for is still discarded
   assert.match(res.rejectedLeads[0].reason, /no public email/);
 });
 
-test("with the website reader on, every lead without an email must come with its company's website", async () => {
+test("with the website reader on, every lead without an email must come with its company's website or LinkedIn profile", async () => {
   leadTools();
   let prompt = '';
   agent.setChat(async (message) => { prompt = message; return JSON.stringify({ leads: [] }); });
   await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
-  assert.match(prompt, /"company_website": .*REQUIRED for every lead without an email/);
-  assert.match(prompt, /no email and no company_website will be REJECTED/);
+  assert.match(prompt, /"company_website": .*REQUIRED for every lead without an email, unless you give their LinkedIn profile/);
+  assert.match(prompt, /no email, no company_website and no such profile will be REJECTED/);
 });
 
 test('the search log counts discards by reason and never names the people discarded', async () => {
@@ -149,12 +149,13 @@ test('the search log counts discards by reason and never names the people discar
   }
 });
 
-test('without the website reader the search still asks only for public emails', async () => {
+test('without the website reader the search asks for public emails, or a LinkedIn profile from the search results', async () => {
   let prompt = '';
   agent.setChat(async (message) => { prompt = message; return JSON.stringify({ leads: [] }); });
   await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
-  assert.match(prompt, /Leads without a public email MUST BE DISCARDED/);
-  assert.doesNotMatch(prompt, /return them with "email": ""/);
+  assert.match(prompt, /Anyone else without a public email MUST BE DISCARDED/);
+  assert.match(prompt, /no public email may be returned only if their personal LinkedIn profile .* appeared in your search results/);
+  assert.doesNotMatch(prompt, /return them with "email": ""/, 'no promise that their company website will be read');
 });
 
 test('a rejected AI key during lead search is reported as the AI key', async () => {

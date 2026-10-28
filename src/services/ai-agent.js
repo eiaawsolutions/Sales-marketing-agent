@@ -3,7 +3,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'crypto';
 import db from '../db/index.js';
 import { leadSourcesService } from './lead-sources.js';
-import { normalizePhone, isRoleMailbox } from '../utils/normalize.js';
+import { normalizePhone, normalizeLinkedIn, isPersonLinkedIn, isRoleMailbox } from '../utils/normalize.js';
+import { appendNote } from './lead-identity.js';
 import { DEFAULT_MODEL, resolveModel } from '../config/models.js';
 import { resolveAnthropicKey } from '../config/ai-key.js';
 import { isSiteReaderConfigured } from './site-reader.js';
@@ -212,6 +213,21 @@ function recordUsage(call) {
 // The searches the task's latest AI call ran: 0 means it answered from memory.
 function lastCallSearches() {
   return usageScope.getStore()?.last?.webSearchRequests || 0;
+}
+
+// The pages those searches returned ({ url, title }), as the API gave them.
+function lastCallSearchResults() {
+  return usageScope.getStore()?.last?.searchResults || [];
+}
+
+// The web_search_tool_result blocks of a response, as { url, title }. A
+// failed search's content is an error object, not a list.
+function searchResultsOf(content) {
+  return content
+    .filter(b => b?.type === 'web_search_tool_result' && Array.isArray(b.content))
+    .flatMap(b => b.content)
+    .filter(r => r?.type === 'web_search_result' && typeof r.url === 'string')
+    .map(r => ({ url: r.url, title: String(r.title || '') }));
 }
 
 function logUsage(campaignId, taskType, userId, usage) {
@@ -467,6 +483,7 @@ async function chat(userMessage, extraContext = '', options = {}) {
         inputTokens: response.usage?.input_tokens || 0,
         outputTokens: response.usage?.output_tokens || 0,
         webSearchRequests: response.usage?.server_tool_use?.web_search_requests || 0,
+        searchResults: Array.isArray(response.content) ? searchResultsOf(response.content) : [],
       });
 
       // When web search is used the content array contains server_tool_use and
@@ -976,7 +993,9 @@ ${fenceUntrusted('lead_data', {
 ${input.context || input.valueProposition ? fenceUntrusted('extra_context', { context: input.context || '', value_proposition: input.valueProposition || '' }, 1500) : ''}
 
 Rules:
-- 4 steps: an email on day 0, a LinkedIn connection note on day 1 (under 300 characters, no link — the sender sends it from their own account), an email on day 3 and an email on day 7.
+- ${String(lead.email || '').trim()
+    ? '4 steps: an email on day 0, a LinkedIn connection note on day 1 (under 300 characters, no link — the sender sends it from their own account), an email on day 3 and an email on day 7.'
+    : 'This lead has no email address. 1 step: a LinkedIn connection note on day 0 (under 300 characters, no link — the sender sends it from their own account), and no emails.'}
 - Write as the sender in sender_brief, about the offer in sender_brief only. Personalise from the lead's signals; never make up news about them.
 - ${CLAIMS_RULE}
 - Tone: ${seller.tone}. Plain text, short, one call to action.
@@ -1114,10 +1133,37 @@ Return JSON: {"found": true|false, "lead": {"name": "", "title": "", "company": 
   return { verified: true, candidate: cand };
 }
 
-// STRICT verification gate — enforces the "real people, real sources, real emails"
-// contract server-side so weak leads NEVER reach the DB even if the model ignores
-// the prompt. Returns { ok, reason } so we can surface why each lead was rejected.
-export function isVerified(lead) {
+// The LinkedIn profiles a search returned, as normalised profile → the titles
+// of the results that showed it ("Lee Shu Fen - Director, L&D - Velora | LinkedIn").
+export function profilesInResults(results) {
+  const seen = new Map();
+  for (const r of results) {
+    const profile = normalizeLinkedIn(r.url);
+    if (isPersonLinkedIn(profile)) seen.set(profile, `${seen.get(profile) || ''} ${r.title}`);
+  }
+  return seen;
+}
+
+// A lead's LinkedIn profile, if the search itself returned it under their
+// name. The model's word for a URL is not enough: it has cited company
+// websites that do not exist.
+function profileVerdict(lead, profilesSeen) {
+  const profile = normalizeLinkedIn(lead.linkedin_url);
+  if (!isPersonLinkedIn(profile)) return { ok: false, reason: 'no public email or LinkedIn profile found' };
+  const titles = profilesSeen?.get(profile);
+  if (titles === undefined) return { ok: false, reason: 'no public email found, and the search did not return their LinkedIn profile' };
+  if (!sameName({ name: titles }, lead.name)) return { ok: false, reason: 'no public email found, and the LinkedIn profile found does not name them' };
+  return { ok: true, channel: 'linkedin', profile };
+}
+
+// STRICT verification gate — enforces the "real people, real sources" contract
+// server-side so weak leads NEVER reach the DB even if the model ignores the
+// prompt. Returns { ok, reason } so we can surface why each lead was rejected,
+// and for a kept lead the channel it can be reached on: 'email', or
+// 'linkedin' for a person with no public email of their own whose profile
+// the search returned (profilesSeen, from profilesInResults). Without
+// profilesSeen an email is required.
+export function isVerified(lead, { profilesSeen } = {}) {
   const sources = Array.isArray(lead.verification_sources) ? lead.verification_sources : [];
   const hasSource = sources.some(s => typeof s === 'string' && /^https?:\/\//i.test(s));
   const hasProfile = typeof lead.linkedin_url === 'string' && /^https?:\/\//i.test(lead.linkedin_url);
@@ -1129,14 +1175,15 @@ export function isVerified(lead) {
   if (!hasSource) return { ok: false, reason: 'no verification_sources URL' };
   if (!hasProfile && !hasSite) return { ok: false, reason: 'no linkedin_url or company_website' };
 
-  // STRICT: real public email is REQUIRED. No pseudo-emails, no missing emails.
-  if (!email) return { ok: false, reason: 'no public email found' };
+  // No pseudo-emails, no guessed ones. A team inbox is not the person's email.
+  if (!email) return profileVerdict(lead, profilesSeen);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: 'malformed email' };
   if (email.endsWith('@noemail.leads.local')) return { ok: false, reason: 'pseudo-email (no real public email)' };
   if (isRoleMailbox(email)) {
-    return { ok: false, reason: `generic mailbox (${email}) — need a person's email, not a role address` };
+    const viaLinkedin = profileVerdict(lead, profilesSeen);
+    return viaLinkedin.ok ? viaLinkedin : { ok: false, reason: `generic mailbox (${email}) — need a person's email, not a role address` };
   }
-  return { ok: true };
+  return { ok: true, channel: 'email' };
 }
 
 export function buildNotes(lead) {
@@ -1172,6 +1219,18 @@ function ownEmailIndex(userId) {
   return new Map(rows.filter(r => r.e).map(r => [r.e, r.id]));
 }
 
+// One account's lead with this LinkedIn profile (normalised), or null. Leads
+// stored before 28 Oct 2026 carry it only in their notes, on their own
+// "Profile:" line: other LinkedIn links in notes can be someone else's.
+function ownLeadWithProfile(userId, profile) {
+  const keyed = db.prepare('SELECT id, email, notes FROM leads WHERE user_id = ? AND linkedin_normalized = ?').get(userId, profile);
+  if (keyed) return keyed;
+  const slug = profile.slice('linkedin.com/in/'.length).replace(/[\\%_]/g, '\\$&');
+  return db.prepare("SELECT id, email, notes FROM leads WHERE user_id = ? AND notes LIKE ? ESCAPE '\\'")
+    .all(userId, `%linkedin.com/in/${slug}%`)
+    .find(r => [...String(r.notes).matchAll(/^Profile: (\S+)/gm)].some(m => normalizeLinkedIn(m[1]) === profile)) || null;
+}
+
 // Apollo was the primary source until 28 Oct 2026 and was dropped to control
 // cost. Leads stored with source 'apollo' before then are left as they are.
 async function generateLeadsTask(input) {
@@ -1188,21 +1247,24 @@ async function generateLeadsViaAI(input) {
   const userEmailToId = ownEmailIndex(leadUserId);
   const existingEmails = Array.from(userEmailToId.keys());
 
-  // With the website reader on, a person confirmed on a real page but with no
-  // public email is still worth returning: lead-evidence.js then reads their
-  // company's own site for an address it publishes. Off, the rule stays strict.
+  // A person confirmed on a real page but with no public email is still worth
+  // returning when their personal LinkedIn profile came up in the search: the
+  // gate checks it against the search results, and they are kept for the
+  // LinkedIn steps of a sequence. With the website reader on, lead-evidence.js
+  // also reads their company's own site for an address it publishes.
   const siteReader = isSiteReaderConfigured();
+  const linkedinRule = 'their personal LinkedIn profile (linkedin.com/in/...) appeared in your search results';
   const emailRules = siteReader
-    ? `5. **REAL EMAIL OR COMPANY WEBSITE**: Give an email only if you saw it written on a real web page (company team page, speaker bio, conference page, news article, public directory). If you confirmed the person on a real page but found no public email, return them with "email": "" and their real company_website — the system then reads that company's own website for an address it publishes. A person with no email and no company_website will be REJECTED, so before returning someone without an email, find their company's official website. NEVER guess or construct an email.
+    ? `5. **REAL EMAIL, OR COMPANY WEBSITE AND LINKEDIN**: Give an email only if you saw it written on a real web page (company team page, speaker bio, conference page, news article, public directory). If you confirmed the person on a real page but found no public email, return them with "email": "" and their real company_website — the system then reads that company's own website for an address it publishes — and their LinkedIn profile URL if ${linkedinRule}. A person with no email is kept only if their company's website publishes their address or ${linkedinRule}; one with no email, no company_website and no such profile will be REJECTED. So before returning someone without an email, find their company's official website and their LinkedIn profile. NEVER guess or construct an email.
 6. Returning ZERO leads is the correct answer when nobody qualifies. Returning fewer real leads is ALWAYS better than returning more weak ones.`
-    : `5. **REAL EMAIL REQUIRED**: Only return leads where you can cite a REAL public email address found on a real web page (company team page, speaker bio, conference page, news article, public directory). Leads without a public email MUST BE DISCARDED — do not return them at all. The system will REJECT every lead with no email.
-6. Returning ZERO leads is the correct answer when no qualifying public emails exist. Returning fewer real leads is ALWAYS better than returning more weak ones.`;
+    : `5. **REAL EMAIL, OR LINKEDIN**: Give an email only if you saw it written on a real web page (company team page, speaker bio, conference page, news article, public directory). A person with no public email may be returned only if ${linkedinRule}: give "email": "" and that profile URL. Anyone else without a public email MUST BE DISCARDED — do not return them at all. NEVER guess or construct an email.
+6. Returning ZERO leads is the correct answer when nobody qualifies. Returning fewer real leads is ALWAYS better than returning more weak ones.`;
   const websiteField = siteReader
-    ? `- "company_website": The company's official website (home page URL), as shown in your search results or on a page you visited — REQUIRED for every lead without an email`
+    ? `- "company_website": The company's official website (home page URL), as shown in your search results or on a page you visited — REQUIRED for every lead without an email, unless you give their LinkedIn profile`
     : `- "company_website": Company / platform website URL (or "")`;
   const emailField = siteReader
-    ? `- "email": REAL public email address seen on a real web page, or "" when you found none (company_website is then REQUIRED). NEVER guess patterns like first.last@company.com.`
-    : `- "email": REAL public email address verified on a real web page — REQUIRED. Do NOT return the lead at all if you cannot find a real public email. NEVER guess patterns like first.last@company.com.`;
+    ? `- "email": REAL public email address seen on a real web page, or "" when you found none (company_website or a LinkedIn profile is then REQUIRED). NEVER guess patterns like first.last@company.com.`
+    : `- "email": REAL public email address verified on a real web page, or "" only for a person whose LinkedIn profile appeared in your search results. NEVER guess patterns like first.last@company.com.`;
 
   // Capture the search count so we can enforce "the model actually browsed" after the call.
   const result = await chatJSON(
@@ -1280,7 +1342,7 @@ Each lead object MUST have these fields (use empty string "" — never a guess �
 ${emailField}
 - "phone": Publicly listed phone only; otherwise ""
 - "other_contact": Any additional verified contact channel, or ""
-- "linkedin_url": LinkedIn or primary profile URL (or "")
+- "linkedin_url": Their personal LinkedIn profile URL exactly as it appeared in your search results, or another primary profile URL (or ""). NEVER construct a LinkedIn URL from a name.
 ${websiteField}
 - "verification_sources": Array of URLs (≥1 required) that prove the identity + role
 - "reason_for_fit": Why this lead matches the ICP
@@ -1301,6 +1363,7 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
   // chat() records response.usage.server_tool_use.web_search_requests per call.
   // If it's 0, the model answered from training data — those leads are unverifiable.
   const searchesRan = lastCallSearches();
+  const profilesSeen = profilesInResults(lastCallSearchResults());
   if (searchesRan === 0) {
     console.log('[generateLeads/ai] Rejecting batch — model did not call web_search (possible training-data answer)');
     return {
@@ -1329,16 +1392,19 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
   // source so these leads appear in the Sources funnel alongside inbound ones.
   const insertLead = db.prepare(`
     INSERT INTO leads (user_id, name, email, company, title, phone, source, notes,
-                       email_normalized, phone_normalized, source_id, first_source_id, last_source_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       email_normalized, phone_normalized, source_id, first_source_id, last_source_id,
+                       linkedin_url, linkedin_normalized)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertCampaignLead = db.prepare(
     'INSERT OR IGNORE INTO campaign_leads (campaign_id, lead_id) VALUES (?, ?)'
   );
 
-  // Track emails seen within this batch to prevent the AI from sneaking in duplicates
+  // Emails and LinkedIn profiles seen within this batch, so the AI cannot
+  // sneak in the same person twice.
   const seenInBatch = new Set();
   const rejected = [];
+  let linkedinOnly = 0;
 
   const addLeads = db.transaction((leadsToAdd) => {
     for (const lead of leadsToAdd) {
@@ -1346,29 +1412,49 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
         rejected.push({ name: lead.name, email: lead.email || '', reason: lead.evidence_reject });
         continue;
       }
-      const verdict = isVerified(lead);
+      const verdict = isVerified(lead, { profilesSeen });
       if (!verdict.ok) {
         rejected.push({ name: lead.name, email: lead.email || '', reason: verdict.reason });
         continue;
       }
 
-      // STRICT: only real public emails get this far. No pseudo-emails.
-      const email = lead.email.toLowerCase().trim();
+      // The person's own public email, or none: a LinkedIn-only lead is
+      // stored without the team inbox it may have come with. Their profile
+      // identifies them only if the search returned it under their name.
+      const email = verdict.channel === 'email' ? lead.email.toLowerCase().trim() : null;
+      const profile = (verdict.channel === 'linkedin' ? verdict : profileVerdict(lead, profilesSeen)).profile || null;
 
-      if (seenInBatch.has(email)) {
-        skippedInBatch.push(email);
+      if ((email && seenInBatch.has(email)) || (profile && seenInBatch.has(profile))) {
+        skippedInBatch.push(email || profile);
         continue;
       }
-      seenInBatch.add(email);
+      if (email) seenInBatch.add(email);
+      if (profile) seenInBatch.add(profile);
 
-      const existingId = userEmailToId.get(email);
+      const existingId = email && userEmailToId.get(email);
       if (existingId) {
         if (campaignId) insertCampaignLead.run(campaignId, existingId);
         linked.push({ id: existingId, email, reused: true });
         continue;
       }
 
-      const notes = buildNotes(lead);
+      const samePerson = profile && ownLeadWithProfile(leadUserId, profile);
+      if (samePerson) {
+        // Found again. A public email they did not have yet goes on their
+        // row, with where it was found, never onto a second row.
+        if (email && !samePerson.email) {
+          const evidence = buildNotes(lead).split('\n').filter(l => /^(Verification|Email found on|Mailbox check):/.test(l)).join('\n');
+          db.prepare('UPDATE leads SET email = ?, email_normalized = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?')
+            .run(email, email, appendNote(samePerson.notes, evidence), samePerson.id, leadUserId);
+          userEmailToId.set(email, samePerson.id);
+        }
+        if (campaignId) insertCampaignLead.run(campaignId, samePerson.id);
+        linked.push({ id: samePerson.id, email: email || '', reused: true });
+        continue;
+      }
+
+      // A LinkedIn-only lead's notes say nothing about an inbox not stored.
+      const notes = buildNotes(email ? lead : { ...lead, email_found_on: null, mailbox_check: null });
 
       // leads.email used to be GLOBALLY unique, and this branch "handled" the
       // resulting collision by reassigning the colliding row's user_id — i.e. it
@@ -1382,11 +1468,12 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
         const res = insertLead.run(
           leadUserId, lead.name, email, lead.company, lead.title,
           lead.phone, 'ai_generated', notes,
-          email, normalizePhone(lead.phone), aiSourceId, aiSourceId, aiSourceId
+          email, normalizePhone(lead.phone), aiSourceId, aiSourceId, aiSourceId,
+          profile ? String(lead.linkedin_url).trim().slice(0, 300) : null, profile
         );
         leadId = res.lastInsertRowid;
       } catch (e) {
-        if (!String(e.message || '').includes('UNIQUE')) throw e;
+        if (!email || !String(e.message || '').includes('UNIQUE')) throw e;
         const own = db.prepare(
           'SELECT id FROM leads WHERE user_id = ? AND email_normalized = ?'
         ).get(leadUserId, email);
@@ -1403,7 +1490,8 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
           aiSourceId, aiSourceId, leadId, leadUserId);
       }
 
-      userEmailToId.set(email, leadId);
+      if (email) userEmailToId.set(email, leadId);
+      else linkedinOnly++;
 
       if (campaignId) insertCampaignLead.run(campaignId, leadId);
 
@@ -1412,10 +1500,10 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
       ).run(
         leadId,
         'ai_action',
-        `AI generated verified lead (${lead.lead_type || 'Cold'}, ${lead.confidence_score || 'Medium'}) for campaign: ${campaignName || 'Unknown'}`
+        `AI generated verified lead (${lead.lead_type || 'Cold'}, ${lead.confidence_score || 'Medium'})${email ? '' : ', LinkedIn only: no public email'} for campaign: ${campaignName || 'Unknown'}`
       );
 
-      created.push({ id: leadId, ...lead, notes });
+      created.push({ id: leadId, ...lead, email: email || '', notes });
     }
   });
 
@@ -1438,6 +1526,7 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
 
   return {
     generated: created.length,
+    linkedin_only: linkedinOnly,
     reused: linked.length,
     rejected: rejected.length,
     leads: created,
@@ -1568,6 +1657,7 @@ async function autoOutreachTask(input) {
     // open web and from public forms.
     const leadsData = fenceUntrusted('leads_data', batch.map(l => ({
       name: l.name, company: l.company || '', title: l.title || '',
+      has_email: !!String(l.email || '').trim(),
       has_linkedin: !!linkedinProfileOf(l),
       signals: String(l.notes || '').slice(0, 700),
     })), 6000);
@@ -1585,6 +1675,7 @@ Return JSON: { "sequences": [ { "lead_name": "exact name from leads_data", "step
 
 Rules:
 - Each lead's sequence, in order: an email on day 0; then, ONLY if that lead's has_linkedin is true, a LinkedIn connection note on day 1 (channel "linkedin", no subject, under 300 characters, no link — the sender sends it from their own LinkedIn account); then an email on day 3 and an email on day 7. Number the steps 1, 2, 3… in that order.
+- A lead whose has_email is false has no email address: their sequence is that LinkedIn connection note alone, on day 0, and no emails.
 - Write as the sender in sender_brief, about the offer in sender_brief only. Sign off with the sender's name.
 - Personalise each first email and the LinkedIn note from that lead's signals (what their company is doing now). If a lead has no signals, use their role and company — never make up news about them. If a lead's signals include a Referral line, the first email opens by saying who suggested getting in touch.
 - ${CLAIMS_RULE}
@@ -1606,14 +1697,17 @@ Rules:
         const lead = batch.find(l => l.name === seq.lead_name);
         if (!lead) continue;
 
-        // Emails always; a LinkedIn note only for a lead with a public
-        // profile. Anything else the model returns is dropped. Steps are
-        // renumbered in send order.
+        // Emails only for a lead with an email address; a LinkedIn note only
+        // for a lead with a public profile. A lead with no email gets one
+        // note, on day 0. Anything else the model returns is dropped. Steps
+        // are renumbered in send order.
+        const hasEmail = !!String(lead.email || '').trim();
         const hasLinkedin = !!linkedinProfileOf(lead);
-        const steps = (seq.steps || [])
-          .filter(s => s && typeof s.message === 'string' && (s.channel === 'email' || (s.channel === 'linkedin' && hasLinkedin)))
-          .map(s => ({ ...s, delay: Math.max(0, Math.min(60, parseInt(s.delay_days, 10) || 0)) }))
+        const kept = (seq.steps || [])
+          .filter(s => s && typeof s.message === 'string' && ((s.channel === 'email' && hasEmail) || (s.channel === 'linkedin' && hasLinkedin)))
+          .map(s => ({ ...s, delay: hasEmail ? Math.max(0, Math.min(60, parseInt(s.delay_days, 10) || 0)) : 0 }))
           .sort((a, b) => a.delay - b.delay || (Number(a.step) || 0) - (Number(b.step) || 0));
+        const steps = hasEmail ? kept : kept.slice(0, 1);
         if (!steps.length) continue;
         // Re-checked here, inside the transaction: the AI call took a while,
         // and the lead may have been approved or drafted by someone else

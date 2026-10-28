@@ -95,10 +95,17 @@ export const campaignsService = {
     const baseUrl = db.prepare("SELECT value FROM settings WHERE key = 'base_url'").get()?.value || 'https://sa.eiaawsolutions.com';
 
     let sentCount = 0;
+    let noEmail = 0;
     const results = [];
 
     for (const lead of campaign.leads) {
       if (lead.campaign_status !== 'pending') continue;
+      // A LinkedIn-only lead: there is no address to send to. Not a bounce.
+      if (!String(lead.email || '').trim()) {
+        noEmail++;
+        results.push({ leadId: lead.id, status: 'no_email' });
+        continue;
+      }
       // Opted out of this account's email: never send, leave the row pending.
       if (isSuppressed(campaign.user_id, lead.email)) {
         results.push({ leadId: lead.id, status: 'suppressed' });
@@ -137,7 +144,7 @@ export const campaignsService = {
     db.prepare('UPDATE campaigns SET status = ?, sent_count = sent_count + ? WHERE id = ?')
       .run('active', sentCount, campaignId);
 
-    return { sent: sentCount, total: campaign.leads.length, results };
+    return { sent: sentCount, total: campaign.leads.length, no_email: noEmail, results };
   },
 
   getStats(userId) {
