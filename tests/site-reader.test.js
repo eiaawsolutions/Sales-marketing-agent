@@ -122,3 +122,8 @@ test('the health check reports the running Crawl4AI version', async () => {
   delete process.env.CRAWL4AI_API_TOKEN;
   assert.deepEqual(await reader.pingSiteReader(), { configured: false, ok: false });
 });
+
+test('an unresolved Infisical handle does not count as a token', () => {
+  process.env.CRAWL4AI_API_TOKEN = 'secret://eiaaw-all-projects/prod/SALES_AGENT_CRAWL4AI_API_TOKEN';
+  assert.equal(reader.isSiteReaderConfigured(), false);
+});

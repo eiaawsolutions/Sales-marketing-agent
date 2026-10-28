@@ -30,7 +30,8 @@ const EMAIL = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,24}/gi;
 const LINK = /\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 
 export function isSiteReaderConfigured() {
-  return !!(process.env.CRAWL4AI_URL && process.env.CRAWL4AI_API_TOKEN);
+  const token = process.env.CRAWL4AI_API_TOKEN || '';
+  return !!(process.env.CRAWL4AI_URL && token && !token.startsWith('secret://'));
 }
 
 // A cheap first check before a URL leaves Node. The crawler does the real
