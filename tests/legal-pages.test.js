@@ -18,7 +18,7 @@ test('published versions match the versions checkout records', () => {
 });
 
 test('superseded versions are archived, linked and kept out of search', () => {
-  for (const [page, file] of [[terms, 'terms-2026-04-19.html'], [terms, 'terms-2026-09-25-v2.0.html'], [privacy, 'privacy-2026-09-24.html']]) {
+  for (const [page, file] of [[terms, 'terms-2026-04-19.html'], [terms, 'terms-2026-09-25-v2.0.html'], [privacy, 'privacy-2026-09-24.html'], [privacy, 'privacy-2026-09-25-v2.1.html'], [dpa, 'dpa-2026-09-25-v1.0.html']]) {
     assert.ok(page.includes(`/legal/archive/${file}`), `current page does not link ${file}`);
     const url = new URL(`../public/legal/archive/${file}`, import.meta.url);
     assert.ok(existsSync(url), `${file} missing`);
@@ -69,11 +69,16 @@ test('no claim of a self-serve export; export on request within 14 days', () => 
   }
 });
 
-test('Apollo.io is disclosed as a lead source and a recipient (EN and BM)', () => {
-  assert.match(privacy, /<tr><td>Apollo\.io<\/td>/);
-  assert.match(privacy, /B2B contact database of <strong>Apollo\.io<\/strong>/);
-  assert.match(privacy, /pangkalan data kenalan B2B <strong>Apollo\.io<\/strong>/);
-  assert.match(privacy, /Apollo\.io \(data kenalan perniagaan untuk penjanaan prospek, Amerika Syarikat\)/);
+test("lead sources are the open web and companies' own websites, not Apollo.io (EN, BM, DPA)", () => {
+  // Apollo may appear only where the change history says it was removed.
+  const withoutHistory = (page) => page.replace(/<p>[^<]*<strong>Earlier versions:<\/strong>[\s\S]*?<\/p>/g, '').replace(/Versi terdahulu:[\s\S]*?<\/p>/g, '');
+  for (const [name, page] of Object.entries({ privacy, dpa })) {
+    assert.doesNotMatch(withoutHistory(page), /Apollo/, `${name} still names Apollo`);
+  }
+  assert.match(privacy, /read that company's public website for an address it publishes for them/);
+  assert.match(privacy, /asking its mail server, without sending a message/);
+  assert.match(privacy, /membaca laman web awam syarikat itu/);
+  assert.match(dpa, /reading the company's own public website for an address it publishes/);
 });
 
 test('Terms §6: sender identity and postal address are the customer\'s to add; the Service adds the unsubscribe link', () => {

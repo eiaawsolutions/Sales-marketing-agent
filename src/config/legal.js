@@ -7,8 +7,8 @@
 // public/legal/archive/ first. tests/legal-pages.test.js fails if the
 // numbers here and the "Version" shown on the pages drift apart.
 export const TERMS_VERSION = '2.1';
-export const PRIVACY_VERSION = '2.1';
-export const DPA_VERSION = '1.0';
+export const PRIVACY_VERSION = '2.2';
+export const DPA_VERSION = '1.1';
 export const LEGAL_EFFECTIVE_DATE = '2026-09-25';
 
 // Returns the acceptance record for a checkout request, or null when the buyer
