@@ -925,9 +925,8 @@ async function runBriefSearch() {
   try {
     const roles = briefMarket.target_roles;
     line('dim', `brief  → ${document.getElementById('br-company_size').selectedOptions[0]?.text || 'Any size'} · ${briefMarket.target_sectors.length} sectors · ${roles.length} roles`);
-    line('', `people → ${roles.slice(0, 3).join(', ') || 'decision-makers'}${roles.length > 3 ? ' and others' : ''}: verified contact database first, then the open web…`);
+    line('', `people → ${roles.slice(0, 3).join(', ') || 'decision-makers'}${roles.length > 3 ? ' and others' : ''}: searching the open web…`);
     const r = await api.post('/leads/find', {});
-    if (r.apollo_error) line('warn', `         ${r.apollo_error}`);
     line('ok', `         ${r.found} candidate${r.found === 1 ? '' : 's'} found`);
     if (r.discarded) line('warn', `         ${r.discarded} discarded: no personal email, no source, or not a match`);
     line('ok', `         ${r.kept} verified and kept${r.already_in_list ? ` · ${r.already_in_list} already in your list` : ''} · no email guessed`);
@@ -2125,8 +2124,6 @@ async function aiGenerateLeads(campaignId) {
 
   try {
     const result = await api.post(`/campaigns/${campaignId}/generate-leads`, { count });
-    const provider = result?.sourceProvider === 'apollo' ? 'Apollo' : 'AI Web Search';
-    const fallbackNote = result?.fallbackFrom === 'apollo' ? ' (Apollo found 0 → fell back to AI Web Search)' : '';
     // Surface up to 2 rejection reasons so the user understands WHY the strict gate dropped leads.
     let rejectedNote = '';
     if (result?.rejected) {
@@ -2134,9 +2131,9 @@ async function aiGenerateLeads(campaignId) {
       rejectedNote = ` (${result.rejected} rejected by strict gate${reasons ? ` — ${reasons}` : ''})`;
     }
     if (result.generated > 0) {
-      showNotification(`Found ${result.generated} verified leads from ${provider}${fallbackNote}${rejectedNote}`, 'success');
+      showNotification(`Found ${result.generated} verified leads from AI Web Search${rejectedNote}`, 'success');
     } else {
-      const msg = result?.message || `${provider} returned no leads matching this audience${rejectedNote}. Strict mode requires real public emails — try broadening titles, seniorities, or location.`;
+      const msg = result?.message || `AI Web Search returned no leads matching this audience${rejectedNote}. Strict mode requires real public emails — try broadening titles, seniorities, or location.`;
       showNotification(msg, 'error');
     }
 
@@ -4511,7 +4508,7 @@ async function loadAccounts() {
     const costData = await api.get('/campaigns/ai-costs').catch(() => ({ overall: { total_cost: 0 } }));
     const aiUsage = await api.get('/admin/ai-usage').catch(() => ({ total: { cost: 0, calls: 0, tokens: 0 }, thisMonth: { cost: 0, calls: 0 }, lastMonth: { cost: 0, calls: 0 }, daily: [], byModel: [], byType: [] }));
     const settingsData = await api.get('/settings').catch(() => ({}));
-    const opex = await api.get('/admin/opex').catch(() => ({ voiceCalls: 0, emailsSent: 0, hasResend: false, hasVoice: false, hasApollo: false, apolloMonthlyUsd: 99, webSearchesThisMonth: 0, webSearchCostUsd: 0 }));
+    const opex = await api.get('/admin/opex').catch(() => ({ voiceCalls: 0, emailsSent: 0, hasResend: false, hasVoice: false, webSearchesThisMonth: 0, webSearchCostUsd: 0 }));
     const aiCreditBalance = parseFloat(settingsData.ai_credit_balance || '5.00');
 
     // Calculate revenue & profit
@@ -4646,14 +4643,6 @@ async function loadAccounts() {
             <td>${opex.webSearchesThisMonth || 0} searches this month. $0.01 each ($10/1k).</td>
           </tr>
           <tr>
-            <td><strong>Lead Database</strong></td>
-            <td>Apollo.io</td>
-            <td>RM ${opex.hasApollo ? ((opex.apolloMonthlyUsd || 99) * 4.5).toFixed(2) : '0.00'}</td>
-            <td>${opex.hasApollo ? '$' + (opex.apolloMonthlyUsd || 99).toFixed(2) : '$0'}</td>
-            <td><span class="badge badge-${opex.hasApollo ? 'active' : 'draft'}">${opex.hasApollo ? 'ACTIVE' : 'NOT SET'}</span></td>
-            <td>${opex.hasApollo ? 'Professional seat — verified people search + enrichment.' : 'Connect Apollo in Settings to source verified leads.'}</td>
-          </tr>
-          <tr>
             <td><strong>Voice Agent</strong></td>
             <td>Retell AI</td>
             <td>RM ${(opex.voiceCalls * 0.50 * 4.5).toFixed(2)}</td>
@@ -4712,7 +4701,7 @@ async function loadAccounts() {
           <tr style="font-weight:700;border-top:2px solid var(--border)">
             <td>TOTAL MONTHLY</td>
             <td></td>
-            <td style="color:var(--warning)">RM ${(22.50 + (aiUsage.thisMonth.cost * 4.5) + ((opex.webSearchCostUsd || 0) * 4.5) + (opex.hasApollo ? (opex.apolloMonthlyUsd || 99) * 4.5 : 0) + (opex.voiceCalls * 0.50 * 4.5) + (opex.hasResend ? opex.emailsSent * 0.002 * 4.5 : 0) + (totalMRR * 0.029 + activeSubscribers.length) + 5 + (99 * 4.5)).toFixed(2)}</td>
+            <td style="color:var(--warning)">RM ${(22.50 + (aiUsage.thisMonth.cost * 4.5) + ((opex.webSearchCostUsd || 0) * 4.5) + (opex.voiceCalls * 0.50 * 4.5) + (opex.hasResend ? opex.emailsSent * 0.002 * 4.5 : 0) + (totalMRR * 0.029 + activeSubscribers.length) + 5 + (99 * 4.5)).toFixed(2)}</td>
             <td></td>
             <td></td>
             <td>Auto-calculated from actual usage</td>
@@ -5930,28 +5919,6 @@ async function loadSettings() {
       </div>
 
       <div class="card">
-        <h3>Lead Generation (Apollo)</h3>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <span style="width:12px;height:12px;border-radius:50%;background:${settings._apollo_key_set ? 'var(--success)' : 'var(--danger)'};display:inline-block"></span>
-          <span class="text-sm">${settings._apollo_key_set ? 'Apollo API key is configured — leads sourced from Apollo (verified + enriched)' : 'No Apollo key set — falls back to AI web-search lead generator'}</span>
-        </div>
-        <p class="text-muted text-sm mb-4">Connect <a href="https://app.apollo.io/#/settings/integrations/api" target="_blank" style="color:var(--primary)">Apollo.io</a> for verified, enriched, hot leads that 100% match your campaign target audience and locations. Apollo finds real people with real verified emails — no AI guessing.</p>
-        <div class="form-group">
-          <label>Apollo API Key ${settings._apollo_key_set ? '<span style="color:var(--success)">&#10003; set</span>' : ''}</label>
-          <div class="flex gap-2">
-            <input id="s-apollo-key" type="password" value="" placeholder="${settings._apollo_key_set ? 'Apollo key saved — enter new to change' : 'Paste Apollo API key'}">
-            <button class="btn btn-outline btn-sm" onclick="document.getElementById('s-apollo-key').type = document.getElementById('s-apollo-key').type === 'password' ? 'text' : 'password'">Show</button>
-          </div>
-          <small class="text-muted">Get your key from <a href="https://app.apollo.io/#/settings/integrations/api" target="_blank" style="color:var(--primary)">Apollo &rarr; Settings &rarr; Integrations &rarr; API</a>. Use a master key so people search + enrichment both work.</small>
-        </div>
-        <div class="flex gap-2" style="margin-top:12px">
-          <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
-          <button class="btn btn-outline" onclick="testApolloConnection()">Test Apollo Connection</button>
-        </div>
-        <div id="apollo-status" style="margin-top:12px"></div>
-      </div>
-
-      <div class="card">
         <h3>Email / SMTP Configuration</h3>
         <div class="grid-2">
           <div class="form-group">
@@ -6276,7 +6243,6 @@ async function saveSettings() {
     voice_ai_api_key: document.getElementById('s-voice-key')?.value || '',
     voice_ai_agent_id: gv('s-voice-agent') || '',
     voice_phone_number: gv('s-voice-phone') || '',
-    apollo_api_key: document.getElementById('s-apollo-key')?.value || '',
   };
 
   try {
@@ -6285,27 +6251,6 @@ async function saveSettings() {
     loadSettings();
   } catch (e) {
     showNotification('Error saving: ' + e.message, 'error');
-  }
-}
-
-async function testApolloConnection() {
-  const statusEl = document.getElementById('apollo-status');
-  if (statusEl) statusEl.innerHTML = '<span class="text-muted">Pinging Apollo...</span>';
-  try {
-    // Save the key first so the test endpoint can read it
-    const apolloKey = document.getElementById('s-apollo-key')?.value || '';
-    if (apolloKey && !apolloKey.includes('•')) {
-      await api.put('/settings', { apollo_api_key: apolloKey });
-    }
-    const result = await api.post('/settings/test-apollo', {});
-    if (result.success) {
-      const total = result.total_entries != null ? ` (Apollo index: ${result.total_entries.toLocaleString()} matching CEOs found)` : '';
-      if (statusEl) statusEl.innerHTML = `<span style="color:var(--success)">&#10003; Connected to Apollo${total}</span>`;
-    } else {
-      if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">Failed: ${result.error || 'Unknown error'}</span>`;
-    }
-  } catch (e) {
-    if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">Error: ${e.message}</span>`;
   }
 }
 

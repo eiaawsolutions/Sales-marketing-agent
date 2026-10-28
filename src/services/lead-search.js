@@ -65,7 +65,6 @@ export async function findFromBrief(user, { count } = {}) {
     monthly_limit: limit,
     campaign_id: campaignId,
     provider: r.sourceProvider || null,
-    apollo_error: r.apolloError || null,
     message: r.message || null,
   };
 }

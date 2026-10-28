@@ -79,11 +79,9 @@ test('a rejected API key reads as a platform problem, not "invalid x-api-key"', 
   assert.match(msg, /not your Brief/);
 });
 
-test('an Apollo 401 is not reported as the AI key', () => {
-  const err = Object.assign(new Error('Apollo API 401: Invalid access credentials. — your Apollo key was rejected.'), { status: 401 });
-  const msg = agent.cleanAIError(err);
-  assert.doesNotMatch(msg, /AI service/);
-  assert.match(msg, /Apollo/);
+test('a 401 from another service is not reported as the AI key', () => {
+  const err = Object.assign(new Error('Website reader 401: missing or invalid token'), { status: 401 });
+  assert.equal(agent.cleanAIError(err), 'Website reader 401: missing or invalid token');
 });
 
 test('other AI errors still come through as Anthropic worded them', () => {

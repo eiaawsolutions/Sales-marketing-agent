@@ -142,7 +142,7 @@
 
       ${builtin.length ? `
         <h3 style="margin:22px 0 10px">Built-in sources</h3>
-        <p class="text-muted text-sm" style="margin:-4px 0 12px">Managed automatically — manual entry, CSV import, Apollo, AI web search, and voice all feed the same funnel.</p>
+        <p class="text-muted text-sm" style="margin:-4px 0 12px">Managed automatically — manual entry, CSV import, AI web search, and voice all feed the same funnel.</p>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">
           ${builtin.map((s) => {
             const f = funnelById[s.id] || {};

@@ -59,12 +59,8 @@ export async function launchCampaignPipeline(userId, campaignId) {
           count: Math.min(LEADS_PER_LAUNCH, remainingMonthlyAiLeads(owner)),
         });
         const newCount = db.prepare('SELECT COUNT(*) as c FROM campaign_leads WHERE campaign_id = ?').get(campaignId).c;
-        const provider = leadResult?.sourceProvider === 'apollo' ? 'Apollo' : 'AI Web Search';
-        const fallbackNote = leadResult?.fallbackFrom !== 'apollo' ? ''
-          : leadResult.apolloError ? ' (Apollo rejected its API key → searched the open web)'
-          : ' (Apollo found 0 matches → fell back to AI Web Search)';
         const rejectedNote = leadResult?.rejected ? ` (${leadResult.rejected} rejected by verification gate)` : '';
-        updateStatus('running', `Step 1: Generated ${newCount} leads from ${provider}${fallbackNote}${rejectedNote}`);
+        updateStatus('running', `Step 1: Generated ${newCount} leads from AI Web Search${rejectedNote}`);
       } catch (e) {
         updateStatus('running', `Step 1: Lead generation failed (${e.message}) — continuing with existing leads`);
       }

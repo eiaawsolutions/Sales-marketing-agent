@@ -99,15 +99,15 @@ test('a missing required secret fails the boot and names the key but never a val
 
 test('a missing optional secret is dropped with a warning, not left as a handle', async () => {
   const warnings = [];
-  const env = { ...BOOT, APOLLO_API_KEY: 'secret://eiaaw-all-projects/prod/APOLLO_API_KEY' };
+  const env = { ...BOOT, TRACKING_SECRET: 'secret://eiaaw-all-projects/prod/TRACKING_SECRET' };
   const report = await resolveEnv({ env, fetchImpl: fakeInfisical({}).fetchImpl, log: { info() {}, warn: (m) => warnings.push(m) } });
-  assert.equal('APOLLO_API_KEY' in env, false);
-  assert.deepEqual(report.skippedOptional, ['APOLLO_API_KEY']);
-  assert.match(warnings.join('\n'), /APOLLO_API_KEY/);
+  assert.equal('TRACKING_SECRET' in env, false);
+  assert.deepEqual(report.skippedOptional, ['TRACKING_SECRET']);
+  assert.match(warnings.join('\n'), /TRACKING_SECRET/);
 });
 
 test('a login failure is fatal even when only optional keys are handles', async () => {
-  const env = { ...BOOT, APOLLO_API_KEY: 'secret://eiaaw-all-projects/prod/APOLLO_API_KEY' };
+  const env = { ...BOOT, TRACKING_SECRET: 'secret://eiaaw-all-projects/prod/TRACKING_SECRET' };
   await assert.rejects(resolveEnv({ env, fetchImpl: fakeInfisical({}, { loginStatus: 401 }).fetchImpl, log: quietLog }), /login failed \(HTTP 401\)/);
 });
 

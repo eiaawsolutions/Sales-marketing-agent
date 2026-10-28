@@ -13,7 +13,6 @@ import express from 'express';
 const dir = mkdtempSync(path.join(tmpdir(), 'sa-market-'));
 process.env.SA_DB_PATH = path.join(dir, 'test.db');
 delete process.env.RESEND_API_KEY;
-delete process.env.APOLLO_API_KEY;
 
 const { default: db } = await import('../src/db/index.js');
 const { __testing: agent } = await import('../src/services/ai-agent.js');

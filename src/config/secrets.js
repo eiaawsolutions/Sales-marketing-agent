@@ -29,7 +29,6 @@ export const OPTIONAL_ENV_KEYS = [
   'RESEND_WEBHOOK_SIGNING_SECRET', // delivery webhooks: rejected (503) when absent
   'SMTP_USER',
   'SMTP_PASS',
-  'APOLLO_API_KEY',  // lead source: disabled when absent
   'TRACKING_SECRET',
   'PURGE_TOKEN',
   'FOUNDER_TOKEN',

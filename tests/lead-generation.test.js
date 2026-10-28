@@ -6,7 +6,6 @@ import path from 'node:path';
 
 const dir = mkdtempSync(path.join(tmpdir(), 'sa-leadgen-'));
 process.env.SA_DB_PATH = path.join(dir, 'test.db');
-delete process.env.APOLLO_API_KEY;
 delete process.env.RESEND_API_KEY;
 
 const { default: db } = await import('../src/db/index.js');
@@ -22,7 +21,6 @@ function reset(plan = 'business') {
   for (const t of ['outreach_queue', 'campaign_leads', 'activities', 'leads', 'campaigns', 'ai_cost_log', 'agent_tasks', 'users']) {
     db.prepare(`DELETE FROM ${t}`).run();
   }
-  db.prepare("DELETE FROM settings WHERE key = 'apollo_api_key'").run();
   db.prepare(`INSERT INTO users (id, username, email, password_hash, role, status, plan) VALUES (2, 'tll', 'aaron@tll.example', 'x', 'user', 'active', ?)`).run(plan);
   globalThis.fetch = realFetch;
   agent.resetChat();
@@ -62,46 +60,7 @@ test('web-search leads with a role inbox (hr@, careers@) are discarded', async (
   assert.deepEqual(db.prepare('SELECT email FROM leads WHERE user_id = 2').all().map(r => r.email), ['nurul@seri.example']);
 });
 
-test('Apollo leads with a role inbox are discarded too', async () => {
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('apollo_api_key', 'apollo_test_key_123')").run();
-  const people = {
-    p1: { id: 'p1', name: 'Daniel Lim', title: 'HR Director', email: 'hr@permata.example', email_status: 'verified', linkedin_url: 'https://www.linkedin.com/in/daniel', organization: { name: 'Permata', website_url: 'https://permata.example' } },
-    p2: { id: 'p2', name: 'Grace Tan', title: 'Head of Talent', email: 'grace.tan@lumina.example', email_status: 'verified', linkedin_url: 'https://www.linkedin.com/in/grace', organization: { name: 'Lumina', website_url: 'https://lumina.example' } },
-  };
-  globalThis.fetch = async (url, init) => {
-    if (String(url).includes('apollo.io')) {
-      const body = init?.body ? JSON.parse(init.body) : {};
-      const json = String(url).includes('match') ? { person: people[body.id] } : { people: Object.values(people).map(p => ({ id: p.id, name: p.name, organization: p.organization })) };
-      return new Response(JSON.stringify(json), { status: 200, headers: { 'content-type': 'application/json' } });
-    }
-    return realFetch(url, init);
-  };
-  agent.setChat(async (message) => (message.includes('100% match') ? '{"match":true,"reason":"HR leader in Malaysia"}' : '{"person_titles":["HR Director"]}'));
-  const res = await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
-  assert.equal(res.sourceProvider, 'apollo');
-  assert.deepEqual(db.prepare('SELECT email FROM leads WHERE user_id = 2').all().map(r => r.email), ['grace.tan@lumina.example']);
-});
-
-test('when Apollo turns down its key, the search still runs on the open web and says why', async () => {
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('apollo_api_key', 'apollo_revoked_key')").run();
-  globalThis.fetch = async (url, init) => {
-    if (String(url).includes('apollo.io')) {
-      return new Response(JSON.stringify({ error: 'Invalid access credentials.' }), { status: 401, headers: { 'content-type': 'application/json' } });
-    }
-    return realFetch(url, init);
-  };
-  agent.setChat(async (message, _ctx, options = {}) => (options.useWebSearch
-    ? JSON.stringify({ leads: [webLead('shufen.lee@velora.example')] })
-    : '{"person_titles":["HR Director"]}'));
-  const res = await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
-  assert.equal(res.sourceProvider, 'ai_websearch');
-  assert.equal(res.fallbackFrom, 'apollo');
-  assert.match(res.apolloError, /rejected/);
-  assert.equal(res.generated, 1);
-});
-
-test('a rejected AI key on the Apollo path is reported as the AI key, not as Apollo', async () => {
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('apollo_api_key', 'apollo_test_key_123')").run();
+test('a rejected AI key during lead search is reported as the AI key', async () => {
   agent.setChat(async () => {
     throw Object.assign(new Error('401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}'), { status: 401 });
   });
