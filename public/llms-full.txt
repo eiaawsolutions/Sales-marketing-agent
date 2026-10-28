@@ -96,6 +96,9 @@ A: No. The system writes per-lead personalised sequences using Claude, with expl
 **Q: How is this different from Apollo / Instantly / Lemlist?**
 A: Three differences. (1) Verification-first lead contract — we discard fake-looking leads instead of selling them to you. (2) Voice agent built in — talk to prospects in real time, not just email. (3) Designed for APAC SMB/agency reality (RM 99 entry, Malaysian PDPA aligned, no per-seat enterprise pricing).
 
+**Q: Do you sell contact lists or personal phone numbers?**
+A: No. We don't sell, rent or supply contact lists or databases. The agent searches public web pages for people and businesses that match your brief, records where it found each one, and keeps only contact details that the person or their company has published. It has no access to credit, banking or other private data, so it cannot tell who needs a loan or other financial product. You still need a lawful basis under Malaysia's PDPA to contact anyone it finds, and our Terms prohibit using the platform with purchased consumer lists.
+
 **Q: Will the AI replace my sales team?**
 A: No. The AI handles top-of-funnel — prospecting, first-touch email, voice triage, follow-up nudges. Closing, negotiation, relationship management stay with your humans. EIAAW Solutions is explicit: AI handles grunt work, humans stay in charge of judgement.
 
