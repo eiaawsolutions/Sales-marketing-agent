@@ -915,13 +915,15 @@ async function redraftFromBrief() {
 // Lead searches run as background jobs on the server: one can outlast the
 // 100-second limit Cloudflare puts on a single request, which used to end in
 // "Unexpected token '<'". Start returns a job id; ask for the result every
-// few seconds. A failed or vanished job comes back as an error from api.get.
+// few seconds. A vanished job comes back as an error from api.get; a failed
+// one is a normal answer with status "failed" and its reason.
 async function waitForJob(path, onWait) {
   const started = Date.now();
   while (Date.now() - started < 10 * 60_000) {
     await new Promise(r => setTimeout(r, 3000));
     const job = await api.get(path);
     if (job.status === 'done') return job.result;
+    if (job.status === 'failed') throw new Error(job.error || 'The search stopped with an error. Run it again.');
     if (onWait) onWait(job.seconds);
   }
   throw new Error('Still running after 10 minutes. Any leads it keeps will appear on the Leads page.');

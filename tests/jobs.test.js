@@ -1,8 +1,9 @@
 import { test, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import vm from 'node:vm';
 
 const dir = mkdtempSync(path.join(tmpdir(), 'sa-jobs-'));
 process.env.SA_DB_PATH = path.join(dir, 'test.db');
@@ -85,6 +86,38 @@ test('finished jobs are forgotten after 15 minutes', async () => {
 test('a search the brief cannot support is refused at once, not started', () => {
   assert.throws(() => startBriefSearch({ id: 2, role: 'user', plan: 'business' }), (e) => e instanceof SearchRefused && e.status === 400);
   assert.equal(jobs.__testing.size(), 0);
+});
+
+// The page's polling loop (public/app.js), run against stubbed answers. A
+// failed job is answered with HTTP 200 and status "failed"; the page used to
+// keep polling it for 10 minutes and then call it "still running".
+function pageWaitForJob(answers) {
+  const src = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  const fn = src.match(/async function waitForJob\([\s\S]*?\n}\n/)[0];
+  const polls = [];
+  let now = 0;
+  const page = {
+    Date: { now: () => (now += 3000) },
+    setTimeout: (f) => f(),
+    api: { get: async (p) => { polls.push(p); return answers[Math.min(polls.length, answers.length) - 1]; } },
+  };
+  vm.createContext(page);
+  vm.runInContext(fn, page);
+  return { waitForJob: page.waitForJob, polls };
+}
+
+test('the page stops waiting as soon as a job fails, and says why', async () => {
+  const { waitForJob, polls } = pageWaitForJob([
+    { status: 'running', seconds: 3 },
+    { status: 'failed', seconds: 275, error: 'Request timed out.', http_status: 500 },
+  ]);
+  await assert.rejects(waitForJob('/leads/find/abc'), /Request timed out/);
+  assert.equal(polls.length, 2);
+});
+
+test('the page returns the result of a job that finishes', async () => {
+  const { waitForJob } = pageWaitForJob([{ status: 'running', seconds: 3 }, { status: 'done', seconds: 9, result: { kept: 2 } }]);
+  assert.deepEqual({ ...(await waitForJob('/leads/find/abc')) }, { kept: 2 });
 });
 
 test('a brief search runs as a job and a second press joins it', async () => {
