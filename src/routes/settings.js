@@ -3,6 +3,7 @@ import db from '../db/index.js';
 import { requireSuperadmin } from '../middleware/auth.js';
 import { encrypt, decrypt, isSensitive } from '../utils/crypto.js';
 import { resolveModel, isAcceptableModelId, SELECTABLE_MODELS } from '../config/models.js';
+import { resolveAnthropicKey } from '../config/ai-key.js';
 
 const router = Router();
 
@@ -38,9 +39,8 @@ router.get('/', (req, res) => {
       settings[row.key] = row.value; // Non-sensitive: return as-is
     }
   }
-  const apiKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'api_key'").get();
-  const decryptedKey = apiKeyRow?.value ? decrypt(apiKeyRow.value) : '';
-  settings._api_key_set = !!(decryptedKey && decryptedKey.length > 5);
+  settings._api_key_source = resolveAnthropicKey().source;
+  settings._api_key_set = !!settings._api_key_source;
 
   const voiceKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'voice_ai_api_key'").get();
   const decryptedVoiceKey = voiceKeyRow?.value ? decrypt(voiceKeyRow.value) : '';
@@ -88,13 +88,11 @@ router.put('/', (req, res) => {
 
 // POST /api/settings/test-ai — test the AI connection
 router.post('/test-ai', async (req, res) => {
+  const { key: apiKey, source } = resolveAnthropicKey();
   try {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
-    const apiKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'api_key'").get();
     const modelRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_model'").get();
 
-    // Decrypt the API key
-    const apiKey = apiKeyRow?.value ? decrypt(apiKeyRow.value) : process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return res.json({ success: false, error: 'No API key configured' });
 
     const client = new Anthropic({ apiKey });
@@ -104,11 +102,17 @@ router.post('/test-ai', async (req, res) => {
       messages: [{ role: 'user', content: 'Reply with exactly: CONNECTION_OK' }],
     });
 
-    res.json({ success: true, model: response.model, response: response.content[0].text });
+    res.json({ success: true, model: response.model, response: response.content[0].text, source });
   } catch (err) {
     const msg = err.message || String(err);
     const jsonMatch = msg.match(/\{.*"message"\s*:\s*"([^"]+)"/);
-    res.json({ success: false, error: jsonMatch ? jsonMatch[1] : msg });
+    let error = jsonMatch ? jsonMatch[1] : msg;
+    if (err.status === 401) {
+      error = source === 'env'
+        ? `Anthropic rejected the key from Infisical (ANTHROPIC_API_KEY): ${error}. Rotate it in Infisical, then redeploy.`
+        : `Anthropic rejected the key saved on this page: ${error}. Paste a current key and save.`;
+    }
+    res.json({ success: false, error, source });
   }
 });
 

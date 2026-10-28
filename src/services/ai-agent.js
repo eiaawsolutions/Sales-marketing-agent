@@ -1,11 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
 import db from '../db/index.js';
-import { decrypt } from '../utils/crypto.js';
 import { isApolloConfigured, searchPeople, enrichPerson, describeApolloSource, detectHotSignal } from './apollo.js';
 import { leadSourcesService } from './lead-sources.js';
 import { normalizePhone, isRoleMailbox } from '../utils/normalize.js';
 import { DEFAULT_MODEL, resolveModel } from '../config/models.js';
+import { resolveAnthropicKey } from '../config/ai-key.js';
 import { approvalRequired, getProfile, hasOffer, isHqAccount, TONES, COMPANY_SIZES } from './account-profile.js';
 import { kickDispatch } from './outreach-dispatch.js';
 
@@ -17,9 +17,7 @@ function getSettings() {
 }
 
 function getClient() {
-  const settings = getSettings();
-  // Decrypt API key (handles both encrypted and plaintext values)
-  const apiKey = decrypt(settings.api_key) || process.env.ANTHROPIC_API_KEY;
+  const { key: apiKey } = resolveAnthropicKey();
   if (!apiKey) throw new Error('API key not configured. Go to Settings to add your Anthropic API key.');
   // Explicit 90s ceiling on every call (SDK default is 10 min). Combined with
   // web_search at max_uses=8 a hung request would lock a worker and bleed
@@ -31,9 +29,18 @@ function getModel() {
   return resolveModel(getSettings().ai_model);
 }
 
+// Shown in place of Anthropic's bare "invalid x-api-key". The key is the
+// platform's, so the account holder can't fix it; the log line says what to.
+const AI_KEY_REJECTED = 'The AI service turned down the platform\'s API key, so this could not run. That is a setup problem on our side, not your Brief. Please try again later.';
+
 // Extract clean error message from Anthropic SDK errors
 function cleanAIError(err) {
   const msg = err.message || String(err);
+  if (err.status === 401 || msg.includes('authentication_error')) {
+    const { source } = resolveAnthropicKey();
+    console.error(`[ai] Anthropic rejected the API key (source: ${source || 'none'}). ${source === 'settings' ? 'Replace the key on the Settings page.' : 'Rotate ANTHROPIC_API_KEY in Infisical, then redeploy.'}`);
+    return AI_KEY_REJECTED;
+  }
   // Anthropic SDK errors look like: "400 {"type":"error","error":{"type":"...","message":"..."}}"
   const jsonMatch = msg.match(/\{.*"message"\s*:\s*"([^"]+)"/);
   if (jsonMatch) return jsonMatch[1];
@@ -2107,7 +2114,9 @@ Total AI spend: $${totalCost.total.toFixed(4)}\n`;
 // network. The stub reports one web search per web-search call, which is what
 // the lead generator's "did the model actually browse" check looks for.
 export const __testing = {
+  getClient,
   getModel,
+  cleanAIError,
   sameName,
   sameCompany,
   setChat(fn) {

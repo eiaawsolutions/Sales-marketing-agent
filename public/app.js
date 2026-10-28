@@ -5888,7 +5888,7 @@ async function loadSettings() {
         <h3>AI Configuration</h3>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
           <span style="width:12px;height:12px;border-radius:50%;background:${settings._api_key_set ? 'var(--success)' : 'var(--danger)'};display:inline-block"></span>
-          <span class="text-sm">${settings._api_key_set ? 'API key is configured' : 'No API key set — AI features will not work'}</span>
+          <span class="text-sm">${settings._api_key_source === 'env' ? 'Using the API key from Infisical (ANTHROPIC_API_KEY). A key saved below is only used if that one is missing.' : settings._api_key_set ? 'Using the API key saved below' : 'No API key set — AI features will not work'}</span>
         </div>
 
         <div class="form-group">
@@ -6380,9 +6380,9 @@ async function testAiConnection() {
     const result = await api.post('/settings/test-ai');
     if (statusEl) {
       if (result.success) {
-        statusEl.innerHTML = `<span style="color:var(--success)">Connected successfully! Model: ${result.model}</span>`;
+        statusEl.innerHTML = `<span style="color:var(--success)">Connected successfully! Model: ${esc(result.model)} · key from ${result.source === 'env' ? 'Infisical' : 'this page'}</span>`;
       } else {
-        statusEl.innerHTML = `<span style="color:var(--danger)">Connection failed: ${result.error}</span>`;
+        statusEl.innerHTML = `<span style="color:var(--danger)">Connection failed: ${esc(result.error)}</span>`;
       }
     }
   } catch (e) {

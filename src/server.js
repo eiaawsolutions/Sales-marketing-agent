@@ -737,9 +737,8 @@ app.post('/api/chatbot', rateLimit({ windowMs: 60000, max: 5, message: { error: 
     if (!message || message.length > 500) return res.status(400).json({ error: 'Message required (max 500 chars).' });
 
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
-    const apiKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'api_key'").get();
-    const { decrypt: dec } = await import('./utils/crypto.js');
-    const apiKey = apiKeyRow?.value ? dec(apiKeyRow.value) : process.env.ANTHROPIC_API_KEY;
+    const { resolveAnthropicKey } = await import('./config/ai-key.js');
+    const { key: apiKey } = resolveAnthropicKey();
     if (!apiKey) return res.json({ response: "Chat is currently unavailable. Please use the contact form or email eiaawsolutions@gmail.com" });
 
     const client = new Anthropic({ apiKey });
