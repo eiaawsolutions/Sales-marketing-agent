@@ -36,7 +36,7 @@ const AI_KEY_REJECTED = 'The AI service turned down the platform\'s API key, so 
 // Extract clean error message from Anthropic SDK errors
 function cleanAIError(err) {
   const msg = err.message || String(err);
-  if (err.status === 401 || msg.includes('authentication_error')) {
+  if (err instanceof Anthropic.AuthenticationError || msg.includes('authentication_error')) {
     const { source } = resolveAnthropicKey();
     console.error(`[ai] Anthropic rejected the API key (source: ${source || 'none'}). ${source === 'settings' ? 'Replace the key on the Settings page.' : 'Rotate ANTHROPIC_API_KEY in Infisical, then redeploy.'}`);
     return AI_KEY_REJECTED;
@@ -1133,9 +1133,12 @@ function ownEmailIndex(userId) {
 }
 
 async function generateLeadsTask(input) {
-  // Apollo is the primary source when configured. Two distinct outcomes:
-  //  - Apollo errors (auth/network/quota) → propagate the error so the user
-  //    knows to fix the key. NEVER silently switch providers on a hard failure.
+  // Apollo is the primary source when configured. Three distinct outcomes:
+  //  - Apollo turns down its key (401/403) → search the open web instead and
+  //    say so (apolloError in the result, and a log line naming the fix). The
+  //    key is the platform's, so stopping the run only blocked the person
+  //    searching (28 Oct 2026). Never silent: the result names the reason.
+  //  - Other Apollo errors (network/quota) → propagate.
   //  - Apollo returns 0 matches → fall back to AI web search as a SECONDARY
   //    source so the user still gets leads. This preserves the verified-only
   //    contract: AI fallback runs the same verification gate Apollo would.
@@ -1143,7 +1146,20 @@ async function generateLeadsTask(input) {
   if (!isApolloConfigured()) {
     return generateLeadsViaAI(input);
   }
-  const apolloResult = await generateLeadsViaApollo(input);
+  let apolloResult;
+  try {
+    apolloResult = await generateLeadsViaApollo(input);
+  } catch (err) {
+    if (err.provider !== 'apollo' || (err.status !== 401 && err.status !== 403)) throw err;
+    console.error(`[generateLeads] Apollo turned down the API key (${err.status}); searching the open web instead. Replace the Apollo key in Settings → Lead Generation (Apollo).`);
+    const aiResult = await generateLeadsViaAI(input);
+    return {
+      ...aiResult,
+      sourceProvider: 'ai_websearch',
+      fallbackFrom: 'apollo',
+      apolloError: 'The verified contact database (Apollo) rejected its API key, so this run searched the open web only.',
+    };
+  }
   const totalProduced = (apolloResult.generated || 0) + (apolloResult.reused || 0);
   if (totalProduced > 0) return apolloResult;
 

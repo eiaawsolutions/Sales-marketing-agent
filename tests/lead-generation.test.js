@@ -82,6 +82,35 @@ test('Apollo leads with a role inbox are discarded too', async () => {
   assert.deepEqual(db.prepare('SELECT email FROM leads WHERE user_id = 2').all().map(r => r.email), ['grace.tan@lumina.example']);
 });
 
+test('when Apollo turns down its key, the search still runs on the open web and says why', async () => {
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('apollo_api_key', 'apollo_revoked_key')").run();
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('apollo.io')) {
+      return new Response(JSON.stringify({ error: 'Invalid access credentials.' }), { status: 401, headers: { 'content-type': 'application/json' } });
+    }
+    return realFetch(url, init);
+  };
+  agent.setChat(async (message, _ctx, options = {}) => (options.useWebSearch
+    ? JSON.stringify({ leads: [webLead('shufen.lee@velora.example')] })
+    : '{"person_titles":["HR Director"]}'));
+  const res = await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
+  assert.equal(res.sourceProvider, 'ai_websearch');
+  assert.equal(res.fallbackFrom, 'apollo');
+  assert.match(res.apolloError, /rejected/);
+  assert.equal(res.generated, 1);
+});
+
+test('a rejected AI key on the Apollo path is reported as the AI key, not as Apollo', async () => {
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('apollo_api_key', 'apollo_test_key_123')").run();
+  agent.setChat(async () => {
+    throw Object.assign(new Error('401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}'), { status: 401 });
+  });
+  await assert.rejects(
+    runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 }),
+    /AI service turned down/,
+  );
+});
+
 test('the monthly verified-lead allowance counts Apollo leads as well as web-search leads', () => {
   const ins = db.prepare("INSERT INTO leads (user_id, name, email, source) VALUES (2, ?, ?, ?)");
   for (let i = 0; i < 140; i++) ins.run(`L${i}`, `l${i}@x.example`, i % 2 ? 'apollo' : 'ai_generated');

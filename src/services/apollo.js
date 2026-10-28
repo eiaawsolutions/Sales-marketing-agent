@@ -61,6 +61,7 @@ async function apolloFetch(url, body, method = 'POST') {
     }
     const err = new Error(`Apollo API ${res.status}: ${msg}`);
     err.status = res.status;
+    err.provider = 'apollo';
     err.body = json;
     throw err;
   }

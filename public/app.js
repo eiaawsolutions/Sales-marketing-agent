@@ -927,6 +927,7 @@ async function runBriefSearch() {
     line('dim', `brief  → ${document.getElementById('br-company_size').selectedOptions[0]?.text || 'Any size'} · ${briefMarket.target_sectors.length} sectors · ${roles.length} roles`);
     line('', `people → ${roles.slice(0, 3).join(', ') || 'decision-makers'}${roles.length > 3 ? ' and others' : ''}: verified contact database first, then the open web…`);
     const r = await api.post('/leads/find', {});
+    if (r.apollo_error) line('warn', `         ${r.apollo_error}`);
     line('ok', `         ${r.found} candidate${r.found === 1 ? '' : 's'} found`);
     if (r.discarded) line('warn', `         ${r.discarded} discarded: no personal email, no source, or not a match`);
     line('ok', `         ${r.kept} verified and kept${r.already_in_list ? ` · ${r.already_in_list} already in your list` : ''} · no email guessed`);

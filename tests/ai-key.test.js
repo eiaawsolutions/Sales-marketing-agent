@@ -79,6 +79,13 @@ test('a rejected API key reads as a platform problem, not "invalid x-api-key"', 
   assert.match(msg, /not your Brief/);
 });
 
+test('an Apollo 401 is not reported as the AI key', () => {
+  const err = Object.assign(new Error('Apollo API 401: Invalid access credentials. — your Apollo key was rejected.'), { status: 401 });
+  const msg = agent.cleanAIError(err);
+  assert.doesNotMatch(msg, /AI service/);
+  assert.match(msg, /Apollo/);
+});
+
 test('other AI errors still come through as Anthropic worded them', () => {
   const err = new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"max_tokens: too large"}}');
   assert.equal(agent.cleanAIError(err), 'max_tokens: too large');
