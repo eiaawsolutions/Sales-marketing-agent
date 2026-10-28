@@ -4,6 +4,9 @@ import { requireSuperadmin } from '../middleware/auth.js';
 import { encrypt, decrypt, isSensitive } from '../utils/crypto.js';
 import { resolveModel, isAcceptableModelId, SELECTABLE_MODELS } from '../config/models.js';
 import { resolveAnthropicKey } from '../config/ai-key.js';
+import { isSiteReaderConfigured } from '../services/site-reader.js';
+import { isEmailCheckConfigured } from '../services/email-check.js';
+import { leadToolsStatus } from '../services/lead-evidence.js';
 
 const router = Router();
 
@@ -50,6 +53,7 @@ router.get('/', (req, res) => {
   const decryptedResendKey = resendKeyRow?.value ? decrypt(resendKeyRow.value) : '';
   settings._resend_key_set = !!(decryptedResendKey && decryptedResendKey.length > 5 && !decryptedResendKey.startsWith('enc:'));
 
+  settings._lead_tools = { site_reader: isSiteReaderConfigured(), mailbox_check: isEmailCheckConfigured() };
   settings._models = SELECTABLE_MODELS;
   settings._effective_model = resolveModel(settings.ai_model);
   settings._model_retired = !!settings.ai_model && settings._effective_model !== settings.ai_model;
@@ -110,6 +114,11 @@ router.post('/test-ai', async (req, res) => {
     }
     res.json({ success: false, error, source });
   }
+});
+
+// POST /api/settings/test-lead-tools — are the website reader and mailbox check up?
+router.post('/test-lead-tools', async (req, res) => {
+  res.json(await leadToolsStatus());
 });
 
 export default router;

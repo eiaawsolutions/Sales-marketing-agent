@@ -29,6 +29,8 @@ export const OPTIONAL_ENV_KEYS = [
   'RESEND_WEBHOOK_SIGNING_SECRET', // delivery webhooks: rejected (503) when absent
   'SMTP_USER',
   'SMTP_PASS',
+  'CRAWL4AI_API_TOKEN', // website reader: disabled when absent
+  'REACHER_SECRET',     // mailbox check's shared header secret, when set
   'TRACKING_SECRET',
   'PURGE_TOKEN',
   'FOUNDER_TOKEN',

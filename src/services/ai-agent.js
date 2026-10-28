@@ -5,6 +5,8 @@ import { leadSourcesService } from './lead-sources.js';
 import { normalizePhone, isRoleMailbox } from '../utils/normalize.js';
 import { DEFAULT_MODEL, resolveModel } from '../config/models.js';
 import { resolveAnthropicKey } from '../config/ai-key.js';
+import { isSiteReaderConfigured } from './site-reader.js';
+import { strengthenLeads } from './lead-evidence.js';
 import { approvalRequired, getProfile, hasOffer, isHqAccount, TONES, COMPANY_SIZES } from './account-profile.js';
 import { kickDispatch } from './outreach-dispatch.js';
 
@@ -1114,6 +1116,8 @@ export function buildNotes(lead) {
   if (Array.isArray(lead.verification_sources) && lead.verification_sources.length) {
     lines.push(`Verification: ${lead.verification_sources.join(' | ')}`);
   }
+  if (lead.email_found_on) lines.push(`Email found on: ${lead.email_found_on}`);
+  if (lead.mailbox_check) lines.push(`Mailbox check: ${lead.mailbox_check.verdict} (${lead.mailbox_check.reason})`);
   if (lead.enrichment) lines.push(`Enrichment: ${lead.enrichment}`);
   if (lead.other_contact) lines.push(`Other contact: ${lead.other_contact}`);
   return lines.join('\n');
@@ -1147,6 +1151,19 @@ async function generateLeadsViaAI(input) {
   const userEmailToId = ownEmailIndex(leadUserId);
   const existingEmails = Array.from(userEmailToId.keys());
 
+  // With the website reader on, a person confirmed on a real page but with no
+  // public email is still worth returning: lead-evidence.js then reads their
+  // company's own site for an address it publishes. Off, the rule stays strict.
+  const siteReader = isSiteReaderConfigured();
+  const emailRules = siteReader
+    ? `5. **REAL EMAIL OR COMPANY WEBSITE**: Give an email only if you saw it written on a real web page (company team page, speaker bio, conference page, news article, public directory). If you confirmed the person on a real page but found no public email, return them with "email": "" and their real company_website — the system then reads that company's own website for an address it publishes. NEVER guess or construct an email.
+6. Returning ZERO leads is the correct answer when nobody qualifies. Returning fewer real leads is ALWAYS better than returning more weak ones.`
+    : `5. **REAL EMAIL REQUIRED**: Only return leads where you can cite a REAL public email address found on a real web page (company team page, speaker bio, conference page, news article, public directory). Leads without a public email MUST BE DISCARDED — do not return them at all. The system will REJECT every lead with no email.
+6. Returning ZERO leads is the correct answer when no qualifying public emails exist. Returning fewer real leads is ALWAYS better than returning more weak ones.`;
+  const emailField = siteReader
+    ? `- "email": REAL public email address seen on a real web page, or "" when you found none (company_website is then REQUIRED). NEVER guess patterns like first.last@company.com.`
+    : `- "email": REAL public email address verified on a real web page — REQUIRED. Do NOT return the lead at all if you cannot find a real public email. NEVER guess patterns like first.last@company.com.`;
+
   // Capture the search count so we can enforce "the model actually browsed" after the call.
   const result = await chatJSON(
     `You are a cross-market lead generation and verification engine designed to generate HIGH-QUALITY, VERIFIED leads for B2B, B2C, and B2B2C campaigns.
@@ -1168,8 +1185,7 @@ Generate a list of qualified leads based on the campaign input provided, ensurin
 2. Every lead MUST have a verifiable digital footprint you retrieved via web_search.
 3. Emails, phone numbers, or personal data MUST NOT be guessed. NEVER invent a pattern like first.last@company.com.
 4. If verification is weak or unclear → DISCARD the lead.
-5. **REAL EMAIL REQUIRED**: Only return leads where you can cite a REAL public email address found on a real web page (company team page, speaker bio, conference page, news article, public directory). Leads without a public email MUST BE DISCARDED — do not return them at all. The system will REJECT every lead with no email.
-6. Returning ZERO leads is the correct answer when no qualifying public emails exist. Returning fewer real leads is ALWAYS better than returning more weak ones.
+${emailRules}
 
 ## 🌐 SUPPORTED LEAD TYPES
 - B2B — Founders, Directors, Heads of Marketing / Growth / Digital / Sales, other decision makers
@@ -1221,7 +1237,7 @@ Each lead object MUST have these fields (use empty string "" — never a guess �
 - "sector": The company's industry, as shown on a page you visited (or "")
 - "company_size": Employee count or range, only if a page you visited states it, e.g. "1,200" or "500-1,000" (or "" — never estimate)
 - "lead_type": "Hot" | "Cold"
-- "email": REAL public email address verified on a real web page — REQUIRED. Do NOT return the lead at all if you cannot find a real public email. NEVER guess patterns like first.last@company.com.
+${emailField}
 - "phone": Publicly listed phone only; otherwise ""
 - "other_contact": Any additional verified contact channel, or ""
 - "linkedin_url": LinkedIn or primary profile URL (or "")
@@ -1257,6 +1273,7 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
   }
 
   const leads = Array.isArray(result.leads) ? result.leads : [];
+  await strengthenLeads(leads);
   const created = [];
   const linked = [];           // existing user-owned leads attached to this campaign
   const skippedInBatch = [];   // in-batch duplicates the AI returned
@@ -1285,6 +1302,10 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
 
   const addLeads = db.transaction((leadsToAdd) => {
     for (const lead of leadsToAdd) {
+      if (lead.evidence_reject) {
+        rejected.push({ name: lead.name, email: lead.email || '', reason: lead.evidence_reject });
+        continue;
+      }
       const verdict = isVerified(lead);
       if (!verdict.ok) {
         rejected.push({ name: lead.name, email: lead.email || '', reason: verdict.reason });

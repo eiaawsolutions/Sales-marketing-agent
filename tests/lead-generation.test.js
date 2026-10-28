@@ -24,8 +24,29 @@ function reset(plan = 'business') {
   db.prepare(`INSERT INTO users (id, username, email, password_hash, role, status, plan) VALUES (2, 'tll', 'aaron@tll.example', 'x', 'user', 'active', ?)`).run(plan);
   globalThis.fetch = realFetch;
   agent.resetChat();
+  for (const k of ['CRAWL4AI_URL', 'CRAWL4AI_API_TOKEN', 'REACHER_URL']) delete process.env[k];
 }
 beforeEach(() => reset());
+
+// The self-hosted website reader (Crawl4AI) and mailbox check (Reacher),
+// stubbed: `pages` is markdown by URL, `reachable` is Reacher's verdict.
+function leadTools({ pages = {}, reachable = 'safe' } = {}) {
+  process.env.CRAWL4AI_URL = 'http://crawl4ai.railway.internal:11235';
+  process.env.CRAWL4AI_API_TOKEN = 'test-token';
+  process.env.REACHER_URL = 'http://reacher.railway.internal:8080';
+  globalThis.fetch = async (url, init) => {
+    const body = init?.body ? JSON.parse(init.body) : {};
+    if (String(url).startsWith(process.env.CRAWL4AI_URL)) {
+      return body.url in pages
+        ? new Response(JSON.stringify({ markdown: pages[body.url], success: true }), { status: 200 })
+        : new Response('{}', { status: 500 });
+    }
+    if (String(url).startsWith(process.env.REACHER_URL)) {
+      return new Response(JSON.stringify({ input: body.to_email, is_reachable: reachable, misc: {}, mx: { accepts_mail: true }, smtp: {} }), { status: 200 });
+    }
+    return realFetch(url, init);
+  };
+}
 
 const webLead = (email, name = 'Lee Shu Fen') => ({
   name, type: 'B2B', title: 'Director, L&D', company: 'Velora', geography: 'Kulim', lead_type: 'Cold', email,
@@ -58,6 +79,49 @@ test('web-search leads with a role inbox (hr@, careers@) are discarded', async (
   assert.equal(res.generated, 1);
   assert.equal(res.rejected, 2);
   assert.deepEqual(db.prepare('SELECT email FROM leads WHERE user_id = 2').all().map(r => r.email), ['nurul@seri.example']);
+});
+
+test("a person found without an email is kept when their company's own site publishes it", async () => {
+  leadTools({ pages: {
+    'https://velora.example/': 'Velora. [Our team](/our-team)',
+    'https://velora.example/our-team': 'Lee Shu Fen — Director, L&D — shufen.lee@velora.example',
+  } });
+  let prompt = '';
+  agent.setChat(async (message) => { prompt = message; return JSON.stringify({ leads: [webLead('')] }); });
+  const res = await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
+  assert.match(prompt, /return them with "email": ""/);
+  assert.equal(res.generated, 1);
+  const lead = db.prepare('SELECT email, notes FROM leads WHERE user_id = 2').get();
+  assert.equal(lead.email, 'shufen.lee@velora.example');
+  assert.match(lead.notes, /Email found on: https:\/\/velora\.example\/our-team/);
+  assert.match(lead.notes, /Verification: .*https:\/\/velora\.example\/our-team/);
+  assert.match(lead.notes, /Mailbox check: deliverable/);
+});
+
+test('an address the mail server rejects is discarded, and the reason is shown', async () => {
+  leadTools({ reachable: 'invalid' });
+  agent.setChat(async () => JSON.stringify({ leads: [webLead('shufen.lee@velora.example')] }));
+  const res = await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
+  assert.equal(res.generated, 0);
+  assert.equal(res.rejected, 1);
+  assert.match(res.rejectedLeads[0].reason, /mailbox check: the mail server says this address does not exist/);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM leads WHERE user_id = 2').get().c, 0);
+});
+
+test('a person the company site does not publish an email for is still discarded', async () => {
+  leadTools({ pages: { 'https://velora.example/': 'Velora. Contact info@velora.example' } });
+  agent.setChat(async () => JSON.stringify({ leads: [webLead('')] }));
+  const res = await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
+  assert.equal(res.generated, 0);
+  assert.match(res.rejectedLeads[0].reason, /no public email/);
+});
+
+test('without the website reader the search still asks only for public emails', async () => {
+  let prompt = '';
+  agent.setChat(async (message) => { prompt = message; return JSON.stringify({ leads: [] }); });
+  await runAgent(2, 'generate_leads', { targetAudience: 'HR Directors in Malaysia', campaignName: 'x', count: 5 });
+  assert.match(prompt, /Leads without a public email MUST BE DISCARDED/);
+  assert.doesNotMatch(prompt, /return them with "email": ""/);
 });
 
 test('a rejected AI key during lead search is reported as the AI key', async () => {

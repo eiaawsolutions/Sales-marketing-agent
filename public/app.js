@@ -925,7 +925,7 @@ async function runBriefSearch() {
   try {
     const roles = briefMarket.target_roles;
     line('dim', `brief  → ${document.getElementById('br-company_size').selectedOptions[0]?.text || 'Any size'} · ${briefMarket.target_sectors.length} sectors · ${roles.length} roles`);
-    line('', `people → ${roles.slice(0, 3).join(', ') || 'decision-makers'}${roles.length > 3 ? ' and others' : ''}: searching the open web…`);
+    line('', `people → ${roles.slice(0, 3).join(', ') || 'decision-makers'}${roles.length > 3 ? ' and others' : ''}: the open web, then each company's own website…`);
     const r = await api.post('/leads/find', {});
     line('ok', `         ${r.found} candidate${r.found === 1 ? '' : 's'} found`);
     if (r.discarded) line('warn', `         ${r.discarded} discarded: no personal email, no source, or not a match`);
@@ -5919,6 +5919,18 @@ async function loadSettings() {
       </div>
 
       <div class="card">
+        <h3>Lead search tools</h3>
+        <p class="text-muted text-sm mb-4">Both run on our own Railway servers. The website reader looks on a company's own site for an email it publishes for the person the search found. The mailbox check asks that address's mail server whether it accepts mail, without sending anything.</p>
+        ${[['site_reader', 'Website reader (Crawl4AI)'], ['mailbox_check', 'Mailbox check (Reacher)']].map(([k, label]) => `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="width:12px;height:12px;border-radius:50%;background:${settings._lead_tools?.[k] ? 'var(--success)' : 'var(--danger)'};display:inline-block"></span>
+            <span class="text-sm">${label}: ${settings._lead_tools?.[k] ? 'set up' : 'not set up'}</span>
+          </div>`).join('')}
+        <button class="btn btn-outline" style="margin-top:8px" onclick="testLeadTools()">Test</button>
+        <div id="lead-tools-status" class="text-sm" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
         <h3>Email / SMTP Configuration</h3>
         <div class="grid-2">
           <div class="form-group">
@@ -6333,6 +6345,22 @@ async function testAiConnection() {
     }
   } catch (e) {
     if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">Error: ${e.message}</span>`;
+  }
+}
+
+async function testLeadTools() {
+  const el = document.getElementById('lead-tools-status');
+  if (!el) return;
+  el.innerHTML = '<span class="text-muted">Checking both services…</span>';
+  try {
+    const { site_reader: r, mailbox_check: m } = await api.post('/settings/test-lead-tools', {});
+    const ok = (t) => `<span style="color:var(--success)">${esc(t)}</span>`;
+    const bad = (t) => `<span style="color:var(--danger)">${esc(t)}</span>`;
+    el.innerHTML = `
+      <div>Website reader: ${!r.configured ? bad('not set up') : r.ok ? ok(`working (Crawl4AI ${r.version})`) : bad(`not reachable: ${r.error}`)}</div>
+      <div>Mailbox check: ${!m.configured ? bad('not set up') : !m.ok ? bad(`not reachable: ${m.error}`) : m.smtpOpen ? ok('working') : bad('reachable, but this server cannot open outbound port 25, so every address reads "unknown"')}</div>`;
+  } catch (e) {
+    el.innerHTML = `<span style="color:var(--danger)">Error: ${esc(e.message)}</span>`;
   }
 }
 

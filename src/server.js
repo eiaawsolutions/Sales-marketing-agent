@@ -891,4 +891,9 @@ app.listen(PORT, '0.0.0.0', () => {
   startScheduler();
   // Warm the chatbot's parent-site facts so the first visitor doesn't wait on the fetch.
   getParentFacts().catch(() => {});
+  // Say in the deploy log whether the self-hosted lead tools are reachable.
+  // Waits for the private network, which can lag the container start.
+  setTimeout(() => {
+    import('./services/lead-evidence.js').then(m => m.logLeadToolsStatus()).catch(err => console.warn('[lead-tools] status check failed:', err.message));
+  }, 15_000).unref();
 });
