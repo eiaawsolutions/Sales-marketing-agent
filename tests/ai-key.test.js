@@ -26,14 +26,13 @@ beforeEach(() => {
   delete process.env.ANTHROPIC_API_KEY;
 });
 
-test('the Infisical key wins over an old key saved on the Settings page', () => {
-  saveSettingsKey(encrypt('sk-ant-old-revoked-key'));
-  assert.deepEqual(resolveAnthropicKey({ ANTHROPIC_API_KEY: 'sk-ant-current-key' }), { key: 'sk-ant-current-key', source: 'env' });
+test('a key saved on the Settings page wins, so changing it there works without a redeploy', () => {
+  saveSettingsKey(encrypt('sk-ant-new-key'));
+  assert.deepEqual(resolveAnthropicKey({ ANTHROPIC_API_KEY: 'sk-ant-revoked-infisical-key' }), { key: 'sk-ant-new-key', source: 'settings' });
 });
 
-test('the Settings key is used when the server has no key of its own', () => {
-  saveSettingsKey(encrypt('sk-ant-local-dev-key'));
-  assert.deepEqual(resolveAnthropicKey({}), { key: 'sk-ant-local-dev-key', source: 'settings' });
+test('the Infisical key is used when nothing is saved on the Settings page', () => {
+  assert.deepEqual(resolveAnthropicKey({ ANTHROPIC_API_KEY: 'sk-ant-infisical-key' }), { key: 'sk-ant-infisical-key', source: 'env' });
 });
 
 test('a Settings key that no longer decrypts is never sent as the key', () => {
@@ -44,9 +43,8 @@ test('a Settings key that no longer decrypts is never sent as the key', () => {
 });
 
 test('an unresolved secret:// handle is never sent as the key', () => {
-  saveSettingsKey(encrypt('sk-ant-local-dev-key'));
-  const env = { ANTHROPIC_API_KEY: 'secret://eiaaw-all-projects/prod/ANTHROPIC_API_KEY' };
-  assert.deepEqual(resolveAnthropicKey(env), { key: 'sk-ant-local-dev-key', source: 'settings' });
+  const env = { ANTHROPIC_API_KEY: 'secret://eiaaw-all-projects/prod/SALES_AGENT_ANTHROPIC_API_KEY' };
+  assert.deepEqual(resolveAnthropicKey(env), { key: '', source: null });
 });
 
 test('stray whitespace around a key is dropped', () => {
@@ -59,10 +57,10 @@ test('with no key anywhere there is nothing to send', () => {
   assert.deepEqual(resolveAnthropicKey({ ANTHROPIC_API_KEY: '   ' }), { key: '', source: null });
 });
 
-test('the agent calls Claude with the resolved key, not the old Settings key', () => {
-  saveSettingsKey(encrypt('sk-ant-old-revoked-key'));
-  process.env.ANTHROPIC_API_KEY = 'sk-ant-current-key';
-  assert.equal(agent.getClient().apiKey, 'sk-ant-current-key');
+test('the agent calls Claude with the key saved on the Settings page', () => {
+  saveSettingsKey(encrypt('sk-ant-new-key'));
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-revoked-infisical-key';
+  assert.equal(agent.getClient().apiKey, 'sk-ant-new-key');
 });
 
 test('with no usable key the agent says so instead of calling Claude', () => {
