@@ -1004,11 +1004,16 @@ ${ctaUrl ? `- Include ${ctaUrl} as the link in two of the emails.` : '- Where a 
     { maxTokens: 6000 }
   );
 
+  // The note goes into a LinkedIn connection request: cut to its 300 characters.
+  const sequence = (Array.isArray(result?.sequence) ? result.sequence : []).map(s => (
+    s && s.channel === 'linkedin' && typeof s.message === 'string' ? { ...s, message: fitLinkedinNote(s.message) } : s
+  ));
+
   db.prepare(
     'INSERT INTO activities (lead_id, type, description) VALUES (?, ?, ?)'
-  ).run(lead.id, 'ai_action', `AI generated ${result.sequence?.length || 0}-step outreach sequence`);
+  ).run(lead.id, 'ai_action', `AI generated ${sequence.length}-step outreach sequence`);
 
-  return result;
+  return { ...result, sequence, linkedin_profile: linkedinProfileLink(lead) };
 }
 
 // ── Replies ──────────────────────────────────────────────────────────────
@@ -1542,6 +1547,17 @@ Return ONLY the JSON object (no prose, no markdown fences) as the FINAL message 
 export function linkedinProfileOf(lead) {
   const m = String(lead?.notes || '').match(/https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/in\/[^\s|]+/i);
   return m ? m[0] : null;
+}
+
+// The lead's own LinkedIn profile as a link for the page to open, or null.
+// Rebuilt from the normalised form, so a stored value can never put anything
+// but https://www.linkedin.com/in/<name> into a link.
+export function linkedinProfileLink(lead) {
+  for (const raw of [lead?.linkedin_url, linkedinProfileOf(lead)]) {
+    const profile = normalizeLinkedIn(raw);
+    if (isPersonLinkedIn(profile)) return `https://www.${profile}`;
+  }
+  return null;
 }
 
 // LinkedIn caps a connection note at 300 characters. No links: the team

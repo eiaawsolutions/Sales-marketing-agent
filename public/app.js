@@ -1583,22 +1583,50 @@ function endVoiceCall() {
 // A one-off sequence for a single lead, written from the account's Brief (the
 // server reads it — nothing about the offer is sent from here). The text is
 // AI output shaped by web-sourced lead data, so every field is escaped.
+// The steps of the sequence on screen, so its buttons copy text by index
+// rather than carrying AI-written text inside an onclick attribute.
+let lastOutreachSteps = [];
+
 async function aiOutreach(id, campaignId) {
   showNotification('Generating outreach sequence...');
   try {
     const result = await api.post(`/leads/${id}/outreach`, {});
+    lastOutreachSteps = result.sequence || [];
     showResultModal('AI Outreach Sequence', `
-      ${(result.sequence || []).map(s => `
+      ${lastOutreachSteps.map((s, i) => `
         <div class="content-card">
           <div class="type">Step ${Number(s.step) || ''} — ${esc(s.channel === 'linkedin' ? 'LinkedIn note · you send it' : s.channel)} (Day ${Number(s.delay_days) || 0})</div>
           ${s.subject ? `<div><strong>Subject:</strong> ${esc(s.subject)}</div>` : ''}
           <pre>${esc(s.message)}</pre>
+          ${s.channel === 'linkedin' ? linkedinNoteActions(i, s.message, result.linkedin_profile) : ''}
           ${s.goal ? `<div class="text-muted text-sm">Goal: ${esc(s.goal)}</div>` : ''}
         </div>
       `).join('')}
     `);
     if (campaignId) refreshCampaignLeads(campaignId);
   } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+// One click copies the note and opens the lead's profile in a new tab. LinkedIn
+// has no link straight to its "Add a note" box, so the user clicks Connect,
+// Add a note, and pastes. The profile link is built by the server.
+function linkedinNoteActions(i, message, profile) {
+  return `
+    <div class="flex gap-1" style="margin-top:8px;align-items:center;flex-wrap:wrap">
+      ${profile ? `<a class="btn btn-sm btn-primary" href="${esc(profile)}" target="_blank" rel="noopener noreferrer" onclick="copyOutreachStep(${i}, true)">Copy note &amp; open profile</a>` : ''}
+      <button class="btn btn-sm btn-outline" type="button" onclick="copyOutreachStep(${i})">Copy note</button>
+      <span class="text-sm text-muted">${String(message || '').length} / 300 characters${profile ? '' : ' · no LinkedIn profile on file for this lead'}</span>
+    </div>
+    ${profile ? '<p class="text-sm text-muted" style="margin:6px 0 0">On their profile: Connect, then Add a note, then paste.</p>' : ''}`;
+}
+
+async function copyOutreachStep(i, openingProfile) {
+  const step = lastOutreachSteps[i];
+  if (!step) return;
+  try {
+    await navigator.clipboard.writeText(step.message || '');
+    showNotification(openingProfile ? 'Note copied. On their profile: Connect, Add a note, then paste.' : 'Note copied.', 'success');
+  } catch { showNotification('Could not copy — select the text and copy it instead.', 'error'); }
 }
 
 // ========== Pipeline ==========
