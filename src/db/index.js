@@ -11,6 +11,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // data/agent.db, which is why none of them had tests.
 const DB_PATH = process.env.SA_DB_PATH || path.join(__dirname, '..', '..', 'data', 'agent.db');
 
+// The persistent folder (Railway volume at /app/data). Anything that must
+// outlive a deploy — the database, uploaded images — lives here.
+export const DATA_DIR = path.dirname(DB_PATH);
+
 // Ensure data directory exists
 import fs from 'fs';
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });

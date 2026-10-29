@@ -28,7 +28,7 @@ import voiceRouter from './routes/voice.js';
 import appointmentsRouter from './routes/appointments.js';
 import trackingRouter from './routes/tracking.js';
 import unsubscribeRouter from './routes/unsubscribe.js';
-import uploadsRouter from './routes/uploads.js';
+import uploadsRouter, { uploadsStatic } from './routes/uploads.js';
 import formsRouter, { saveInboundLead, normaliseSite } from './routes/forms.js';
 import ingestRouter from './routes/ingest.js';
 import sourcesRouter from './routes/sources.js';
@@ -127,6 +127,10 @@ app.get('/proposal.html', (req, res, next) => {
 // URLs resolve instead of falling through to the 404 below.
 app.get(['/landing.html', '/index.html'], (req, res) => res.redirect(301, '/'));
 app.get(['/privacy', '/terms', '/security'], (req, res) => res.redirect(301, `${req.path}.html`));
+
+// Uploaded logos and images (data volume); anything else under /media falls
+// through to the site's own images in public/media.
+app.use('/media', uploadsStatic);
 
 app.use(express.static(path.join(__dirname, '..', 'public'), {
   maxAge: 0,

@@ -3,16 +3,22 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { fileURLToPath } from 'url';
-import db from '../db/index.js';
+import db, { DATA_DIR } from '../db/index.js';
 
 const router = Router();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MEDIA_DIR = path.join(__dirname, '..', '..', 'public', 'media');
+// Uploads live on the data volume beside the database. They used to be
+// written into public/media inside the container, which every deploy
+// replaces: on 28 Oct 2026 a campaign's logo was gone minutes after upload,
+// and every lead who opened the email saw a broken image.
+const MEDIA_DIR = path.join(DATA_DIR, 'media');
 const MAX_BYTES = 1_500_000; // ~1.5 MB final image cap (after base64 decode)
 
 if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
+
+// Served at /media/<name>, ahead of the site images bundled in public/media.
+// Each upload has a unique name (timestamp + random), so it never changes.
+export const uploadsStatic = express.static(MEDIA_DIR, { index: false, maxAge: '30d', immutable: true });
 
 // Per-route body parser — main app caps JSON at 1mb which would reject a 1mb logo
 // once base64-encoded (adds ~33% overhead). Allow up to 3mb just for this route.
