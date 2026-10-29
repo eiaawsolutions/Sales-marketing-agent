@@ -7,6 +7,7 @@
 import db from '../db/index.js';
 import { kickDispatch } from './outreach-dispatch.js';
 import { runAgent } from './ai-agent.js';
+import { markContacted } from './leads.js';
 import { LINKEDIN_NOTE_MAX } from '../utils/linkedin-note.js';
 
 const MAX_SUBJECT = 200;
@@ -122,12 +123,6 @@ export function markLinkedinSent({ campaignId, itemId, by }) {
 }
 
 const NOTE_SENT = 'LinkedIn connection note sent from your own account';
-
-// A lead someone has written to is Contacted. Only from New: a lead already
-// further along keeps its stage.
-function markContacted(leadId) {
-  db.prepare("UPDATE leads SET status = 'contacted', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'new'").run(leadId);
-}
 
 /**
  * The team sent a note from the outreach window (not the approval queue) from

@@ -1712,7 +1712,7 @@ async function loadPipeline() {
           <h3 style="margin:0">Assistant · pipeline review</h3>
           <span class="badge badge-new">${brief ? `${brief.kind === 'weekly' ? 'Monday brief' : 'Generated on request'} · ${esc(new Date(String(brief.created_at).replace(' ', 'T') + 'Z').toLocaleString('en-MY', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}` : 'Generated on request'}</span>
         </div>
-        <div id="pipeline-review" style="margin-top:10px">${renderBrief(brief)}</div>
+        <div id="pipeline-review" style="margin-top:10px;text-align:left">${renderBrief(brief)}</div>
       </div>`;
   } catch (e) {
     document.getElementById('page').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;

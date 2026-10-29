@@ -37,6 +37,34 @@ export function fitUnsentLinkedinNotes(db) {
   return changed;
 }
 
+// Sends used to leave a lead at New, so the board and the pipeline review
+// counted emailed leads as "not contacted yet". Moves every New lead that was
+// written to — an email or LinkedIn note sent, a campaign email that reached
+// them, or a send on its timeline (the campaign may since have been deleted) —
+// to Contacted. Runs once: a lead someone later moves back to New stays there.
+// Returns how many moved.
+export function markWrittenToLeadsContacted(db) {
+  const KEY = 'migration_written_to_contacted';
+  if (db.prepare('SELECT 1 FROM settings WHERE key = ?').get(KEY)) return 0;
+  return db.transaction(() => {
+    const { changes } = db.prepare(`
+      UPDATE leads SET status = 'contacted', updated_at = CURRENT_TIMESTAMP
+       WHERE status = 'new' AND (
+         EXISTS (SELECT 1 FROM outreach_queue oq JOIN campaigns c ON c.id = oq.campaign_id
+                  WHERE oq.lead_id = leads.id AND c.user_id = leads.user_id AND oq.status = 'sent')
+         OR EXISTS (SELECT 1 FROM campaign_leads cl JOIN campaigns c ON c.id = cl.campaign_id
+                     WHERE cl.lead_id = leads.id AND c.user_id = leads.user_id
+                       AND cl.status IN ('sent', 'opened', 'clicked', 'replied'))
+         OR EXISTS (SELECT 1 FROM activities a
+                     WHERE a.lead_id = leads.id AND a.user_id = leads.user_id
+                       AND ((a.type = 'email' AND (a.description LIKE 'Sent campaign:%' OR a.description LIKE 'Auto-outreach Step%'))
+                         OR (a.type = 'note' AND a.description LIKE 'LinkedIn connection note sent%'))))
+    `).run();
+    db.prepare("INSERT INTO settings (key, value) VALUES (?, datetime('now'))").run(KEY);
+    return changes;
+  })();
+}
+
 export function migrateOutreach(db) {
   rebuild(db, {
     table: 'outreach_queue',

@@ -101,6 +101,12 @@ export function recordCallCapture(userId, leadId, summary, callId) {
   return call;
 }
 
+// A lead someone has written to (an email or a LinkedIn note went out) is
+// Contacted. Only from New: a lead already further along keeps its stage.
+export function markContacted(leadId) {
+  db.prepare("UPDATE leads SET status = 'contacted', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'new'").run(leadId);
+}
+
 export function maskLeads(leads) {
   return leads.map(maskLead);
 }

@@ -4,6 +4,7 @@ import { signTracking } from '../utils/tracking-token.js';
 import { isSuppressed, prepareOutreachEmail, UNSUBSCRIBE_PATH } from './unsubscribe.js';
 import { senderFor } from './account-profile.js';
 import { replyAddressFor } from './reply-routing.js';
+import { markContacted } from './leads.js';
 
 // A design holds text and image URLs (uploads are stored as files), never
 // image data, so a real one is a few kilobytes.
@@ -172,6 +173,7 @@ export const campaignsService = {
           .run('sent', sent?.id || null, campaignId, lead.id);
         db.prepare('INSERT INTO activities (user_id, lead_id, campaign_id, type, description) VALUES (?, ?, ?, ?, ?)')
           .run(userId || campaign.user_id, lead.id, campaignId, 'email', `Sent campaign: ${campaign.name}`);
+        markContacted(lead.id);
         sentCount++;
         results.push({ leadId: lead.id, status: 'sent' });
       } catch (err) {

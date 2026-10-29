@@ -41,6 +41,20 @@ function monthLabel(month) {
 
 const pct = (n, d) => (d > 0 ? Math.round((n / d) * 1000) / 10 : null);
 
+/**
+ * Every email sent to a prospect in [from, to) (SQL timestamps): sequence
+ * steps the dispatcher sent, plus campaign emails. One row per email, with the
+ * lead it went to. The monthly report and the pipeline review both count this.
+ */
+export function emailsSent(userId, from, to) {
+  return db.prepare(`
+    SELECT oq.lead_id FROM outreach_queue oq JOIN campaigns c ON c.id = oq.campaign_id
+     WHERE c.user_id = ? AND oq.channel = 'email' AND oq.status = 'sent' AND oq.sent_at >= ? AND oq.sent_at < ?
+    UNION ALL
+    SELECT lead_id FROM activities WHERE user_id = ? AND type = 'email' AND description LIKE 'Sent campaign:%' AND created_at >= ? AND created_at < ?
+  `).all(userId, from, to, userId, from, to);
+}
+
 export function monthlyReport(userId, month) {
   const { from, to } = monthRange(month);
   const range = [sqlTime(from), sqlTime(to)];
@@ -48,13 +62,7 @@ export function monthlyReport(userId, month) {
 
   const verified = count(`SELECT COUNT(*) c FROM leads WHERE user_id = ? AND source IN ('ai_generated', 'apollo', 'referral')
                             AND created_at >= ? AND created_at < ?`, userId, ...range);
-  // Outreach emails the dispatcher sent, plus one-off campaign sends.
-  const emailed = db.prepare(`
-    SELECT oq.lead_id FROM outreach_queue oq JOIN campaigns c ON c.id = oq.campaign_id
-     WHERE c.user_id = ? AND oq.channel = 'email' AND oq.status = 'sent' AND oq.sent_at >= ? AND oq.sent_at < ?
-    UNION ALL
-    SELECT lead_id FROM activities WHERE user_id = ? AND type = 'email' AND description LIKE 'Sent campaign:%' AND created_at >= ? AND created_at < ?
-  `).all(userId, ...range, userId, ...range);
+  const emailed = emailsSent(userId, ...range);
   const replies = count(`SELECT COUNT(*) c FROM replies WHERE user_id = ? AND received_at >= ? AND received_at < ?
                            AND COALESCE(intent, '') <> 'out_of_office'`, userId, ...range);
   const positive = count(`SELECT COUNT(*) c FROM replies WHERE user_id = ? AND received_at >= ? AND received_at < ?

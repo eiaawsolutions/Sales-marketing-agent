@@ -17,6 +17,7 @@ import { boardFor, BOARD_STAGES } from './pipeline-board.js';
 import { getProfile } from './account-profile.js';
 import { checkPlanLimitForUser, loadPlanUser } from '../middleware/auth.js';
 import { sendEmail } from '../utils/email.js';
+import { emailsSent } from './monthly-report.js';
 
 const DAY = 86400000;
 const sqlTime = (d) => d.toISOString().replace('T', ' ').slice(0, 19);
@@ -72,8 +73,7 @@ export function briefFacts(userId, now = new Date()) {
     },
     last_7_days: {
       verified_leads: count(`SELECT COUNT(*) c FROM leads WHERE user_id = ? AND source IN ('ai_generated', 'apollo', 'referral') AND created_at >= ?`, userId, weekAgo),
-      emails_sent: count(`SELECT COUNT(*) c FROM outreach_queue oq JOIN campaigns c ON c.id = oq.campaign_id
-                           WHERE c.user_id = ? AND oq.channel = 'email' AND oq.status = 'sent' AND oq.sent_at >= ?`, userId, weekAgo),
+      emails_sent: emailsSent(userId, weekAgo, sqlTime(now)).length,
       replies: count(`SELECT COUNT(*) c FROM replies WHERE user_id = ? AND received_at >= ? AND COALESCE(intent, '') <> 'out_of_office'`, userId, weekAgo),
       positive_replies: count(`SELECT COUNT(*) c FROM replies WHERE user_id = ? AND received_at >= ? AND intent IN ('interested', 'referral')`, userId, weekAgo),
       meetings_booked: count(`SELECT COUNT(*) c FROM appointments WHERE user_id = ? AND type IN ('meeting', 'demo', 'call') AND created_at >= ?`, userId, weekAgo),

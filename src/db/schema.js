@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { migrateOmnichannel } from './schema-omnichannel.js';
 import { migrateSuppressions } from './schema-suppressions.js';
-import { migrateOutreach, fitUnsentLinkedinNotes } from './schema-outreach.js';
+import { migrateOutreach, fitUnsentLinkedinNotes, markWrittenToLeadsContacted } from './schema-outreach.js';
 import { migrateTeam } from './schema-team.js';
 import { migrateFlow } from './schema-flow.js';
 import { FOUNDER_HQ_EMAIL } from '../config/hq.js';
@@ -454,6 +454,10 @@ export function initializeDatabase(db) {
   // LinkedIn notes written for the old 300 limit, cut to 200 (once).
   const notesFitted = fitUnsentLinkedinNotes(db);
   if (notesFitted) console.log(`[schema] ${notesFitted} unsent LinkedIn note(s) cut to 200 characters`);
+
+  // Leads emailed while sends left them at New, moved to Contacted (once).
+  const contacted = markWrittenToLeadsContacted(db);
+  if (contacted) console.log(`[schema] ${contacted} lead(s) already written to moved from New to Contacted`);
 
   // Seed system logic from codebase on every startup (auto-update)
   seedSystemLogic(db);

@@ -23,6 +23,7 @@ import { injectTracking, appendFormCta } from './campaigns.js';
 import { isSuppressed, prepareOutreachEmail } from './unsubscribe.js';
 import { senderFor } from './account-profile.js';
 import { replyAddressFor } from './reply-routing.js';
+import { markContacted } from './leads.js';
 
 const BATCH = 20;
 // A row stuck in 'sending' means the process died mid-send. Whether the email
@@ -136,6 +137,7 @@ export async function processOutreachQueue({ campaignId = null } = {}) {
           .run(item.campaign_id, item.lead_id);
         db.prepare('UPDATE campaigns SET sent_count = sent_count + 1 WHERE id = ?')
           .run(item.campaign_id);
+        markContacted(item.lead_id);
         db.prepare('INSERT INTO activities (lead_id, campaign_id, type, description, user_id) VALUES (?, ?, ?, ?, ?)')
           .run(item.lead_id, item.campaign_id, 'email',
             `Auto-outreach Step ${item.step}: ${item.subject || 'Follow-up'}`,
