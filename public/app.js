@@ -25,7 +25,12 @@ let currentUser = null;
 async function apiRequest(url, options = {}) {
   const headers = { ...(options.headers || {}) };
   if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-  const r = await fetch(`/api${url}`, { ...options, headers });
+  let r;
+  try {
+    r = await fetch(`/api${url}`, { ...options, headers });
+  } catch {
+    throw new Error('Could not reach SalesAgent. Check your connection and try again.');
+  }
   if (r.status === 401) {
     let errPayload = null;
     try { errPayload = await r.clone().json(); } catch {}
@@ -37,7 +42,18 @@ async function apiRequest(url, options = {}) {
     render();
     throw new Error(errPayload?.error || 'Session expired. Please log in again.');
   }
-  const data = await r.json();
+  let data;
+  try {
+    data = await r.json();
+  } catch {
+    // While Railway swaps in a new version (a service with a volume can't run
+    // two at once), requests get its own page instead of JSON.
+    if (r.status >= 502 && r.status <= 504) {
+      checkAppVersion();
+      throw new Error('SalesAgent was updating and could not finish that. Wait a minute and try again.');
+    }
+    throw new Error(`Request failed (${r.status})`);
+  }
   if (data.error) throw new Error(data.error);
   if (!r.ok) throw new Error(`Request failed (${r.status})`);
   return data;
