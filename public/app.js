@@ -56,6 +56,12 @@ const api = {
 window.api = api;
 window.esc = esc;
 
+// The ?v= this copy of app.js was loaded with. Read now: currentScript is only
+// set while the script first runs.
+const APP_VERSION = (() => {
+  try { return new URL(document.currentScript.src).searchParams.get('v'); } catch { return null; }
+})();
+
 // ========== State ==========
 let currentPage = 'dashboard';
 let modal = null;
@@ -2554,6 +2560,7 @@ const WIZARD_STEPS = [
 ];
 
 async function startCampaignWizard(editId) {
+  checkAppVersion();
   let campaign = { name: '', type: 'email', subject: '', body: '', target_audience: '' };
   let assignedLeadIds = [];
 
@@ -7249,5 +7256,27 @@ function wizardAttachForm(formId) {
 
 window.openAttachFormModal = openAttachFormModal;
 window.wizardAttachForm = wizardAttachForm;
+
+// A tab left open across a deploy keeps running the old page: on 29 Oct 2026
+// one still showed the starter email in Preview after the fix was live. When
+// the server serves a newer app.js than this one, ask for a reload.
+async function checkAppVersion() {
+  if (!APP_VERSION || document.getElementById('app-update-notice')) return;
+  try {
+    const r = await fetch('/api/health', { cache: 'no-store' });
+    const served = (await r.json()).appVersion;
+    if (!served || served === APP_VERSION) return;
+  } catch { return; }
+  const n = document.createElement('div');
+  n.id = 'app-update-notice';
+  n.setAttribute('role', 'status');
+  n.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:300;display:flex;align-items:center;gap:14px;'
+    + 'max-width:calc(100% - 32px);padding:12px 16px;border-radius:var(--radius);background:var(--text);color:#fff;font-size:14px;box-shadow:0 6px 24px rgba(15,26,29,0.18)';
+  n.innerHTML = '<span>SalesAgent has been updated. Reload to use the latest version (unsaved changes on this page will be lost).</span>'
+    + '<button type="button" class="btn btn-sm btn-primary" onclick="location.reload()">Reload</button>';
+  document.body.appendChild(n);
+}
+window.addEventListener('focus', () => { checkAppVersion(); });
+setInterval(checkAppVersion, 10 * 60 * 1000);
 
 init();

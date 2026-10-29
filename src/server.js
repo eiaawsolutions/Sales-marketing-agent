@@ -42,6 +42,8 @@ import { buildChatbotPrompt } from './prompts/chatbot.js';
 import { getParentFacts } from './services/site-facts.js';
 import { GIT_SHA, BUILT_AT } from './version.js';
 import { resolveModel } from './config/models.js';
+import { appVersionFrom } from './utils/app-version.js';
+import { readFileSync } from 'fs';
 
 // Fingerprint of the voice prompt that /refresh-prompt-with-token pushes to
 // Retell. Computed once at boot — the prompt is a module-level constant.
@@ -52,6 +54,10 @@ const PROMPT_CHARS = SALES_AGENT_PROMPT.length;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+
+// The app.js version this build serves; an open tab compares it with its own.
+let APP_VERSION = null;
+try { APP_VERSION = appVersionFrom(readFileSync(path.join(__dirname, '..', 'public', 'app.html'), 'utf8')); } catch { /* health reports null */ }
 
 // Security headers
 app.use(helmet({
@@ -224,6 +230,7 @@ app.get('/api/health', (req, res) => {
       // expect before refreshing, so you never push a stale/old prompt.
       promptChars: PROMPT_CHARS,
       promptSha: PROMPT_SHA,
+      appVersion: APP_VERSION,
     });
   } catch (e) {
     res.status(503).json({ status: 'error', error: e.message });

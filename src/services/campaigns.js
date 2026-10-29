@@ -23,6 +23,14 @@ export function normalizeDesign(value) {
   return text;
 }
 
+// The designer's untouched starter paragraph (defaultDesign in
+// public/email-designer.js). An email still carrying it was never written.
+const STARTER_TEXT = 'Write your message here. Tell your reader what this email is about and why it matters to them.';
+
+export function isStarterEmail(html) {
+  return String(html || '').includes(STARTER_TEXT);
+}
+
 export const campaignsService = {
   getAll(userId, filters = {}) {
     let query = 'SELECT * FROM campaigns WHERE 1=1';
@@ -71,6 +79,16 @@ export const campaignsService = {
       if (!existing) return null;
     }
 
+    // A page running an older wizard can put the starter email over the one
+    // the campaign already has (29 Oct 2026). A draft still being written may
+    // keep the starter; a written email is never replaced by it.
+    if (isStarterEmail(data.body)) {
+      const current = db.prepare('SELECT body FROM campaigns WHERE id = ?').get(id)?.body;
+      if (current && !isStarterEmail(current)) {
+        throw new Error('This would replace your saved email with the designer\'s sample text ("Write your message here…"). Your email is still saved: reload the page and open the campaign again.');
+      }
+    }
+
     const fields = [];
     const params = [];
     for (const [key, value] of Object.entries(data)) {
@@ -109,6 +127,9 @@ export const campaignsService = {
     if (!campaign) throw new Error('Campaign not found');
     if (campaign.type !== 'email') throw new Error('Only email campaigns can be sent');
     if (!campaign.leads?.length) throw new Error('No leads assigned to campaign');
+    if (isStarterEmail(campaign.body)) {
+      throw new Error('This email still has the designer\'s sample text ("Write your message here…"). Write your message before sending.');
+    }
 
     // Get base URL for tracking
     const baseUrl = db.prepare("SELECT value FROM settings WHERE key = 'base_url'").get()?.value || 'https://sa.eiaawsolutions.com';
