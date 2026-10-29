@@ -1588,6 +1588,11 @@ function endVoiceCall() {
 let lastOutreachSteps = [];
 let lastOutreachLead = null;
 
+// "29 Oct 2026" for a server timestamp (UTC, "YYYY-MM-DD HH:MM:SS").
+function noteSentDay(ts) {
+  return new Date(String(ts).replace(' ', 'T') + 'Z').toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 // LinkedIn stops a connection note at 200 characters (the server cuts notes to
 // fit; this flags one that was written before that).
 const LINKEDIN_NOTE_MAX = 200;
@@ -1610,7 +1615,7 @@ async function aiOutreach(id, campaignId) {
           <div class="type">Step ${Number(s.step) || ''} — ${esc(s.channel === 'linkedin' ? 'LinkedIn note · you send it' : s.channel)} (Day ${Number(s.delay_days) || 0})</div>
           ${s.subject ? `<div><strong>Subject:</strong> ${esc(s.subject)}</div>` : ''}
           <pre>${esc(s.message)}</pre>
-          ${s.channel === 'linkedin' ? linkedinNoteActions(i, s.message, result.linkedin_profile) : ''}
+          ${s.channel === 'linkedin' ? linkedinNoteActions(i, s.message, result.linkedin_profile, result.linkedin_note_sent_at) : ''}
           ${s.goal ? `<div class="text-muted text-sm">Goal: ${esc(s.goal)}</div>` : ''}
         </div>
       `).join('')}
@@ -1622,16 +1627,21 @@ async function aiOutreach(id, campaignId) {
 // One click copies the note and opens the lead's profile in a new tab. LinkedIn
 // has no link straight to its "Add a note" box, so the user clicks Connect,
 // Add a note, and pastes, then comes back to Mark as sent. The profile link is
-// built by the server.
-function linkedinNoteActions(i, message, profile) {
+// built by the server. A lead already invited shows when, not the button:
+// LinkedIn takes one invitation per person.
+function linkedinNoteActions(i, message, profile, sentAt) {
   return `
     <div class="flex gap-1" style="margin-top:8px;align-items:center;flex-wrap:wrap">
       ${profile ? `<a class="btn btn-sm btn-primary" href="${esc(profile)}" target="_blank" rel="noopener noreferrer" onclick="copyOutreachStep(${i}, true)">Copy note &amp; open profile</a>` : ''}
       <button class="btn btn-sm btn-outline" type="button" onclick="copyOutreachStep(${i})">Copy note</button>
-      <button class="btn btn-sm btn-outline" type="button" id="li-sent-${i}" onclick="markOutreachNoteSent(${i})">Mark as sent</button>
+      ${sentAt
+        ? `<button class="btn btn-sm btn-outline" type="button" disabled>Sent ✓ ${esc(noteSentDay(sentAt))}</button>`
+        : `<button class="btn btn-sm btn-outline" type="button" id="li-sent-${i}" onclick="markOutreachNoteSent(${i})">Mark as sent</button>`}
       ${linkedinNoteCount(message)}${profile ? '' : '<span class="text-sm text-muted"> · no LinkedIn profile on file for this lead</span>'}
     </div>
-    <p class="text-sm text-muted" style="margin:6px 0 0">${profile ? 'On their profile: Connect, then Add a note, then paste. ' : ''}Once it is sent, click Mark as sent: it is logged on the lead and the lead moves to Contacted.</p>`;
+    <p class="text-sm text-muted" style="margin:6px 0 0">${sentAt
+      ? `Your note to this lead was marked sent on ${esc(noteSentDay(sentAt))}. LinkedIn takes one invitation per person, so there is nothing more to send here.`
+      : `${profile ? 'On their profile: Connect, then Add a note, then paste. ' : ''}Once it is sent, click Mark as sent: it is logged on the lead, the lead moves to Contacted and shows as sent in the campaign.`}</p>`;
 }
 
 // The note went out from the user's own LinkedIn account.
@@ -1641,10 +1651,10 @@ async function markOutreachNoteSent(i) {
   if (!step || !lastOutreachLead) return;
   if (btn) btn.disabled = true;
   try {
-    const r = await api.post(`/leads/${lastOutreachLead.id}/linkedin-note-sent`, { message: step.message || '' });
+    const r = await api.post(`/leads/${lastOutreachLead.id}/linkedin-note-sent`, { message: step.message || '', campaignId: lastOutreachLead.campaignId ?? null });
     if (btn) btn.textContent = 'Sent ✓';
     showNotification(r.already
-      ? `Already recorded as sent${r.sent_at ? ` on ${new Date(String(r.sent_at).replace(' ', 'T') + 'Z').toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} — LinkedIn takes one invitation per person.`
+      ? `Already recorded as sent${r.sent_at ? ` on ${noteSentDay(r.sent_at)}` : ''} — LinkedIn takes one invitation per person.`
       : 'Note logged on the lead. The lead is now Contacted.', 'success');
     if (lastOutreachLead.campaignId) refreshCampaignLeads(lastOutreachLead.campaignId);
     else if (currentPage === 'leads') loadLeads();

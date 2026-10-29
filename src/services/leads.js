@@ -107,6 +107,16 @@ export function markContacted(leadId) {
   db.prepare("UPDATE leads SET status = 'contacted', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'new'").run(leadId);
 }
 
+// How a LinkedIn note the team sent from their own account is logged on the lead.
+export const LINKEDIN_NOTE_SENT = 'LinkedIn connection note sent from your own account';
+
+// When this lead's LinkedIn note was marked sent, or null. LinkedIn takes one
+// invitation per person, so there is never a second.
+export function linkedinNoteSentAt(leadId) {
+  return db.prepare("SELECT created_at FROM activities WHERE lead_id = ? AND type = 'note' AND description LIKE ? ORDER BY id DESC LIMIT 1")
+    .get(leadId, `${LINKEDIN_NOTE_SENT}%`)?.created_at ?? null;
+}
+
 export function maskLeads(leads) {
   return leads.map(maskLead);
 }

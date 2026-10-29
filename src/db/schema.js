@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { migrateOmnichannel } from './schema-omnichannel.js';
 import { migrateSuppressions } from './schema-suppressions.js';
-import { migrateOutreach, fitUnsentLinkedinNotes, markWrittenToLeadsContacted } from './schema-outreach.js';
+import { migrateOutreach, fitUnsentLinkedinNotes, markWrittenToLeadsContacted, markLinkedinNotesSentInCampaigns } from './schema-outreach.js';
 import { migrateTeam } from './schema-team.js';
 import { migrateFlow } from './schema-flow.js';
 import { FOUNDER_HQ_EMAIL } from '../config/hq.js';
@@ -458,6 +458,10 @@ export function initializeDatabase(db) {
   // Leads emailed while sends left them at New, moved to Contacted (once).
   const contacted = markWrittenToLeadsContacted(db);
   if (contacted) console.log(`[schema] ${contacted} lead(s) already written to moved from New to Contacted`);
+
+  // LinkedIn notes marked sent before they counted in the campaign's lead list (once).
+  const notesCounted = markLinkedinNotesSentInCampaigns(db);
+  if (notesCounted) console.log(`[schema] ${notesCounted} campaign lead(s) with a LinkedIn note sent moved from pending to sent`);
 
   // Seed system logic from codebase on every startup (auto-update)
   seedSystemLogic(db);

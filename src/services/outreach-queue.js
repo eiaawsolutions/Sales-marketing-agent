@@ -7,7 +7,7 @@
 import db from '../db/index.js';
 import { kickDispatch } from './outreach-dispatch.js';
 import { runAgent } from './ai-agent.js';
-import { markContacted } from './leads.js';
+import { markContacted, linkedinNoteSentAt, LINKEDIN_NOTE_SENT } from './leads.js';
 import { LINKEDIN_NOTE_MAX } from '../utils/linkedin-note.js';
 
 const MAX_SUBJECT = 200;
@@ -117,12 +117,19 @@ export function markLinkedinSent({ campaignId, itemId, by }) {
   `).run(by, itemId);
   if (!changes) return 'closed';
   db.prepare("INSERT INTO activities (user_id, lead_id, campaign_id, type, description) VALUES (?, ?, ?, 'note', ?)")
-    .run(item.user_id, item.lead_id, campaignId, NOTE_SENT);
+    .run(item.user_id, item.lead_id, campaignId, LINKEDIN_NOTE_SENT);
   markContacted(item.lead_id);
+  markSentInCampaign(campaignId, item.lead_id);
   return 'ok';
 }
 
-const NOTE_SENT = 'LinkedIn connection note sent from your own account';
+// A note marked sent is the campaign's send to that lead, as an email from the
+// dispatcher is: the campaign's lead list goes from pending to sent. A lead
+// who already opened, clicked or replied keeps that.
+function markSentInCampaign(campaignId, leadId) {
+  db.prepare("UPDATE campaign_leads SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE campaign_id = ? AND lead_id = ? AND status = 'pending'")
+    .run(campaignId, leadId);
+}
 
 /**
  * The team sent a note from the outreach window (not the approval queue) from
@@ -130,14 +137,23 @@ const NOTE_SENT = 'LinkedIn connection note sent from your own account';
  * lead Contacted. LinkedIn takes one invitation per person, so a note already
  * logged for this lead is reported instead of logged twice, and any note still
  * waiting in the account's campaigns is closed: the first records this text as
- * sent, any others are skipped. The caller has checked that the lead is theirs.
+ * sent, any others are skipped. The campaign the window was opened from (when
+ * it is the account's) and the one whose note was closed count it as sent. The
+ * caller has checked that the lead is theirs.
  */
-export function recordLinkedinNoteSent({ userId, leadId, message, by }) {
+export function recordLinkedinNoteSent({ userId, leadId, message, by, campaignId = null }) {
   const text = String(message || '').trim().slice(0, LINKEDIN_NOTE_MAX);
+  const openedFrom = Number.isInteger(campaignId) && db.prepare('SELECT 1 FROM campaigns WHERE id = ? AND user_id = ?').get(campaignId, userId)
+    ? [campaignId] : [];
   return db.transaction(() => {
-    const prior = db.prepare("SELECT created_at FROM activities WHERE lead_id = ? AND type = 'note' AND description LIKE ? ORDER BY id DESC LIMIT 1")
-      .get(leadId, `${NOTE_SENT}%`);
-    if (prior) return { ok: true, already: true, sent_at: prior.created_at };
+    const sentAt = linkedinNoteSentAt(leadId);
+    if (sentAt) {
+      // Logged already (perhaps before a note counted as the campaign's send):
+      // put the stages right, log nothing new.
+      for (const id of openedFrom) markSentInCampaign(id, leadId);
+      markContacted(leadId);
+      return { ok: true, already: true, sent_at: sentAt };
+    }
     const [first, ...rest] = db.prepare(`
       SELECT oq.id, oq.campaign_id FROM outreach_queue oq JOIN campaigns c ON c.id = oq.campaign_id
        WHERE c.user_id = ? AND oq.lead_id = ? AND oq.channel = 'linkedin' AND oq.status IN ('draft', 'pending')
@@ -152,8 +168,9 @@ export function recordLinkedinNoteSent({ userId, leadId, message, by }) {
     }
     for (const r of rest) db.prepare("UPDATE outreach_queue SET status = 'skipped' WHERE id = ?").run(r.id);
     db.prepare("INSERT INTO activities (user_id, lead_id, campaign_id, type, description) VALUES (?, ?, ?, 'note', ?)")
-      .run(userId, leadId, first?.campaign_id ?? null, `${NOTE_SENT}: "${text}"`);
+      .run(userId, leadId, first?.campaign_id ?? null, `${LINKEDIN_NOTE_SENT}: "${text}"`);
     markContacted(leadId);
+    for (const id of new Set([...openedFrom, ...(first ? [first.campaign_id] : [])])) markSentInCampaign(id, leadId);
     return { ok: true, already: false, queue_note_closed: Boolean(first) };
   })();
 }

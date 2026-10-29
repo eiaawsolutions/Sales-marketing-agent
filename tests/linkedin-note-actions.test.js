@@ -81,7 +81,7 @@ async function windowFor(result) {
   };
   vm.createContext(ctx);
   vm.runInContext([
-    'let lastOutreachSteps = []; let lastOutreachLead = null; const LINKEDIN_NOTE_MAX = 200;', fn('esc'), fn('linkedinNoteCount'), fn('aiOutreach', 'async function'), fn('linkedinNoteActions'), fn('copyOutreachStep', 'async function'),
+    'let lastOutreachSteps = []; let lastOutreachLead = null; const LINKEDIN_NOTE_MAX = 200;', fn('esc'), fn('noteSentDay'), fn('linkedinNoteCount'), fn('aiOutreach', 'async function'), fn('linkedinNoteActions'), fn('copyOutreachStep', 'async function'),
   ].join('\n'), ctx);
   await ctx.aiOutreach(30);
   return { ctx, doc: new JSDOM(ctx.shown.html).window.document };

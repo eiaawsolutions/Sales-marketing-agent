@@ -189,7 +189,7 @@ async function outreachWindow(result, answer = { ok: true, already: false }) {
   vm.createContext(ctx);
   vm.runInContext([
     'let lastOutreachSteps = []; let lastOutreachLead = null; let currentPage = "campaigns";', 'const LINKEDIN_NOTE_MAX = 200;',
-    fn('esc'), fn('linkedinNoteCount'), fn('aiOutreach', 'async function'), fn('linkedinNoteActions'),
+    fn('esc'), fn('noteSentDay'), fn('linkedinNoteCount'), fn('aiOutreach', 'async function'), fn('linkedinNoteActions'),
     fn('copyOutreachStep', 'async function'), fn('markOutreachNoteSent', 'async function'),
   ].join('\n'), ctx);
   await ctx.aiOutreach(20, 50);
@@ -204,7 +204,7 @@ test('the outreach window counts against 200 and has Mark as sent', async () => 
   assert.ok(btn, 'a Mark as sent button');
   ctx.refreshed = [];
   await vm.runInContext(btn.getAttribute('onclick'), ctx);
-  assert.deepEqual(JSON.parse(JSON.stringify(ctx.posts)), [{ p: '/leads/20/linkedin-note-sent', body: { message: note } }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.posts)), [{ p: '/leads/20/linkedin-note-sent', body: { message: note, campaignId: 50 } }]);
   assert.equal(btn.disabled, true);
   assert.match(btn.textContent, /Sent/);
   assert.match(ctx.notes.at(-1).msg, /Contacted/);

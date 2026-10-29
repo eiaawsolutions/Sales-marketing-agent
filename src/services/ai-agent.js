@@ -5,6 +5,7 @@ import db from '../db/index.js';
 import { leadSourcesService } from './lead-sources.js';
 import { normalizePhone, normalizeLinkedIn, isPersonLinkedIn, isRoleMailbox } from '../utils/normalize.js';
 import { fitLinkedinNote, LINKEDIN_NOTE_RULE } from '../utils/linkedin-note.js';
+import { linkedinNoteSentAt } from './leads.js';
 import { appendNote } from './lead-identity.js';
 import { DEFAULT_MODEL, resolveModel } from '../config/models.js';
 import { resolveAnthropicKey } from '../config/ai-key.js';
@@ -1014,7 +1015,7 @@ ${ctaUrl ? `- Include ${ctaUrl} as the link in two of the emails.` : '- Where a 
     'INSERT INTO activities (lead_id, type, description) VALUES (?, ?, ?)'
   ).run(lead.id, 'ai_action', `AI generated ${sequence.length}-step outreach sequence`);
 
-  return { ...result, sequence, linkedin_profile: linkedinProfileLink(lead) };
+  return { ...result, sequence, linkedin_profile: linkedinProfileLink(lead), linkedin_note_sent_at: linkedinNoteSentAt(lead.id) };
 }
 
 // ── Replies ──────────────────────────────────────────────────────────────

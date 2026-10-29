@@ -65,6 +65,24 @@ export function markWrittenToLeadsContacted(db) {
   })();
 }
 
+// LinkedIn notes marked sent before a note counted as the campaign's send left
+// the lead at "pending" in that campaign's lead list. Moves them to sent, dated
+// when the note went. Runs once. Returns how many moved.
+export function markLinkedinNotesSentInCampaigns(db) {
+  const KEY = 'migration_linkedin_notes_sent_in_campaigns';
+  if (db.prepare('SELECT 1 FROM settings WHERE key = ?').get(KEY)) return 0;
+  const sentNote = `FROM outreach_queue oq WHERE oq.campaign_id = campaign_leads.campaign_id AND oq.lead_id = campaign_leads.lead_id
+                      AND oq.channel = 'linkedin' AND oq.status = 'sent'`;
+  return db.transaction(() => {
+    const { changes } = db.prepare(`
+      UPDATE campaign_leads SET status = 'sent', sent_at = COALESCE(sent_at, (SELECT MIN(oq.sent_at) ${sentNote}))
+       WHERE status = 'pending' AND EXISTS (SELECT 1 ${sentNote})
+    `).run();
+    db.prepare("INSERT INTO settings (key, value) VALUES (?, datetime('now'))").run(KEY);
+    return changes;
+  })();
+}
+
 export function migrateOutreach(db) {
   rebuild(db, {
     table: 'outreach_queue',
