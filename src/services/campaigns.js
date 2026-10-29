@@ -5,6 +5,24 @@ import { isSuppressed, prepareOutreachEmail, UNSUBSCRIBE_PATH } from './unsubscr
 import { senderFor } from './account-profile.js';
 import { replyAddressFor } from './reply-routing.js';
 
+// A design holds text and image URLs (uploads are stored as files), never
+// image data, so a real one is a few kilobytes.
+const MAX_DESIGN_CHARS = 200_000;
+
+// The email designer's blocks, as the JSON text stored in campaigns.design.
+// Empty means "no design"; anything that is not the designer's JSON is refused.
+export function normalizeDesign(value) {
+  if (value == null || value === '') return null;
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  if (text.length > MAX_DESIGN_CHARS) throw new Error('The email design is too large to save.');
+  let parsed;
+  try { parsed = JSON.parse(text); } catch { throw new Error('The email design could not be read.'); }
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.blocks)) {
+    throw new Error('The email design could not be read.');
+  }
+  return text;
+}
+
 export const campaignsService = {
   getAll(userId, filters = {}) {
     let query = 'SELECT * FROM campaigns WHERE 1=1';
@@ -35,13 +53,14 @@ export const campaignsService = {
 
   create(userId, campaign) {
     const result = db.prepare(`
-      INSERT INTO campaigns (user_id, name, type, subject, body, target_audience, scheduled_at, budget_limit, form_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO campaigns (user_id, name, type, subject, body, target_audience, scheduled_at, budget_limit, form_id, design)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       userId, campaign.name, campaign.type, campaign.subject,
       campaign.body, campaign.target_audience, campaign.scheduled_at,
       campaign.budget_limit || 0,
-      campaign.form_id ? parseInt(campaign.form_id) : null
+      campaign.form_id ? parseInt(campaign.form_id) : null,
+      normalizeDesign(campaign.design)
     );
     return this.getById(null, result.lastInsertRowid);
   },
@@ -55,9 +74,9 @@ export const campaignsService = {
     const fields = [];
     const params = [];
     for (const [key, value] of Object.entries(data)) {
-      if (['name', 'type', 'status', 'subject', 'body', 'target_audience', 'scheduled_at', 'budget_limit', 'form_id'].includes(key)) {
+      if (['name', 'type', 'status', 'subject', 'body', 'target_audience', 'scheduled_at', 'budget_limit', 'form_id', 'design'].includes(key)) {
         fields.push(`${key} = ?`);
-        params.push(key === 'form_id' ? (value ? parseInt(value) : null) : value);
+        params.push(key === 'form_id' ? (value ? parseInt(value) : null) : key === 'design' ? normalizeDesign(value) : value);
       }
     }
     if (fields.length === 0) return this.getById(null, id);

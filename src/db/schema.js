@@ -378,6 +378,10 @@ export function initializeDatabase(db) {
   // Form creator: attach a form to a campaign
   try { db.exec("ALTER TABLE campaigns ADD COLUMN form_id INTEGER"); } catch (e) { /* exists */ }
 
+  // The email designer's blocks (JSON) beside the HTML they compile to, so
+  // Edit reopens the same layout instead of the designer's starter email.
+  try { db.exec("ALTER TABLE campaigns ADD COLUMN design TEXT"); } catch (e) { /* exists */ }
+
   // Account lockout columns. The previous design relied solely on the per-IP
   // rate limit, which is bypassable from a residential proxy pool — 256 IPs
   // = 2,560 attempts/15min against a single account. The username-bound

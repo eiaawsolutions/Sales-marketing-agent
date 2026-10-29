@@ -2573,14 +2573,25 @@ async function startCampaignWizard(editId) {
       target_audience: campaign.target_audience || '',
       budget_limit: campaign.budget_limit || 0,
       form_id: campaign.form_id || null,
-      // design state — only populated when user opens email designer
-      design: null,
+      design: editId ? loadSavedDesign(campaign) : null,
     },
     selectedLeads: assignedLeadIds,
     allLeads: [],
   });
 
   renderCampaignWizard();
+}
+
+// The designer's blocks for a saved email campaign. Campaigns saved before the
+// design was stored have only the compiled HTML; the designer reads its blocks
+// back out of that. Null means the email was not made in the designer, and it
+// opens as HTML — never as the designer's starter email.
+function loadSavedDesign(campaign) {
+  if (campaign.type !== 'email') return null;
+  if (campaign.design) {
+    try { return JSON.parse(campaign.design); } catch (_) { /* read it from the HTML instead */ }
+  }
+  return campaign.body && window.EmailDesigner ? window.EmailDesigner.fromHtml(campaign.body) : null;
 }
 
 function renderCampaignWizard() {
@@ -2734,7 +2745,8 @@ function renderWizardStepContent(step) {
               <label>Email Body (HTML)</label>
               <textarea id="wz-body" style="min-height:240px;font-family:monospace;font-size:12px"
                 oninput="wizardState.data.body=this.value">${esc(d.body)}</textarea>
-              <small class="text-muted">This campaign was created with the legacy editor. Save and re-create to use the new designer.</small>
+              <small class="text-muted">This email was not made in the designer, so it opens as HTML.</small>
+              <div style="margin-top:8px"><button class="btn btn-sm btn-outline" type="button" onclick="wizardPreviewEmail()">&#128065; Preview email</button></div>
             </div>
             <div class="wizard-ai-box">
               <div style="flex:1">
@@ -2923,7 +2935,7 @@ function renderWizardReview() {
         <div class="wizard-review-value">
           ${d.type === 'email'
             ? (d.body
-                ? `<button class="btn btn-sm btn-outline" type="button" onclick="window.EmailDesigner && window.EmailDesigner.openPreview(wizardState.data.design)">&#128065; Preview email</button>`
+                ? `<button class="btn btn-sm btn-outline" type="button" onclick="wizardPreviewEmail()">&#128065; Preview email</button>`
                 : '<span class="text-muted">No content yet — go back to the Content step.</span>')
             : (d.body ? `<div class="wizard-review-content">${esc(d.body.substring(0, 300))}${d.body.length > 300 ? '...' : ''}</div>` : '<span class="text-muted">No content</span>')
           }
@@ -2961,6 +2973,15 @@ function renderWizardReview() {
       </div>
     ` : ''}
   `;
+}
+
+// Shows what the leads will get: the designer's blocks, or the saved HTML
+// itself for an email the designer did not make.
+function wizardPreviewEmail() {
+  const d = wizardState.data;
+  if (!window.EmailDesigner) return;
+  if (d.design) window.EmailDesigner.openPreview(d.design);
+  else window.EmailDesigner.openPreviewHtml(d.body);
 }
 
 // Wizard Navigation
@@ -3057,6 +3078,20 @@ async function wizardAiGenerate() {
   }
 }
 
+// The designer's blocks travel with the HTML they compile to, so Edit reopens
+// the same layout. An email the designer did not make sends none, which
+// leaves any saved design untouched.
+function wizardPayload(d) {
+  const payload = {
+    name: d.name, type: d.type, subject: d.subject,
+    body: d.body, target_audience: d.target_audience,
+    budget_limit: d.budget_limit || 0,
+    form_id: d.form_id || null,
+  };
+  if (d.type === 'email' && d.design) payload.design = JSON.stringify(d.design);
+  return payload;
+}
+
 async function wizardSave(action) {
   wizardSaveCurrentStepData();
   const d = wizardState.data;
@@ -3075,12 +3110,7 @@ async function wizardSave(action) {
 
   try {
     let campaign;
-    const payload = {
-      name: d.name, type: d.type, subject: d.subject,
-      body: d.body, target_audience: d.target_audience,
-      budget_limit: d.budget_limit || 0,
-      form_id: d.form_id || null,
-    };
+    const payload = wizardPayload(d);
 
     if (wizardState.editId) {
       campaign = await api.put(`/campaigns/${wizardState.editId}`, payload);

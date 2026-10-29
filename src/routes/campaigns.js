@@ -184,9 +184,13 @@ router.put('/:id', (req, res) => {
   if (status !== undefined && req.user.role !== 'superadmin') {
     return res.status(400).json({ error: 'Use PATCH /:id/status to change campaign status' });
   }
-  const campaign = campaignsService.update(userId, req.params.id, req.user.role === 'superadmin' ? req.body : rest);
-  if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
-  res.json(campaign);
+  try {
+    const campaign = campaignsService.update(userId, req.params.id, req.user.role === 'superadmin' ? req.body : rest);
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+    res.json(campaign);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // PATCH /:id/status — change campaign lifecycle status with state-machine enforcement.

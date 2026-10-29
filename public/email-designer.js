@@ -83,7 +83,9 @@
     defaultDesign,
     render: renderDesigner,
     compile: compileEmail,
+    fromHtml: designFromHtml,
     openPreview: openPreview,
+    openPreviewHtml: openPreviewHtml,
   };
 
   // ------------- Rendering --------------------------------------------------
@@ -758,6 +760,22 @@
 </html>`;
   }
 
+  const PARAGRAPH_STYLE = 'margin:0 0 14px 0;';
+
+  // A link typed into a paragraph becomes a real link, so it can be clicked
+  // and the click tracker counts it. Only https, as in outreach-dispatch.js.
+  const URL_RE = /https:\/\/[^\s<>"']+[^\s<>"'.,;:!?)]/g;
+  function linkify(text, color) {
+    let out = '';
+    let last = 0;
+    for (const m of text.matchAll(URL_RE)) {
+      out += esc(text.slice(last, m.index))
+        + `<a href="${escAttr(m[0])}" style="color:${escAttr(color)};text-decoration:underline;">${esc(m[0])}</a>`;
+      last = m.index + m[0].length;
+    }
+    return out + esc(text.slice(last));
+  }
+
   function renderBlockHtml(b, brand) {
     const safeFont = brand.font;
     switch (b.type) {
@@ -769,7 +787,7 @@
         return `<tr><td align="${b.align || 'left'}" style="padding:6px 0;font-family:${escAttr(safeFont)};color:${escAttr(brand.textColor)};font-size:18px;line-height:1.35;font-weight:700;">${esc(b.text)}</td></tr>`;
       case 'p': {
         const paragraphs = String(b.text || '').split(/\n\s*\n/).map(p =>
-          `<p style="margin:0 0 14px 0;">${esc(p).replace(/\n/g, '<br>')}</p>`
+          `<p style="${PARAGRAPH_STYLE}">${linkify(p, brand.accentColor).replace(/\n/g, '<br>')}</p>`
         ).join('');
         return `<tr><td align="${b.align || 'left'}" style="padding:6px 0;font-family:${escAttr(safeFont)};color:${escAttr(brand.textColor)};font-size:16px;line-height:1.7;">${paragraphs}</td></tr>`;
       }
@@ -800,14 +818,124 @@
     }
   }
 
+  // ------------- Read a compiled email back into a design -------------------
+  // compileEmail's output carries everything the editor needs, so an email
+  // saved before campaigns stored their design still reopens in the editor.
+  // Returns null for HTML the designer did not make.
+  const HEADING_SIZES = { '30px': 'h1', '22px': 'h2', '18px': 'h3' };
+  const SOCIAL_LABELS = { FB: 'facebook', IG: 'instagram', in: 'linkedin', X: 'x', YT: 'youtube' };
+
+  function cssValue(el, prop) {
+    const m = String((el && el.getAttribute('style')) || '').match(new RegExp('(?:^|;)\\s*' + prop + ':\\s*([^;]+)'));
+    return m ? m[1].trim() : '';
+  }
+
+  function paragraphText(p) {
+    return Array.from(p.childNodes).map(n => (n.nodeName === 'BR' ? '\n' : n.textContent)).join('');
+  }
+
+  function blockFromCell(td) {
+    const align = td.getAttribute('align') || 'left';
+    const heading = HEADING_SIZES[cssValue(td, 'font-size')];
+    if (heading) return { id: uid(), type: heading, text: td.textContent, align };
+    if (cssValue(td, 'font-size') === '16px') {
+      const kids = Array.from(td.children);
+      if (kids.length && kids.every(k => k.tagName === 'P' && k.getAttribute('style') === PARAGRAPH_STYLE)) {
+        return { id: uid(), type: 'p', text: kids.map(paragraphText).join('\n\n'), align };
+      }
+      return { id: uid(), type: 'html', html: td.innerHTML };
+    }
+    if (cssValue(td, 'height')) return { id: uid(), type: 'spacer', height: parseInt(cssValue(td, 'height'), 10) || 24 };
+    const button = td.querySelector('table a');
+    if (button) {
+      const pad = cssValue(button, 'padding').match(/^(\d+)px (\d+)px$/);
+      const size = Object.keys(BTN_SIZES).find(k => pad && BTN_SIZES[k].padY === +pad[1] && BTN_SIZES[k].padX === +pad[2]) || 'md';
+      return {
+        id: uid(), type: 'cta', text: button.textContent, url: button.getAttribute('href') || '',
+        bg: button.parentElement.getAttribute('bgcolor') || '', color: cssValue(button, 'color'),
+        font: cssValue(button, 'font-family'), size, align: td.getAttribute('align') || 'center',
+      };
+    }
+    const img = td.querySelector('img');
+    if (img) return { id: uid(), type: 'image', url: img.getAttribute('src') || '', alt: img.getAttribute('alt') || '' };
+    if (td.querySelector('div')) return { id: uid(), type: 'divider' };
+    return null;
+  }
+
+  function footerFromCell(td, footer, brand) {
+    const plain = [];
+    for (const div of Array.from(td.children)) {
+      const style = div.getAttribute('style');
+      if (!style) plain.push(div.textContent);
+      else if (/font-weight:600/.test(style)) footer.companyName = div.textContent;
+      else if (/font-size:12px/.test(style)) {
+        const a = div.querySelector('a');
+        footer.unsubscribeText = a ? a.textContent : '';
+        footer.unsubscribeUrl = a ? a.getAttribute('href') || '' : '';
+      } else {
+        for (const a of Array.from(div.querySelectorAll('a'))) {
+          const key = SOCIAL_LABELS[a.textContent.trim()];
+          if (key) footer.social[key] = a.getAttribute('href') || '';
+          if (cssValue(a, 'background')) brand.accentColor = cssValue(a, 'background');
+        }
+      }
+    }
+    // Address and phone are both plain lines, address first. A lone line is
+    // the phone when it reads like a number.
+    if (plain.length >= 2) [footer.address, footer.phone] = plain;
+    else if (plain.length === 1 && /^\+?[\d\s()\-.]{6,}$/.test(plain[0])) footer.phone = plain[0];
+    else if (plain.length === 1) footer.address = plain[0];
+  }
+
+  function designFromHtml(html) {
+    try {
+      if (!html || typeof DOMParser === 'undefined') return null;
+      const doc = new DOMParser().parseFromString(String(html), 'text/html');
+      const card = doc.querySelector('table.ed-card');
+      if (!card) return null;
+      const cellStarting = (prefix) => Array.from(card.rows).map(r => r.cells[0]).find(td => td && String(td.getAttribute('style') || '').startsWith(prefix));
+      const blocksTable = cellStarting('padding:8px 24px 24px 24px')?.querySelector('table');
+      if (!blocksTable) return null;
+
+      const d = defaultDesign();
+      d.mode = 'scratch';
+      d.brand.bgColor = cssValue(doc.body, 'background') || d.brand.bgColor;
+      d.brand.font = cssValue(doc.body, 'font-family') || d.brand.font;
+      d.brand.textColor = cssValue(doc.body, 'color') || d.brand.textColor;
+
+      const headerCell = cellStarting('padding:24px 24px 8px 24px');
+      const logo = headerCell && headerCell.querySelector('img');
+      d.brand.logoUrl = logo ? logo.getAttribute('src') || '' : '';
+      d.header.align = (headerCell && headerCell.getAttribute('align')) || d.header.align;
+
+      d.blocks = Array.from(blocksTable.rows).map(r => r.cells[0] && blockFromCell(r.cells[0])).filter(Boolean);
+      const paragraphLink = blocksTable.querySelector(`p[style="${PARAGRAPH_STYLE}"] > a`);
+      if (cssValue(paragraphLink, 'color')) d.brand.accentColor = cssValue(paragraphLink, 'color');
+
+      const footerCell = Array.from(card.rows).map(r => r.cells[0]).find(td => td && /border-top:1px solid #E8DFCC/.test(td.getAttribute('style') || ''));
+      const logoAlt = logo && logo.getAttribute('alt') !== 'Logo' ? logo.getAttribute('alt') || '' : '';
+      d.footer = { ...d.footer, show: !!footerCell, companyName: logoAlt, address: '', phone: '',
+        social: { facebook: '', instagram: '', linkedin: '', x: '', youtube: '' }, unsubscribeText: '', unsubscribeUrl: '' };
+      if (footerCell) footerFromCell(footerCell, d.footer, d.brand);
+      return d;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ------------- Preview modal ----------------------------------------------
+  // Previewing never changes the campaign: with no design it shows the
+  // starter design without putting it into the wizard.
   function openPreview(d) {
+    openPreviewHtml(compileEmail(d || defaultDesign()));
+  }
+
+  function openPreviewHtml(html) {
     let modal = document.getElementById('ed-preview-modal');
     if (modal) modal.remove();
     modal = document.createElement('div');
     modal.id = 'ed-preview-modal';
     modal.className = 'ed-preview-overlay';
-    const html = compileEmail(d || ensureDesign());
     modal.innerHTML = `
       <div class="ed-preview-shell" onclick="event.stopPropagation()">
         <div class="ed-preview-bar">
@@ -826,7 +954,7 @@
     modal.addEventListener('click', () => window.EmailDesigner_closePreview());
     document.body.appendChild(modal);
     const iframe = document.getElementById('ed-preview-iframe');
-    iframe.srcdoc = html;
+    iframe.srcdoc = String(html || '');
   }
 
   window.EmailDesigner_setPreviewWidth = function (btn, w) {
