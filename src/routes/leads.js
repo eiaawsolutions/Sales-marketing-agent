@@ -6,6 +6,7 @@ import db from '../db/index.js';
 import { handleReply, sendReply } from '../services/replies.js';
 import { startBriefSearch } from '../services/lead-search.js';
 import { getJob } from '../services/jobs.js';
+import { recordLinkedinNoteSent } from '../services/outreach-queue.js';
 
 const router = Router();
 
@@ -144,6 +145,17 @@ router.post('/:id/outreach', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// POST /api/leads/:id/linkedin-note-sent — the team sent the note from the
+// outreach window from their own LinkedIn account: log it, mark the lead
+// Contacted, close any note still waiting in a campaign.
+router.post('/:id/linkedin-note-sent', (req, res) => {
+  const lead = requireOwnedLead(req, res);
+  if (!lead) return;
+  const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+  if (!message) return res.status(400).json({ error: 'The note is empty.' });
+  res.json(recordLinkedinNoteSent({ userId: lead.user_id, leadId: lead.id, message, by: req.user.memberId ?? req.user.id }));
 });
 
 // POST /api/leads/:id/reply — log a prospect's reply (pasted from the inbox):

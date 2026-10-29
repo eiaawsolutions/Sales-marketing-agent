@@ -86,11 +86,11 @@ test('a lead without a LinkedIn profile gets no LinkedIn step, whatever the mode
   assert.deepEqual(rows(21).map(r => r.channel), ['email', 'email', 'email']);
 });
 
-test('a LinkedIn note over 300 characters is cut back to fit', async () => {
+test('a LinkedIn note over 200 characters is cut back to fit', async () => {
   agent.setChat(async () => sequenceReply({ note: LONG_NOTE }));
   await runAgent(2, 'auto_outreach', { campaignId: 50 });
   const note = rows(20).find(r => r.channel === 'linkedin');
-  assert.ok(note.message.length <= 300, `got ${note.message.length}`);
+  assert.ok(note.message.length <= 200, `got ${note.message.length}`);
 });
 
 test('only phrases that are really in the message are kept as personalised', async () => {

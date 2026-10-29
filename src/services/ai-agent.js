@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import db from '../db/index.js';
 import { leadSourcesService } from './lead-sources.js';
 import { normalizePhone, normalizeLinkedIn, isPersonLinkedIn, isRoleMailbox } from '../utils/normalize.js';
+import { fitLinkedinNote, LINKEDIN_NOTE_RULE } from '../utils/linkedin-note.js';
 import { appendNote } from './lead-identity.js';
 import { DEFAULT_MODEL, resolveModel } from '../config/models.js';
 import { resolveAnthropicKey } from '../config/ai-key.js';
@@ -994,8 +995,8 @@ ${input.context || input.valueProposition ? fenceUntrusted('extra_context', { co
 
 Rules:
 - ${String(lead.email || '').trim()
-    ? '4 steps: an email on day 0, a LinkedIn connection note on day 1 (under 300 characters, no link — the sender sends it from their own account), an email on day 3 and an email on day 7.'
-    : 'This lead has no email address. 1 step: a LinkedIn connection note on day 0 (under 300 characters, no link — the sender sends it from their own account), and no emails.'}
+    ? `4 steps: an email on day 0, a LinkedIn connection note on day 1 (${LINKEDIN_NOTE_RULE}), an email on day 3 and an email on day 7.`
+    : `This lead has no email address. 1 step: a LinkedIn connection note on day 0 (${LINKEDIN_NOTE_RULE}), and no emails.`}
 - Write as the sender in sender_brief, about the offer in sender_brief only. Personalise from the lead's signals; never make up news about them.
 - ${CLAIMS_RULE}
 - Tone: ${seller.tone}. Plain text, short, one call to action.
@@ -1004,7 +1005,7 @@ ${ctaUrl ? `- Include ${ctaUrl} as the link in two of the emails.` : '- Where a 
     { maxTokens: 6000 }
   );
 
-  // The note goes into a LinkedIn connection request: cut to its 300 characters.
+  // The note goes into a LinkedIn connection request: cut to its 200 characters.
   const sequence = (Array.isArray(result?.sequence) ? result.sequence : []).map(s => (
     s && s.channel === 'linkedin' && typeof s.message === 'string' ? { ...s, message: fitLinkedinNote(s.message) } : s
   ));
@@ -1560,17 +1561,7 @@ export function linkedinProfileLink(lead) {
   return null;
 }
 
-// LinkedIn caps a connection note at 300 characters. No links: the team
-// sends it from their own account, and a link reads as spam there.
-export const LINKEDIN_NOTE_MAX = 300;
-export function fitLinkedinNote(text) {
-  const s = String(text || '').replace(/\{\{CALL_LINK\}\}/g, '').replace(/https?:\/\/\S+/g, '').replace(/[ \t]+/g, ' ').trim();
-  if (s.length <= LINKEDIN_NOTE_MAX) return s;
-  const cut = s.slice(0, LINKEDIN_NOTE_MAX);
-  const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '), cut.endsWith('.') ? cut.length - 1 : -1);
-  if (end > LINKEDIN_NOTE_MAX / 2) return cut.slice(0, end + 1).trim();
-  return cut.slice(0, cut.lastIndexOf(' ')).trim();
-}
+export { fitLinkedinNote, LINKEDIN_NOTE_MAX } from '../utils/linkedin-note.js';
 
 // What was personalised: phrases the model says came from the lead's signals
 // or from the brief, kept only if they appear verbatim in the message, never
@@ -1690,7 +1681,7 @@ ${leadsData}
 Return JSON: { "sequences": [ { "lead_name": "exact name from leads_data", "steps": [ { "step": 1, "channel": "email", "delay_days": 0, "subject": "...", "message": "...", "goal": "...", "personalised": ["..."], "from_brief": ["..."] } ] } ] }
 
 Rules:
-- Each lead's sequence, in order: an email on day 0; then, ONLY if that lead's has_linkedin is true, a LinkedIn connection note on day 1 (channel "linkedin", no subject, under 300 characters, no link — the sender sends it from their own LinkedIn account); then an email on day 3 and an email on day 7. Number the steps 1, 2, 3… in that order.
+- Each lead's sequence, in order: an email on day 0; then, ONLY if that lead's has_linkedin is true, a LinkedIn connection note on day 1 (channel "linkedin", no subject, ${LINKEDIN_NOTE_RULE}); then an email on day 3 and an email on day 7. Number the steps 1, 2, 3… in that order.
 - A lead whose has_email is false has no email address: their sequence is that LinkedIn connection note alone, on day 0, and no emails.
 - Write as the sender in sender_brief, about the offer in sender_brief only. Sign off with the sender's name.
 - Personalise each first email and the LinkedIn note from that lead's signals (what their company is doing now). If a lead has no signals, use their role and company — never make up news about them. If a lead's signals include a Referral line, the first email opens by saying who suggested getting in touch.
@@ -1737,7 +1728,7 @@ Rules:
         steps.forEach((step, i) => {
           // Emails carry the lead's voice link (placeholder replaced, or the
           // standard line added if the model left it out). A LinkedIn note
-          // carries no link and is cut to LinkedIn's 300 characters.
+          // carries no link and is cut to LinkedIn's 200 characters.
           const isNote = step.channel === 'linkedin';
           const msg = isNote ? fitLinkedinNote(step.message) : withVoiceLink(step.message, seller, callUrl);
           const highlights = keepHighlights(msg, step.personalised, step.from_brief);
@@ -1807,7 +1798,7 @@ Rules:
 - Write as the sender in sender_brief, about the offer in sender_brief only. Never make up news about the lead.
 - ${CLAIMS_RULE}
 - Tone: ${seller.tone}. Plain text, no markdown, one call to action.
-- ${isNote ? 'Under 300 characters. No link, no subject.' : 'Keep the literal placeholder {{CALL_LINK}} exactly once, and keep the sign-off.'}
+- ${isNote ? `The note: ${LINKEDIN_NOTE_RULE}. No subject.` : 'Keep the literal placeholder {{CALL_LINK}} exactly once, and keep the sign-off.'}
 - "personalised" lists the short phrases in the new message that came from the lead's signals, "from_brief" those from sender_brief, each copied character for character.
 
 Return JSON: {"subject": "${isNote ? '' : '...'}", "message": "...", "personalised": ["..."], "from_brief": ["..."]}`,

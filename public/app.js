@@ -1586,12 +1586,24 @@ function endVoiceCall() {
 // The steps of the sequence on screen, so its buttons copy text by index
 // rather than carrying AI-written text inside an onclick attribute.
 let lastOutreachSteps = [];
+let lastOutreachLead = null;
+
+// LinkedIn stops a connection note at 200 characters (the server cuts notes to
+// fit; this flags one that was written before that).
+const LINKEDIN_NOTE_MAX = 200;
+function linkedinNoteCount(message) {
+  const n = String(message || '').length;
+  return n > LINKEDIN_NOTE_MAX
+    ? `<span class="text-sm" style="color:var(--danger)">${n} / ${LINKEDIN_NOTE_MAX} characters — too long, LinkedIn stops at ${LINKEDIN_NOTE_MAX}</span>`
+    : `<span class="text-sm text-muted">${n} / ${LINKEDIN_NOTE_MAX} characters</span>`;
+}
 
 async function aiOutreach(id, campaignId) {
   showNotification('Generating outreach sequence...');
   try {
     const result = await api.post(`/leads/${id}/outreach`, {});
     lastOutreachSteps = result.sequence || [];
+    lastOutreachLead = { id, campaignId };
     showResultModal('AI Outreach Sequence', `
       ${lastOutreachSteps.map((s, i) => `
         <div class="content-card">
@@ -1609,15 +1621,37 @@ async function aiOutreach(id, campaignId) {
 
 // One click copies the note and opens the lead's profile in a new tab. LinkedIn
 // has no link straight to its "Add a note" box, so the user clicks Connect,
-// Add a note, and pastes. The profile link is built by the server.
+// Add a note, and pastes, then comes back to Mark as sent. The profile link is
+// built by the server.
 function linkedinNoteActions(i, message, profile) {
   return `
     <div class="flex gap-1" style="margin-top:8px;align-items:center;flex-wrap:wrap">
       ${profile ? `<a class="btn btn-sm btn-primary" href="${esc(profile)}" target="_blank" rel="noopener noreferrer" onclick="copyOutreachStep(${i}, true)">Copy note &amp; open profile</a>` : ''}
       <button class="btn btn-sm btn-outline" type="button" onclick="copyOutreachStep(${i})">Copy note</button>
-      <span class="text-sm text-muted">${String(message || '').length} / 300 characters${profile ? '' : ' · no LinkedIn profile on file for this lead'}</span>
+      <button class="btn btn-sm btn-outline" type="button" id="li-sent-${i}" onclick="markOutreachNoteSent(${i})">Mark as sent</button>
+      ${linkedinNoteCount(message)}${profile ? '' : '<span class="text-sm text-muted"> · no LinkedIn profile on file for this lead</span>'}
     </div>
-    ${profile ? '<p class="text-sm text-muted" style="margin:6px 0 0">On their profile: Connect, then Add a note, then paste.</p>' : ''}`;
+    <p class="text-sm text-muted" style="margin:6px 0 0">${profile ? 'On their profile: Connect, then Add a note, then paste. ' : ''}Once it is sent, click Mark as sent: it is logged on the lead and the lead moves to Contacted.</p>`;
+}
+
+// The note went out from the user's own LinkedIn account.
+async function markOutreachNoteSent(i) {
+  const step = lastOutreachSteps[i];
+  const btn = document.getElementById(`li-sent-${i}`);
+  if (!step || !lastOutreachLead) return;
+  if (btn) btn.disabled = true;
+  try {
+    const r = await api.post(`/leads/${lastOutreachLead.id}/linkedin-note-sent`, { message: step.message || '' });
+    if (btn) btn.textContent = 'Sent ✓';
+    showNotification(r.already
+      ? `Already recorded as sent${r.sent_at ? ` on ${new Date(String(r.sent_at).replace(' ', 'T') + 'Z').toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} — LinkedIn takes one invitation per person.`
+      : 'Note logged on the lead. The lead is now Contacted.', 'success');
+    if (lastOutreachLead.campaignId) refreshCampaignLeads(lastOutreachLead.campaignId);
+    else if (currentPage === 'leads') loadLeads();
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    showNotification('Error: ' + e.message, 'error');
+  }
 }
 
 async function copyOutreachStep(i, openingProfile) {
@@ -2490,7 +2524,7 @@ async function showOutreachQueue(campaignId) {
             <div class="text-sm" style="line-height:1.55;margin-top:4px">${renderHighlighted(s.message, s.highlights)}</div>
             ${isNote ? `
               <div class="flex gap-1" style="margin-top:6px;align-items:center;flex-wrap:wrap">
-                <span class="text-sm text-muted">${String(s.message || '').length} / 300 characters · you paste and send this from your own LinkedIn account</span>
+                ${linkedinNoteCount(s.message)}<span class="text-sm text-muted"> · you paste and send this from your own LinkedIn account</span>
                 <button class="btn btn-sm btn-outline" onclick="copyOutreachText(${campaignId}, ${id})">Copy note</button>
                 ${profile ? `<a class="btn btn-sm btn-outline" href="${esc(profile)}" target="_blank" rel="noopener noreferrer">Open profile</a>` : ''}
                 ${s.status === 'draft' || s.status === 'pending' ? `<button class="btn btn-sm btn-outline" onclick="markLinkedinSent(${campaignId}, ${id})">Mark as sent</button>` : ''}
@@ -2580,8 +2614,8 @@ function editOutreachDraft(campaignId, itemId) {
     title: `Edit draft — step ${Number(item.step)} to ${esc(item.lead_name)}`,
     body: `
       <div class="form-group"><label>Subject</label><input id="od-subject" value="${esc(item.subject || '')}" maxlength="200"></div>
-      <div class="form-group"><label>Message</label><textarea id="od-message" style="min-height:220px">${esc(item.message || '')}</textarea></div>
-      <p class="text-sm text-muted">Keep the voice-call link if you want the prospect to be able to talk to your assistant.</p>`,
+      <div class="form-group"><label>Message</label><textarea id="od-message" style="min-height:220px"${item.channel === 'linkedin' ? ` maxlength="${LINKEDIN_NOTE_MAX}"` : ''}>${esc(item.message || '')}</textarea></div>
+      <p class="text-sm text-muted">${item.channel === 'linkedin' ? `A LinkedIn note can be at most ${LINKEDIN_NOTE_MAX} characters.` : 'Keep the voice-call link if you want the prospect to be able to talk to your assistant.'}</p>`,
     saveLabel: 'Save draft',
     onSave: async () => {
       await api.put(`/campaigns/${campaignId}/outreach/${itemId}`, {

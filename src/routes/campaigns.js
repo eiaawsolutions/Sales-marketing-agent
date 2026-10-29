@@ -388,6 +388,7 @@ router.put('/:id/outreach/:itemId', (req, res) => {
   });
   if (result === 'not_found') return res.status(404).json({ error: 'Message not found' });
   if (result === 'not_draft') return res.status(409).json({ error: 'Only drafts can be edited — this message is already approved or sent.' });
+  if (result === 'too_long') return res.status(400).json({ error: 'A LinkedIn note can be at most 200 characters — LinkedIn cuts off the rest.' });
   res.json({ ok: true });
 });
 

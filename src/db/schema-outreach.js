@@ -14,11 +14,28 @@
 // following the leads rebuild in schema-omnichannel.js: foreign keys off for
 // the swap, AUTOINCREMENT high-water mark held so a dead id is never reused.
 
+import { fitLinkedinNote, LINKEDIN_NOTE_MAX } from '../utils/linkedin-note.js';
+
 const OUTREACH_COLUMNS = ['id', 'campaign_id', 'lead_id', 'step', 'channel', 'subject', 'message', 'goal',
   'delay_days', 'scheduled_at', 'sent_at', 'status', 'created_at', 'user_id', 'provider_message_id',
   'approved_at', 'approved_by', 'claimed_at'];
 
 const SUPPRESSION_COLUMNS = ['id', 'user_id', 'email_hash', 'reason', 'campaign_id', 'lead_id', 'created_at'];
+
+// LinkedIn notes waiting to be sent that were written for the old 300 limit:
+// cut to LinkedIn's 200 so a pasted note is not chopped off mid-sentence.
+// Sent and skipped notes are history and stay as they were. Returns how many
+// changed (none on every boot after the first).
+export function fitUnsentLinkedinNotes(db) {
+  const rows = db.prepare("SELECT id, message FROM outreach_queue WHERE channel = 'linkedin' AND status IN ('draft', 'pending')").all();
+  const update = db.prepare("UPDATE outreach_queue SET message = ? WHERE id = ? AND status IN ('draft', 'pending')");
+  let changed = 0;
+  for (const r of rows) {
+    if (String(r.message || '').length <= LINKEDIN_NOTE_MAX) continue;
+    changed += update.run(fitLinkedinNote(r.message), r.id).changes;
+  }
+  return changed;
+}
 
 export function migrateOutreach(db) {
   rebuild(db, {

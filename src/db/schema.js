@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { migrateOmnichannel } from './schema-omnichannel.js';
 import { migrateSuppressions } from './schema-suppressions.js';
-import { migrateOutreach } from './schema-outreach.js';
+import { migrateOutreach, fitUnsentLinkedinNotes } from './schema-outreach.js';
 import { migrateTeam } from './schema-team.js';
 import { migrateFlow } from './schema-flow.js';
 import { FOUNDER_HQ_EMAIL } from '../config/hq.js';
@@ -451,6 +451,10 @@ export function initializeDatabase(db) {
   // Score breakdowns, the brief's market, replies, calendar (see schema-flow.js).
   migrateFlow(db);
 
+  // LinkedIn notes written for the old 300 limit, cut to 200 (once).
+  const notesFitted = fitUnsentLinkedinNotes(db);
+  if (notesFitted) console.log(`[schema] ${notesFitted} unsent LinkedIn note(s) cut to 200 characters`);
+
   // Seed system logic from codebase on every startup (auto-update)
   seedSystemLogic(db);
 }
@@ -495,7 +499,7 @@ function seedSystemLogic(db) {
 
     ['AI Engine', 'Outreach Sequence (AI)', 'Email day 0, LinkedIn note day 1 (you send), emails days 3 and 7',
       'src/services/ai-agent.js → autoOutreachTask() / rewriteOutreachTask() / craftOutreachTask()',
-      'autoOutreachTask drafts each lead\'s sequence from the Brief and the lead\'s verified signals: an email on day 0, a LinkedIn connection note on day 1 only when the lead has a public LinkedIn profile (max 300 characters, no link; the team sends it from their own account and marks it sent), and emails on days 3 and 7. A lead with no email (LinkedIn only) gets the LinkedIn note alone, on day 0; a lead with neither gets no sequence. Every email carries the lead\'s voice link. Each step stores highlights: the phrases taken from the lead\'s signals and from the brief, kept only when found verbatim. The dispatcher never sends a LinkedIn note and never lets one hold up the emails after it. rewriteOutreachTask rewrites one draft shorter or longer, keeping the voice link. craftOutreachTask is the per-lead preview.', 4],
+      'autoOutreachTask drafts each lead\'s sequence from the Brief and the lead\'s verified signals: an email on day 0, a LinkedIn connection note on day 1 only when the lead has a public LinkedIn profile (max 200 characters, no link; the team sends it from their own account and marks it sent, in the approval queue or in the outreach window of the lead, which logs it on the lead and moves a New lead to Contacted), and emails on days 3 and 7. A lead with no email (LinkedIn only) gets the LinkedIn note alone, on day 0; a lead with neither gets no sequence. Every email carries the lead\'s voice link. Each step stores highlights: the phrases taken from the lead\'s signals and from the brief, kept only when found verbatim. The dispatcher never sends a LinkedIn note and never lets one hold up the emails after it. rewriteOutreachTask rewrites one draft shorter or longer, keeping the voice link. craftOutreachTask is the per-lead preview.', 4],
 
     ['AI Engine', 'Content Generation (AI)', 'Email, social, ad copy, SEO keyword generation',
       'src/services/ai-agent.js → generateEmailTask / generateSocialTask / generateAdTask / generateSeoTask',

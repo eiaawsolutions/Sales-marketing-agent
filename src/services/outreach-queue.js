@@ -7,6 +7,7 @@
 import db from '../db/index.js';
 import { kickDispatch } from './outreach-dispatch.js';
 import { runAgent } from './ai-agent.js';
+import { LINKEDIN_NOTE_MAX } from '../utils/linkedin-note.js';
 
 const MAX_SUBJECT = 200;
 const MAX_MESSAGE = 20000;
@@ -115,15 +116,62 @@ export function markLinkedinSent({ campaignId, itemId, by }) {
   `).run(by, itemId);
   if (!changes) return 'closed';
   db.prepare("INSERT INTO activities (user_id, lead_id, campaign_id, type, description) VALUES (?, ?, ?, 'note', ?)")
-    .run(item.user_id, item.lead_id, campaignId, 'LinkedIn connection note sent from your own account');
+    .run(item.user_id, item.lead_id, campaignId, NOTE_SENT);
+  markContacted(item.lead_id);
   return 'ok';
 }
 
-/** Edit a draft's subject and/or body. Returns 'ok', 'not_found' or 'not_draft'. */
+const NOTE_SENT = 'LinkedIn connection note sent from your own account';
+
+// A lead someone has written to is Contacted. Only from New: a lead already
+// further along keeps its stage.
+function markContacted(leadId) {
+  db.prepare("UPDATE leads SET status = 'contacted', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'new'").run(leadId);
+}
+
+/**
+ * The team sent a note from the outreach window (not the approval queue) from
+ * their own LinkedIn account. Logs it on the lead with its text and marks the
+ * lead Contacted. LinkedIn takes one invitation per person, so a note already
+ * logged for this lead is reported instead of logged twice, and any note still
+ * waiting in the account's campaigns is closed: the first records this text as
+ * sent, any others are skipped. The caller has checked that the lead is theirs.
+ */
+export function recordLinkedinNoteSent({ userId, leadId, message, by }) {
+  const text = String(message || '').trim().slice(0, LINKEDIN_NOTE_MAX);
+  return db.transaction(() => {
+    const prior = db.prepare("SELECT created_at FROM activities WHERE lead_id = ? AND type = 'note' AND description LIKE ? ORDER BY id DESC LIMIT 1")
+      .get(leadId, `${NOTE_SENT}%`);
+    if (prior) return { ok: true, already: true, sent_at: prior.created_at };
+    const [first, ...rest] = db.prepare(`
+      SELECT oq.id, oq.campaign_id FROM outreach_queue oq JOIN campaigns c ON c.id = oq.campaign_id
+       WHERE c.user_id = ? AND oq.lead_id = ? AND oq.channel = 'linkedin' AND oq.status IN ('draft', 'pending')
+       ORDER BY oq.id
+    `).all(userId, leadId);
+    if (first) {
+      db.prepare(`
+        UPDATE outreach_queue SET status = 'sent', message = ?, highlights = NULL, sent_at = CURRENT_TIMESTAMP,
+               approved_at = COALESCE(approved_at, CURRENT_TIMESTAMP), approved_by = COALESCE(approved_by, ?)
+         WHERE id = ?
+      `).run(text, by, first.id);
+    }
+    for (const r of rest) db.prepare("UPDATE outreach_queue SET status = 'skipped' WHERE id = ?").run(r.id);
+    db.prepare("INSERT INTO activities (user_id, lead_id, campaign_id, type, description) VALUES (?, ?, ?, 'note', ?)")
+      .run(userId, leadId, first?.campaign_id ?? null, `${NOTE_SENT}: "${text}"`);
+    markContacted(leadId);
+    return { ok: true, already: false, queue_note_closed: Boolean(first) };
+  })();
+}
+
+/**
+ * Edit a draft's subject and/or body. Returns 'ok', 'not_found', 'not_draft' or
+ * 'too_long' (a LinkedIn note over LinkedIn's limit).
+ */
 export function editDraft({ campaignId, itemId, subject, message }) {
-  const row = db.prepare('SELECT status FROM outreach_queue WHERE id = ? AND campaign_id = ?').get(itemId, campaignId);
+  const row = db.prepare('SELECT status, channel FROM outreach_queue WHERE id = ? AND campaign_id = ?').get(itemId, campaignId);
   if (!row) return 'not_found';
   if (row.status !== 'draft') return 'not_draft';
+  if (row.channel === 'linkedin' && typeof message === 'string' && message.trim().length > LINKEDIN_NOTE_MAX) return 'too_long';
   const fields = [];
   const params = [];
   if (typeof subject === 'string') { fields.push('subject = ?'); params.push(subject.trim().slice(0, MAX_SUBJECT)); }

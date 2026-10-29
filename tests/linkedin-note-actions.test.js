@@ -54,7 +54,7 @@ test('no profile link for a company page, or for anything that is not a LinkedIn
   assert.equal((await runAgent(2, 'craft_outreach', { leadId: 33 })).linkedin_profile, null);
 });
 
-test("a LinkedIn note is cut to LinkedIn's 300 characters; emails are left as written", async () => {
+test("a LinkedIn note is cut to LinkedIn's 200 characters; emails are left as written", async () => {
   lead(34, { email: 'foong@elyxia.example', linkedin_url: 'https://www.linkedin.com/in/foong-pon' });
   const longNote = `${'We build AI agents for Malaysian teams. '.repeat(12)}Would love to connect.`;
   const longEmail = 'A long email body. '.repeat(40);
@@ -63,7 +63,7 @@ test("a LinkedIn note is cut to LinkedIn's 300 characters; emails are left as wr
     { step: 2, channel: 'linkedin', delay_days: 1, message: longNote },
   ]);
   const r = await runAgent(2, 'craft_outreach', { leadId: 34 });
-  assert.ok(r.sequence[1].message.length <= 300, `note is ${r.sequence[1].message.length} characters`);
+  assert.ok(r.sequence[1].message.length <= 200, `note is ${r.sequence[1].message.length} characters`);
   assert.equal(r.sequence[0].message, longEmail);
 });
 
@@ -81,7 +81,7 @@ async function windowFor(result) {
   };
   vm.createContext(ctx);
   vm.runInContext([
-    'let lastOutreachSteps = [];', fn('esc'), fn('aiOutreach', 'async function'), fn('linkedinNoteActions'), fn('copyOutreachStep', 'async function'),
+    'let lastOutreachSteps = []; let lastOutreachLead = null; const LINKEDIN_NOTE_MAX = 200;', fn('esc'), fn('linkedinNoteCount'), fn('aiOutreach', 'async function'), fn('linkedinNoteActions'), fn('copyOutreachStep', 'async function'),
   ].join('\n'), ctx);
   await ctx.aiOutreach(30);
   return { ctx, doc: new JSDOM(ctx.shown.html).window.document };
