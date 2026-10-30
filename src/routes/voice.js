@@ -3,7 +3,6 @@ import crypto from 'crypto';
 import db from '../db/index.js';
 import { requireAuth, actAsAccount } from '../middleware/auth.js';
 import { checkPlanLimit, checkPlanLimitForUser, loadPlanUser, VOICE_ADDONS } from '../middleware/auth.js';
-import { decrypt } from '../utils/crypto.js';
 import { sendEmail } from '../utils/email.js';
 import { sendCalendarInviteEmail, hostFor } from './appointments.js';
 import { getProfile, senderFor } from '../services/account-profile.js';
@@ -14,6 +13,7 @@ import { parseMeetingTime } from '../services/meeting-time.js';
 import { recordCallCapture } from '../services/leads.js';
 import { runAgent } from '../services/ai-agent.js';
 import { calendarVars, hasCalendar, isFree, offerTimes, bookOnCalendar } from '../services/calendar.js';
+import { getVoiceConfig, retellAPI, createWebCall } from '../services/retell.js';
 
 const router = Router();
 
@@ -21,42 +21,6 @@ const router = Router();
 // because SALES_AGENT_PROMPT is declared further down this module.
 function promptFingerprint() {
   return crypto.createHash('sha256').update(SALES_AGENT_PROMPT).digest('hex').slice(0, 16);
-}
-
-// --- Helpers ---
-
-function getVoiceConfig() {
-  const provider = db.prepare("SELECT value FROM settings WHERE key = 'voice_ai_provider'").get()?.value || 'retell';
-  const apiKey = decrypt(db.prepare("SELECT value FROM settings WHERE key = 'voice_ai_api_key'").get()?.value) || '';
-  const agentId = db.prepare("SELECT value FROM settings WHERE key = 'voice_ai_agent_id'").get()?.value || '';
-  const phoneNumber = db.prepare("SELECT value FROM settings WHERE key = 'voice_phone_number'").get()?.value || '';
-  return { provider, apiKey, agentId, phoneNumber };
-}
-
-async function retellAPI(apiKey, endpoint, method = 'GET', body = null) {
-  const opts = {
-    method,
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-  };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`https://api.retellai.com${endpoint}`, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || data.error || `Retell API error ${res.status}`);
-  return data;
-}
-
-// Retell switched off /v2/create-web-call on 18 Oct 2026. v3 answers with
-// connection details only, and the browser SDK must be given `transport` and
-// `iceServers`: handed just the token, SDK 3.x assumes LiveKit and never
-// connects. Returns what the browser passes straight to startCall().
-async function createWebCall(apiKey, body) {
-  const call = await retellAPI(apiKey, '/v3/create-web-call', 'POST', body);
-  return {
-    accessToken: call.access_token,
-    callId: call.call_id,
-    transport: call.transport,
-    iceServers: call.ice_servers,
-  };
 }
 
 // --- Webhook routes (no user session — called by Retell, signature-checked) ---
