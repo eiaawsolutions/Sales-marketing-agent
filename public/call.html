@@ -312,6 +312,20 @@
     let callActive = false;
     let timerInterval = null;
     let seconds = 0;
+    let linePaused = false;
+
+    // The voice line is paused while the Retell account is out of credit. Not
+    // an error: the link works again once it is back, so say that, calmly.
+    function showPaused() {
+      linePaused = true;
+      document.getElementById('call-btn').style.display = 'none';
+      document.getElementById('permissions-note').style.display = 'none';
+      document.getElementById('error').className = 'error-msg';
+      const status = document.getElementById('status');
+      status.textContent = 'Line unavailable';
+      status.className = 'status ended';
+      document.getElementById('subtitle').textContent = "The voice line isn't taking calls right now. Please try this link again a little later, or if it came by email, just reply to that email and we'll find a time to talk.";
+    }
 
     const params = new URLSearchParams(window.location.search);
     const token = params.get('t');
@@ -323,6 +337,10 @@
       document.getElementById('status').className = 'status error';
       document.getElementById('permissions-note').style.display = 'none';
     } else {
+      fetch('/api/voice/availability')
+        .then(r => r.json())
+        .then(({ available }) => { if (!available) showPaused(); })
+        .catch(() => {});
       // A link from a business that uses EIAAW: name that business, not EIAAW,
       // before the call starts. "Powered by EIAAW Solutions" stays — it is.
       fetch(`/api/voice/call-link-info?t=${encodeURIComponent(token)}`)
@@ -341,7 +359,7 @@
           const em = document.createElement('em');
           em.textContent = name;
           document.getElementById('heading').replaceChildren('Talk to ', em, "'s AI assistant.");
-          document.getElementById('subtitle').textContent = `Ask your questions and find a time to speak with the ${name} team. You'll be talking to an AI assistant.`;
+          if (!linePaused) document.getElementById('subtitle').textContent = `Ask your questions and find a time to speak with the ${name} team. You'll be talking to an AI assistant.`;
         })
         .catch(() => {});
     }
@@ -362,6 +380,7 @@
       try {
         const res = await fetch(`/api/voice/call-link-token?t=${token}`);
         const data = await res.json();
+        if (data.paused) return showPaused();
         if (!res.ok || !data.accessToken) throw new Error(data.error || 'Failed to connect. This link may have expired.');
 
         if (data.leadName) {

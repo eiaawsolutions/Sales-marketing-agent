@@ -14,6 +14,7 @@ import { recordCallCapture } from '../services/leads.js';
 import { runAgent } from '../services/ai-agent.js';
 import { calendarVars, hasCalendar, isFree, offerTimes, bookOnCalendar } from '../services/calendar.js';
 import { getVoiceConfig, retellAPI, createWebCall } from '../services/retell.js';
+import { voiceAvailable, noteRetellError, noteCallEnded } from '../services/voice-availability.js';
 
 const router = Router();
 
@@ -24,6 +25,15 @@ function promptFingerprint() {
 }
 
 // --- Webhook routes (no user session — called by Retell, signature-checked) ---
+
+// While Retell is out of credit (services/voice-availability.js). Visitors and
+// customers are never told why: it is EIAAW's account, not theirs.
+const VOICE_PAUSED = 'The voice assistant is unavailable right now.';
+const VOICE_PAUSED_HQ = 'Voice calls are paused: Retell refused a call for lack of credit. Top up at dashboard.retellai.com and voice comes back on by itself within 5 minutes.';
+const pausedMessage = (req) => (req?.user?.role === 'superadmin' ? VOICE_PAUSED_HQ : VOICE_PAUSED);
+function pausedReply(res, req) {
+  return res.status(503).json({ error: pausedMessage(req), paused: true });
+}
 
 // Calls with no lead (website visitors) belong to EIAAW's own account, the same
 // convention as FOUNDER_ID in routes/forms.js.
@@ -63,6 +73,7 @@ router.post('/webhook', requireRetellSignature, async (req, res) => {
     const eventType = event.event;
 
     if (eventType === 'call_ended' || eventType === 'call_analyzed') {
+      noteCallEnded(event.call?.disconnection_reason);
       const metadata = event.call?.metadata || {};
       const { lead: callLead, userId: ownerId } = leadForCall(metadata);
       const leadId = callLead?.id || null;
@@ -466,6 +477,7 @@ router.get('/call-link-token', async (req, res) => {
 
     const { apiKey, agentId } = getVoiceConfig();
     if (!apiKey || !agentId) return res.status(500).json({ error: 'Voice system not configured.' });
+    if (!voiceAvailable()) return pausedReply(res);
 
     // Determine dynamic variables from lead data
     const lead = data.leadId ? db.prepare('SELECT * FROM leads WHERE id = ?').get(data.leadId) : null;
@@ -568,8 +580,18 @@ router.get('/call-link-token', async (req, res) => {
       businessName: vars.business_name || null,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (noteRetellError(err)) return pausedReply(res);
+    // Public page: Retell's own wording stays in the log.
+    console.error(`[voice] call-link-token: ${err.message}`);
+    res.status(500).json({ error: 'The call could not be connected. Please try again in a moment.' });
   }
+});
+
+// GET /api/voice/availability — public: may a "Talk to the agent" button show?
+// Every EIAAW site asks before showing one. Yes or no only; why stays here.
+router.get('/availability', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=60');
+  res.json({ available: voiceAvailable() });
 });
 
 // POST /api/voice/public-session — create a voice call link for landing page visitors (no auth)
@@ -577,6 +599,7 @@ router.post('/public-session', async (req, res) => {
   try {
     const { apiKey, agentId } = getVoiceConfig();
     if (!apiKey || !agentId) return res.status(400).json({ error: 'Voice agent not configured.' });
+    if (!voiceAvailable()) return pausedReply(res);
 
     // CSPRNG visitor token.
     const token = crypto.randomBytes(24).toString('hex');
@@ -908,6 +931,7 @@ router.get('/voices', async (req, res) => {
 // POST /api/voice/call — initiate an AI voice call to a lead
 router.post('/call', async (req, res) => {
   try {
+    if (!voiceAvailable()) return pausedReply(res, req);
     checkPlanLimit(req, 'voice_call');
 
     const { leadId, campaignId, script } = req.body;
@@ -999,6 +1023,7 @@ router.post('/call', async (req, res) => {
       objective: callObjective,
     });
   } catch (err) {
+    if (noteRetellError(err)) return pausedReply(res, req);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1115,6 +1140,7 @@ router.post('/generate-link', async (req, res) => {
 // POST /api/voice/web-call — create a browser-based web call (no phone number needed)
 router.post('/web-call', async (req, res) => {
   try {
+    if (!voiceAvailable()) return pausedReply(res, req);
     checkPlanLimit(req, 'voice_call');
 
     const { leadId, campaignId } = req.body;
@@ -1192,6 +1218,7 @@ router.post('/web-call', async (req, res) => {
     // v3 no longer echoes the agent id; it is the one the call was created with.
     res.json({ success: true, ...webCall, agentId });
   } catch (err) {
+    if (noteRetellError(err)) return pausedReply(res, req);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1199,6 +1226,7 @@ router.post('/web-call', async (req, res) => {
 // POST /api/voice/auto-call — batch AI calls to all leads in a campaign
 router.post('/auto-call', async (req, res) => {
   try {
+    if (!voiceAvailable()) return pausedReply(res, req);
     checkPlanLimit(req, 'voice_call');
 
     const { campaignId } = req.body;
@@ -1231,6 +1259,7 @@ router.post('/auto-call', async (req, res) => {
 
     const batch = newLeads.slice(0, 10); // Max 10 per batch
     const results = [];
+    let paused = false;
 
     for (const lead of batch) {
       try {
@@ -1266,6 +1295,8 @@ router.post('/auto-call', async (req, res) => {
         // Small delay between calls to avoid rate limits
         await new Promise(r => setTimeout(r, 500));
       } catch (e) {
+        // Out of credit: every remaining call would fail the same way.
+        if (noteRetellError(e)) { paused = true; break; }
         results.push({ leadId: lead.id, name: lead.name, status: 'error', error: e.message });
       }
     }
@@ -1274,8 +1305,9 @@ router.post('/auto-call', async (req, res) => {
       initiated: results.filter(r => r.status === 'initiated').length,
       errors: results.filter(r => r.status === 'error').length,
       total: newLeads.length,
-      remaining: Math.max(0, newLeads.length - batch.length),
+      remaining: newLeads.length - results.length,
       results,
+      ...(paused ? { paused: true, error: pausedMessage(req) } : {}),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

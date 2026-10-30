@@ -110,6 +110,11 @@ export function isParentSurface(origin = '', source = '') {
   return hostSaysParent || srcSaysParent;
 }
 
-export function buildChatbotPrompt(origin, source) {
-  return isParentSurface(origin, source) ? buildParentPrompt() : buildSalesAgentPrompt();
+// While Retell is out of credit the sites hide "Talk to the agent", so the
+// assistant must not send people to it. Appended, so the cached prefix holds.
+const VOICE_PAUSED_RULE = `\n\n## RIGHT NOW\nThe voice agent is unavailable at the moment. Do not offer it or mention "Talk to the agent" or "Talk to Our AI Agent"; send people to the Talk to us form instead. If someone asks for the voice agent, say the voice line is taking a short break and offer the form.`;
+
+export async function buildChatbotPrompt(origin, source, { voiceAvailable = true } = {}) {
+  const prompt = await (isParentSurface(origin, source) ? buildParentPrompt() : buildSalesAgentPrompt());
+  return voiceAvailable ? prompt : prompt + VOICE_PAUSED_RULE;
 }

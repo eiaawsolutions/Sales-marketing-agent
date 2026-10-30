@@ -6147,6 +6147,7 @@ async function loadSettings() {
           <div style="font-weight:700;font-size:13px;color:#22c55e;margin-bottom:4px">&#9889; Web Calls (No Phone Number Needed)</div>
           <small class="text-muted">Voice calls run directly in the browser using your microphone. Click the green <b>Call</b> button on any lead to start. No phone number or Twilio setup required.</small>
         </div>
+        ${voiceLinePausedNote(settings.voice_availability)}
         <div class="form-group" style="margin-top:10px">
           <label>Phone Number (optional — for outbound phone calls)</label>
           <input id="s-voice-phone" value="${settings.voice_phone_number || ''}" placeholder="Optional: +60123456789 for actual phone calls (requires Twilio SIP trunk)">
@@ -6501,6 +6502,20 @@ async function testAiConnection() {
   } catch (e) {
     if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">Error: ${e.message}</span>`;
   }
+}
+
+// The voice line pauses itself while Retell is out of credit (every EIAAW site
+// hides "Talk to the agent") and comes back once Retell accepts a call again.
+function voiceLinePausedNote(raw) {
+  let line = null;
+  try { line = raw ? JSON.parse(raw) : null; } catch { /* not recorded yet */ }
+  if (!line?.paused) return '';
+  const why = line.reason === 'budget_reached' ? "Retell's monthly budget is used up" : 'Retell is out of credit';
+  return `
+    <div style="margin-top:8px;padding:14px;background:rgba(239,68,68,0.06);border-radius:var(--radius);border:1px solid rgba(239,68,68,0.2)">
+      <div style="font-weight:700;font-size:13px;color:var(--danger);margin-bottom:4px">Voice line paused since ${esc(new Date(line.since).toLocaleString())}</div>
+      <small class="text-muted">${why}, so "Talk to the agent" is hidden on every EIAAW site. Top up at <a href="https://dashboard.retellai.com" target="_blank" rel="noopener" style="color:var(--primary)">dashboard.retellai.com</a> &mdash; voice comes back on by itself within 5 minutes.</small>
+    </div>`;
 }
 
 async function testLeadTools() {

@@ -1294,7 +1294,7 @@
       </p>
       <div class="hero-cta-row">
         <button class="btn btn-primary btn-lg magnetic" onclick="openSignup('pro')">Subscribe now <span class="arrow">&rarr;</span></button>
-        <button class="btn btn-ghost" onclick="bookSession()">Talk to the agent</button>
+        <button class="btn btn-ghost" data-voice-cta onclick="bookSession()">Talk to the agent</button>
       </div>
     </div>
 
@@ -1703,7 +1703,7 @@
       <p class="lead">Pick a plan, pay for the first month, and the agent is live the moment you sign in. Cancel anytime &mdash; you keep access to the end of the cycle.</p>
       <div class="hero-cta-row">
         <button class="btn btn-primary btn-lg" onclick="openSignup('pro')">Subscribe now <span class="arrow">&rarr;</span></button>
-        <button class="btn btn-outline btn-lg" onclick="bookSession()">Talk to the agent</button>
+        <button class="btn btn-outline btn-lg" data-voice-cta onclick="bookSession()">Talk to the agent</button>
         <button class="btn btn-ghost" onclick="openContact()">Talk to us</button>
       </div>
     </div>
@@ -1770,7 +1770,7 @@
         <ul>
           <li><a href="https://eiaawsolutions.com" target="_blank">EIAAW Solutions</a></li>
           <li><a href="#" onclick="openContact();return false">Contact</a></li>
-          <li><a href="#" onclick="bookSession();return false">Voice agent</a></li>
+          <li data-voice-cta><a href="#" onclick="bookSession();return false">Voice agent</a></li>
         </ul>
       </div>
 
@@ -2061,6 +2061,16 @@ function consentRecord() {
   return `Consent: agreed to privacy notice (${PRIVACY_VERSION}) on ${new Date().toISOString()} via ${location.href}`;
 }
 const CONSENT_ERR = 'Please tick the box so we can use your details to reply.';
+
+// Every "Talk to the agent" is hidden while the voice line is paused (the
+// Retell account is out of credit). The server decides, for every EIAAW site.
+function hideVoiceCtas() {
+  document.querySelectorAll('[data-voice-cta]').forEach(el => { el.style.display = 'none'; });
+}
+fetch('/api/voice/availability')
+  .then(r => r.json())
+  .then(({ available }) => { if (!available) hideVoiceCtas(); })
+  .catch(hideVoiceCtas);
 
 async function bookSession() {
   // Create a voice call link for this visitor — no login needed

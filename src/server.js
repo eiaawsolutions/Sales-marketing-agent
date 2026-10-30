@@ -39,6 +39,7 @@ import { maskLeads, maskLead } from './services/leads.js';
 import { startScheduler } from './services/scheduler.js';
 import { SALES_AGENT_PROMPT } from './routes/voice.js';
 import { buildChatbotPrompt } from './prompts/chatbot.js';
+import { voiceAvailable, startVoiceLineWatch } from './services/voice-availability.js';
 import { getParentFacts } from './services/site-facts.js';
 import { GIT_SHA, BUILT_AT } from './version.js';
 import { resolveModel } from './config/models.js';
@@ -755,7 +756,7 @@ app.post('/api/chatbot', rateLimit({ windowMs: 60000, max: 5, message: { error: 
     const response = await client.messages.create({
       model,
       max_tokens: 300,
-      system: await buildChatbotPrompt(req.headers['origin'] || req.headers['referer'] || '', source),
+      system: await buildChatbotPrompt(req.headers['origin'] || req.headers['referer'] || '', source, { voiceAvailable: voiceAvailable() }),
       messages: [{ role: 'user', content: message }],
     });
 
@@ -900,6 +901,8 @@ const PORT = process.env.PORT || config.port;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`EIAAW SalesAgent running on port ${PORT}`);
   startScheduler();
+  // Hides "Talk to the agent" on every EIAAW site while Retell is out of credit.
+  startVoiceLineWatch();
   // Warm the chatbot's parent-site facts so the first visitor doesn't wait on the fetch.
   getParentFacts().catch(() => {});
   // Say in the deploy log whether the self-hosted lead tools are reachable.
