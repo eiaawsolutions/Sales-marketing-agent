@@ -1561,7 +1561,9 @@ async function aiVoiceCall(leadId) {
     });
 
     // Start the call
-    await retellClient.startCall({ accessToken: result.accessToken });
+    // Without `transport` the SDK assumes LiveKit and a gateway call never connects.
+    const { accessToken, callId, transport, iceServers } = result;
+    await retellClient.startCall({ accessToken, callId, transport, iceServers });
 
   } catch (e) {
     showNotification('Voice call error: ' + e.message, 'error');

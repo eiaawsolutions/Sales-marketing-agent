@@ -45,6 +45,20 @@ async function retellAPI(apiKey, endpoint, method = 'GET', body = null) {
   return data;
 }
 
+// Retell switched off /v2/create-web-call on 18 Oct 2026. v3 answers with
+// connection details only, and the browser SDK must be given `transport` and
+// `iceServers`: handed just the token, SDK 3.x assumes LiveKit and never
+// connects. Returns what the browser passes straight to startCall().
+async function createWebCall(apiKey, body) {
+  const call = await retellAPI(apiKey, '/v3/create-web-call', 'POST', body);
+  return {
+    accessToken: call.access_token,
+    callId: call.call_id,
+    transport: call.transport,
+    iceServers: call.ice_servers,
+  };
+}
+
 // --- Webhook routes (no user session — called by Retell, signature-checked) ---
 
 // Calls with no lead (website visitors) belong to EIAAW's own account, the same
@@ -563,8 +577,7 @@ router.get('/call-link-token', async (req, res) => {
       if (persona.kind === 'customer') vars = { ...vars, ...persona.vars, ...(await calendarVars(lead.user_id)) };
     }
 
-    // Create web call with Retell
-    const webCall = await retellAPI(apiKey, '/v2/create-web-call', 'POST', {
+    const webCall = await createWebCall(apiKey, {
       agent_id: agentId,
       retell_llm_dynamic_variables: vars,
       metadata: {
@@ -574,17 +587,18 @@ router.get('/call-link-token', async (req, res) => {
       },
     });
 
-    // Log the call activity (in the lead owner's account — it is their allowance)
+    // Log the call activity (in the lead owner's account — it is their allowance).
+    // The call id is what the webhook matches on; the token and TURN
+    // credentials stay out of the database.
     if (lead) {
       db.prepare('INSERT INTO activities (user_id, lead_id, type, description, outcome) VALUES (?, ?, ?, ?, ?)')
         .run(lead.user_id, lead.id, 'voice_call',
           `Lead opened call link and started web call`,
-          JSON.stringify(webCall));
+          JSON.stringify({ call_id: webCall.callId }));
     }
 
     res.json({
-      accessToken: webCall.access_token,
-      callId: webCall.call_id,
+      ...webCall,
       leadName: lead?.name || null,
       greeting: vars.begin_message,
       businessName: vars.business_name || null,
@@ -1195,7 +1209,7 @@ router.post('/web-call', async (req, res) => {
       description = 'Web call (no lead)';
     }
 
-    const webCall = await retellAPI(apiKey, '/v2/create-web-call', 'POST', {
+    const webCall = await createWebCall(apiKey, {
       agent_id: agentId,
       retell_llm_dynamic_variables: dynamicVars,
       metadata: {
@@ -1208,15 +1222,11 @@ router.post('/web-call', async (req, res) => {
     // Log the call
     if (leadId) {
       db.prepare('INSERT INTO activities (user_id, lead_id, campaign_id, type, description, outcome) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(req.user.id, leadId, campaignId || null, 'voice_call', description, JSON.stringify(webCall));
+        .run(req.user.id, leadId, campaignId || null, 'voice_call', description, JSON.stringify({ call_id: webCall.callId }));
     }
 
-    res.json({
-      success: true,
-      accessToken: webCall.access_token,
-      callId: webCall.call_id,
-      agentId: webCall.agent_id,
-    });
+    // v3 no longer echoes the agent id; it is the one the call was created with.
+    res.json({ success: true, ...webCall, agentId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

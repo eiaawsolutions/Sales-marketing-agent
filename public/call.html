@@ -305,7 +305,7 @@
   </footer>
 
   <script type="module">
-    import { RetellWebClient } from 'https://esm.sh/retell-client-js-sdk@2.0.7';
+    import { RetellWebClient } from 'https://esm.sh/retell-client-js-sdk@3.0.3';
     window.RetellWebClient = RetellWebClient;
   </script>
   <script>
@@ -420,13 +420,17 @@
         });
 
         client.on('error', (err) => {
-          errorEl.textContent = 'Connection error: ' + (err.message || 'Please try again.');
+          // The SDK emits a plain string.
+          errorEl.textContent = 'Connection error: ' + ((typeof err === 'string' ? err : err?.message) || 'Please try again.');
           errorEl.className = 'error-msg visible';
           endCallUI('Connection lost');
         });
 
         window._retellClient = client;
-        await client.startCall({ accessToken: data.accessToken });
+        // All four, from the server's create-web-call: without `transport` the
+        // SDK assumes LiveKit and a gateway call never connects.
+        const { accessToken, callId, transport, iceServers } = data;
+        await client.startCall({ accessToken, callId, transport, iceServers });
 
       } catch (e) {
         errorEl.textContent = e.message;
